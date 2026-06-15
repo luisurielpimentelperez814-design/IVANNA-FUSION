@@ -124,7 +124,6 @@ fun SimbiosisScreen(navController: NavController) {
                     modifier = Modifier.padding(top = 32.dp, bottom = 4.dp)
                 )
 
-                // BOTÓN DIAGNÓSTICO
                 Button(
                     onClick = { showDiagnostics = true },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333)),
@@ -211,20 +210,18 @@ fun SimbiosisScreen(navController: NavController) {
 fun DiagnosticsPanel(onDismiss: () -> Unit) {
     val context = LocalContext.current
 
-    // Recolectar estado del sistema
     val nativeLibStatus = if (ShmManager.nativeLibLoaded) "✓ CARGADA" else "✗ FALLÓ"
     val nativeLibColor = if (ShmManager.nativeLibLoaded) Color.Green else Color.Red
 
     val shmStatus = if (ShmManager.shmInitialized) "✓ OK" else "✗ FALLÓ"
     val shmColor = if (ShmManager.shmInitialized) Color.Green else Color.Red
 
-    val audioInitStatus = if (AudioEngine.audio_fs_hz > 0) "✓ ${AudioEngine.audio_fs_hz}Hz" else "✗ NO INICIADO"
-    val audioColor = if (AudioEngine.audio_fs_hz > 0) Color.Green else Color.Red
+    val audioInitStatus = if (AudioEngine.initialized) "✓ ${AudioEngine.audio_fs_hz}Hz" else "✗ NO INICIADO"
+    val audioColor = if (AudioEngine.initialized) Color.Green else Color.Red
 
     val latencyStatus = AudioEngine.getLatencyMicros()
     val latencyText = if (latencyStatus > 0) "$latencyStatus µs" else "NO DISPONIBLE"
 
-    // Verificar permisos
     val recordPerm = context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     val modifyPerm = context.checkSelfPermission(android.Manifest.permission.MODIFY_AUDIO_SETTINGS) == PackageManager.PERMISSION_GRANTED
     val writePerm = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
@@ -260,11 +257,6 @@ fun DiagnosticsPanel(onDismiss: () -> Unit) {
             Spacer(modifier = Modifier.height(16.dp))
             Text("ÚLTIMO ERROR:", color = Color.Red, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Text(ShmManager.lastError!!, color = Color.Red, fontSize = 12.sp)
-        }
-
-        if (AudioEngine.audio_latencia_us < 0) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("ERROR AUDIO: Latencia negativa indica fallo en AAudio", color = Color.Red, fontSize = 12.sp)
         }
 
         Spacer(modifier = Modifier.weight(1f))

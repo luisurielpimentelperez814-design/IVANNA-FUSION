@@ -91,14 +91,23 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun initializeTrascendental() {
-        // Inicializar memoria compartida
-        ShmManager.initialize(this)
+        try {
+            ShmManager.initialize(this)
+        } catch (e: Exception) {
+            android.util.Log.e("IVANNA-Main", "Error ShmManager: ${e.message}")
+        }
 
-        // Inicializar motor de audio nativo
-        AudioEngine.initialize(this)
+        try {
+            AudioEngine.initialize(this)
+        } catch (e: Exception) {
+            android.util.Log.e("IVANNA-Main", "Error AudioEngine: ${e.message}")
+        }
 
-        // Cargar eBPF si estamos en kernel modificado
-        ThermalMonitor.initialize(this)
+        try {
+            ThermalMonitor.initialize(this)
+        } catch (e: Exception) {
+            android.util.Log.e("IVANNA-Main", "Error ThermalMonitor: ${e.message}")
+        }
 
         setContent {
             MaterialTheme {

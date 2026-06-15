@@ -15,6 +15,7 @@ import android.os.Process
 object AudioEngine {
     private var audioTrack: AudioTrack? = null
     private var nativeHandle: Long = 0
+    var initialized = false
 
     var audio_fs_hz: Int = 48_000
     var audio_bit_depth: Int = 32   // siempre float-32; PROPERTY_OUTPUT_FRAMES_PER_BUFFER
@@ -36,6 +37,7 @@ object AudioEngine {
 
         nativeHandle = nativeCreateEngine(audio_fs_hz, audio_bit_depth)
         startAudioTrack()
+        initialized = true
     }
 
     private fun startAudioTrack() {
