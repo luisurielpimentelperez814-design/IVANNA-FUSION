@@ -6,17 +6,19 @@
 package com.ivannafusion
 
 import android.content.Context
+import android.os.ParcelFileDescriptor
 import android.system.Os
-import android.system.OsConstants
 import java.io.RandomAccessFile
-import java.nio.MappedByteBuffer
+import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 
 object ShmManager {
     private const val SHM_SIZE = 2 * 1024 * 1024 // 2 MB (huge page)
     private const val SHM_NAME = "ivanna_hyperplane"
+    private const val MFD_ALLOW_SEALING = 0x0002  // <linux/memfd.h>
+    private const val MFD_HUGETLB       = 0x0004  // <linux/memfd.h>
 
-    private var hyperplaneBuffer: MappedByteBuffer? = null
+    private var hyperplaneBuffer: ByteBuffer? = null
     private var fd: Int = -1
 
     // Offsets dentro del hiperplano
@@ -31,7 +33,7 @@ object ShmManager {
     fun initialize(context: Context) {
         try {
             // memfd_create via syscall directo (requiere root / kernel modificado)
-            fd = memfdCreate(SHM_NAME, OsConstants.MFD_ALLOW_SEALING or 0x00000004) // MFD_HUGETLB = 0x4
+            fd = memfdCreate(SHM_NAME, MFD_ALLOW_SEALING or MFD_HUGETLB)
             if (fd < 0) {
                 // Fallback: usar ashmem o archivo en /dev/shm
                 val shmFile = java.io.File("/dev/shm/$SHM_NAME")
@@ -43,7 +45,12 @@ object ShmManager {
                 hyperplaneBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, SHM_SIZE.toLong())
                 raf.close()
             } else {
-                Os.ftruncate(fd, SHM_SIZE.toLong())
+                val pfd = ParcelFileDescriptor.fromFd(fd)
+                try {
+                    Os.ftruncate(pfd.fileDescriptor, SHM_SIZE.toLong())
+                } finally {
+                    pfd.close()
+                }
                 // mlockall equivalente: bloquear región
                 val raf = RandomAccessFile("/proc/self/fd/$fd", "rw")
                 hyperplaneBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, SHM_SIZE.toLong())
@@ -68,7 +75,7 @@ object ShmManager {
     private external fun nativeMlock(address: Long, length: Long): Int
     private external fun memfdCreate(name: String, flags: Int): Int
 
-    fun getBuffer(): MappedByteBuffer? = hyperplaneBuffer
+    fun getBuffer(): ByteBuffer? = hyperplaneBuffer
 
     fun readSeqCounter(): Long {
         val buf = hyperplaneBuffer ?: return 0L

@@ -43,7 +43,14 @@ jobs:
           if [ -n "$KEYSTORE_B64" ]; then
             echo "$KEYSTORE_B64" | base64 -d > ivanna-keystore.jks
           else
-            echo "IVANNA_KEYSTORE_B64 no configurado; se omite restauración del keystore."
+            echo "IVANNA_KEYSTORE_B64 no configurado; generando keystore temporal para CI."
+            keytool -genkeypair -v \
+              -keystore ivanna-keystore.jks \
+              -alias ivanna \
+              -keyalg RSA -keysize 2048 -validity 365 \
+              -storepass ivanna_trascendental_2025 \
+              -keypass  ivanna_trascendental_2025 \
+              -dname "CN=IVANNA-FUSION CI, OU=CI, O=GoretNS, L=Tultitlan, S=Mexico, C=MX"
           fi
 
       - name: Compilar APK release
