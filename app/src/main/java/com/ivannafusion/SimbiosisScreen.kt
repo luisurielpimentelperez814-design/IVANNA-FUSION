@@ -87,7 +87,9 @@ fun SimbiosisScreen(navController: NavController) {
                 .background(Color(0xFF0A0A1A))
                 .pointerInteropFilter { event ->
                     gestureDetector.onTouchEvent(event)
-                    true
+                    // false: Compose sigue propagando el evento a los hijos (Buttons, etc.)
+                    // true bloquearía todos los clicks de la pantalla
+                    false
                 }
         ) {
             val maxTemp = ThermalMonitor.getMaxTemperature()
