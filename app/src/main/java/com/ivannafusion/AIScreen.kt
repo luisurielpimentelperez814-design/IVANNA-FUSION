@@ -24,25 +24,17 @@ fun AIScreen(navController: NavController, audioEngine: AudioEngine) {
                 Text("Mejor fitness: %.4f".format(bestFitness))
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Tasa mutación: %.3f".format(mutationRate))
-                Slider(
-                    value = mutationRate,
-                    onValueChange = { mutationRate = it },
-                    valueRange = 0.01f..0.2f
-                )
+                Slider(value = mutationRate, onValueChange = { mutationRate = it }, valueRange = 0.01f..0.2f)
                 Button(onClick = {
                     scope.launch {
                         AudioEngine.evolveStep()
                         generation = AudioEngine.getGeneration()
                         bestFitness = AudioEngine.getBestFitness()
                     }
-                }) {
-                    Text("Evolucionar manual")
-                }
+                }) { Text("Evolucionar manual") }
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { navController.popBackStack() }) {
-            Text("Volver")
-        }
+        Button(onClick = { navController.popBackStack() }) { Text("Volver") }
     }
 }

@@ -55,16 +55,11 @@ fun MonitorScreen(
             try {
                 val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                 val json = JSONObject().apply {
-                    put("timestamp", timestamp)
-                    put("shm_status", shmStatus)
-                    put("audio_fs_hz", audioFs)
-                    put("latency_us", latencyUs)
-                    put("phase_error_rms", phaseError)
-                    put("fusion_level", fusionLevel)
-                    put("generation", generation)
-                    put("best_fitness", bestFitness)
-                    put("cpu_temp", cpuTemp)
-                    put("gpu_temp", gpuTemp)
+                    put("timestamp", timestamp); put("shm_status", shmStatus)
+                    put("audio_fs_hz", audioFs); put("latency_us", latencyUs)
+                    put("phase_error_rms", phaseError); put("fusion_level", fusionLevel)
+                    put("generation", generation); put("best_fitness", bestFitness)
+                    put("cpu_temp", cpuTemp); put("gpu_temp", gpuTemp)
                 }
                 val file = File(context.getExternalFilesDir(null), "IVANNA_Diagnostic_$timestamp.json")
                 file.writeText(json.toString(2))
@@ -77,11 +72,7 @@ fun MonitorScreen(
 
     fun changeSampleRate(rate: Int) {
         selectedRate = rate
-        scope.launch {
-            audioEngine.restart()
-            delay(200)
-            audioFs = AudioEngine.audio_fs_hz
-        }
+        scope.launch { audioEngine.restart(); delay(200); audioFs = AudioEngine.audio_fs_hz }
     }
 
     LaunchedEffect(Unit) {
@@ -169,20 +160,23 @@ fun MetricCard(label: String, value: String, color: Color) {
 
 @Composable
 fun PhaseErrorGraph(data: List<Float>) {
-    Canvas(modifier = Modifier.fillMaxWidth().height(120.dp).background(Color.Black)) {
-        if (data.isEmpty()) return@Canvas
-        val width = size.width
-        val height = size.height
-        val maxError = data.maxOrNull()?.coerceAtLeast(0.001f) ?: 1f
-        val stepX = width / (data.size - 1).coerceAtLeast(1)
-        val path = Path()
-        for (i in data.indices) {
-            val x = i * stepX
-            val y = height * (1 - (data[i] / maxError).coerceIn(0f, 1f))
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    Canvas(modifier = Modifier.fillMaxWidth().height(80.dp)) {
+        if (data.size < 2) return@Canvas
+        val maxVal = data.maxOrNull()?.coerceAtLeast(0.001f) ?: 0.001f
+        val w = size.width
+        val h = size.height
+        val step = w / (data.size - 1)
+        for (i in 1 until data.size) {
+            val x1 = (i - 1) * step
+            val y1 = h - (data[i - 1] / maxVal) * h
+            val x2 = i * step
+            val y2 = h - (data[i] / maxVal) * h
+            drawLine(
+                color = if (data[i] < 0.05f) Color.Green else Color.Red,
+                start = Offset(x1, y1),
+                end = Offset(x2, y2),
+                strokeWidth = 2f
+            )
         }
-        drawPath(path = path, color = Color.Cyan, style = Stroke(width = 2f))
-        val thresholdY = height * (1 - (0.05f / maxError).coerceIn(0f, 1f))
-        drawLine(color = Color.Red, start = Offset(0f, thresholdY), end = Offset(width, thresholdY), strokeWidth = 1f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f)))
     }
 }

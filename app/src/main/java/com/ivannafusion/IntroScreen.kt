@@ -16,7 +16,6 @@ import kotlinx.coroutines.delay
 fun IntroScreen(navController: NavController) {
     val context = LocalContext.current
     var showIntro by remember { mutableStateOf(true) }
-    // Reemplazar con URLs reales de conciertos (ejemplo: Deep Purple, Led Zeppelin)
     val videoUrls = listOf(
         "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
         "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
@@ -41,17 +40,12 @@ fun IntroScreen(navController: NavController) {
             )
             androidx.compose.material3.Button(
                 onClick = { showIntro = false },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
             ) {
                 androidx.compose.material3.Text("SALTAR")
             }
         }
-        LaunchedEffect(Unit) {
-            delay(20000)
-            showIntro = false
-        }
+        LaunchedEffect(Unit) { delay(20000); showIntro = false }
     } else {
         navController.navigate("simbiosis")
     }
