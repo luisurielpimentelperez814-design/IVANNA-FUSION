@@ -1,0 +1,53 @@
+name: Build IVANNA-FUSION APK
+
+# Se ejecuta en cada push a main o manualmente desde la pestaña Actions
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Configurar Android SDK + NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar NDK r25c
+        run: sdkmanager --install "ndk;25.2.9519653"
+
+      - name: Generar Gradle Wrapper (si no existe)
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            gradle wrapper --gradle-version 8.5
+          fi
+          chmod +x ./gradlew
+
+      # --- Firma del release ---
+      # Sube tu keystore real como secreto en Base64:
+      #   base64 -w0 ivanna-keystore.jks  -> pega el resultado en el secreto IVANNA_KEYSTORE_B64
+      - name: Restaurar keystore desde secreto
+        if: ${{ secrets.IVANNA_KEYSTORE_B64 != '' }}
+        run: echo "${{ secrets.IVANNA_KEYSTORE_B64 }}" | base64 -d > ivanna-keystore.jks
+
+      - name: Compilar APK release
+        env:
+          IVANNA_KEYSTORE_PASSWORD: ${{ secrets.IVANNA_KEYSTORE_PASSWORD }}
+          IVANNA_KEY_PASSWORD: ${{ secrets.IVANNA_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Subir APK como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: IVANNA-FUSION-v1.0-release
+          path: app/build/outputs/apk/release/*.apk

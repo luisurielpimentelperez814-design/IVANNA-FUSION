@@ -1,0 +1,18 @@
+Variable	Tipo	Rango	
+`audio_fs_hz`	uint32	44100 – 384000	
+`audio_bit_depth`	uint8	16, 24, 32	
+`audio_latencia_us`	uint32	0 – 10000	
+`audio_error_fase_rms`	float	0 – π	
+`biquad_coef[64][5]`	int32 Q8.24	±8	
+`kalman_fase_rad`	float	-π … π	
+`kalman_frec_hz`	float	20 – 20000	
+`evo_poblacion_tam`	uint16	0 – 512	
+`evo_generacion`	uint32	–	
+`evo_fitness_mejor`	float	0 – 1	
+`temp_cpu_coreX`	int16	0 – 120 °C	
+`temp_gpu/npu/pmic`	int16	0 – 120 °C	
+`sched_nucleo_activo`	uint8	0 – 7	
+`sched_budget_mW`	uint16	0 – 5000	
+`sched_throttle_predicho`	bool	true/false	
+`shm_buffer_activo`	uint8	0/1	
+`shm_seq_counter`	uint64	–	
