@@ -1,6 +1,5 @@
 name: Build IVANNA-FUSION APK
 
-# Se ejecuta en cada push a main o manualmente desde la pestaña Actions
 on:
   push:
     branches: [ main ]
@@ -20,26 +19,30 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Configurar Android SDK + NDK
-        uses: android-actions/setup-android@v3
+      # ubuntu-latest ya trae Android SDK en $ANDROID_HOME.
+      # Solo se acepta licencias y se instala NDK r25c directamente.
+      - name: Aceptar licencias Android SDK
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Cache NDK
+      - name: Cache NDK r25c
+        id: cache-ndk
         uses: actions/cache@v4
         with:
-          path: |
-            /usr/local/lib/android/sdk/ndk/25.2.9519653
-            ${{ runner.tool_cache }}/ndk/25.2.9519653
+          path: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
           key: ndk-r25c-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
           restore-keys: |
             ndk-r25c-${{ runner.os }}-
 
       - name: Instalar NDK r25c
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
         run: |
-          if [ ! -d "/usr/local/lib/android/sdk/ndk/25.2.9519653" ]; then
-            sdkmanager --install "ndk;25.2.9519653"
-          else
-            echo "NDK ya está cacheado, saltando descarga."
-          fi
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;25.2.9519653"
+
+      - name: Exportar ANDROID_NDK_HOME
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+          echo "NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653"         >> $GITHUB_ENV
 
       - name: Generar Gradle Wrapper (si no existe)
         run: |
@@ -48,9 +51,6 @@ jobs:
           fi
           chmod +x ./gradlew
 
-      # --- Firma del release ---
-      # Sube tu keystore real como secreto en Base64:
-      #   base64 -w0 ivanna-keystore.jks  -> pega el resultado en el secreto IVANNA_KEYSTORE_B64
       - name: Restaurar keystore desde secreto
         env:
           KEYSTORE_B64: ${{ secrets.IVANNA_KEYSTORE_B64 }}
@@ -71,7 +71,7 @@ jobs:
       - name: Compilar APK release
         env:
           IVANNA_KEYSTORE_PASSWORD: ${{ secrets.IVANNA_KEYSTORE_PASSWORD }}
-          IVANNA_KEY_PASSWORD: ${{ secrets.IVANNA_KEY_PASSWORD }}
+          IVANNA_KEY_PASSWORD:      ${{ secrets.IVANNA_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Subir APK como artefacto
