@@ -40,11 +40,11 @@ object ShmManager {
         try {
             fd = memfdCreate(SHM_NAME, 1)
             if (fd >= 0) {
-                val pfd = ParcelFileDescriptor.adoptFd(fd)
-                val raf = RandomAccessFile(pfd.fileDescriptor, "rw")
+                // RandomAccessFile no tiene constructor (FileDescriptor, String)
+                // → acceder vía /proc/self/fd/<n> que sí acepta String
+                val raf = RandomAccessFile("/proc/self/fd/$fd", "rw")
                 hyperplaneBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, SHM_SIZE.toLong())
-                raf.close()
-                pfd.close()
+                raf.close()  // cierra copia del canal; el mapping y fd original se mantienen
                 try {
                     val addressField = java.nio.Buffer::class.java.getDeclaredField("address")
                     addressField.isAccessible = true
@@ -92,7 +92,10 @@ object ShmManager {
         _shmStatus.value = "SHM cerrada"
         hyperplaneBuffer = null
         shmInitialized = false
-        if (fd >= 0) android.system.Os.close(fd)
+        if (fd >= 0) {
+            try { android.os.ParcelFileDescriptor.adoptFd(fd).close() } catch (_: Exception) { }
+            fd = -1
+        }
     }
 
     init {
