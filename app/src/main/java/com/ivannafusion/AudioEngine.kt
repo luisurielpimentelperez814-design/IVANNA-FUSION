@@ -1,8 +1,6 @@
 /*
  * IVANNA-FUSION TRASCENDENTAL
  * © 2025 Luis Uriel Pimentel Pérez. Todos los derechos reservados.
- * Prohibida la copia, distribución, ingeniería inversa o cualquier uso no autorizado.
- * Quien infrinja será perseguido penal y civilmente.
  */
 
 package com.ivannafusion
@@ -21,14 +19,14 @@ object AudioEngine {
     private var audioTrack: AudioTrack? = null
     private var nativeHandle: Long = 0
     var initialized = false
-    private var appContext: Context? = null   // 🔹 Guardamos el contexto para reiniciar
+    private var appContext: Context? = null
 
     var audio_fs_hz: Int = 48_000
     var audio_bit_depth: Int = 32
     var audio_latencia_us: Int = 0
 
     fun initialize(context: Context) {
-        appContext = context.applicationContext   // 🔹 Almacenamos contexto
+        appContext = context.applicationContext
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
 
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -39,18 +37,20 @@ object AudioEngine {
 
         nativeHandle = nativeCreateEngine(audio_fs_hz, audio_bit_depth)
         if (nativeHandle == 0L) {
-            Log.e(TAG, "nativeCreateEngine retornó 0; stream AAudio no disponible")
+            Log.e(TAG, "nativeCreateEngine retornó 0")
         }
 
-        // Conectar hiperplano SHM al engine nativo
+        // Conectar SHM ANTES de nativeStartProcessing
         val shmBuf = ShmManager.getBuffer()
         if (shmBuf != null && nativeHandle != 0L) {
             try {
                 val addressField = java.nio.Buffer::class.java.getDeclaredField("address")
                 addressField.isAccessible = true
                 val address = addressField.getLong(shmBuf)
-                nativeSetHyperplane(address)
-                Log.i(TAG, "Hyperplane SHM conectado al engine nativo")
+                if (address != 0L) {
+                    nativeSetHyperplane(address)
+                    Log.i(TAG, "Hyperplane SHM conectado al engine nativo addr=0x${address.toString(16)}")
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "No se pudo conectar hyperplane: ${e.message}")
             }
@@ -75,7 +75,6 @@ object AudioEngine {
                 AudioFormat.ENCODING_PCM_FLOAT
             )
         }
-
         try {
             audioTrack = AudioTrack.Builder()
                 .setAudioAttributes(
@@ -113,7 +112,6 @@ object AudioEngine {
     fun getPhaseErrorRms(): Float =
         if (nativeHandle != 0L) nativeGetPhaseError(nativeHandle) else 0f
 
-    // ── Evolutionary kernel ──────────────────────────────────────────────────
     fun initializeEvolution() {
         if (nativeHandle != 0L) nativeInitializeEvolution()
     }
@@ -128,7 +126,6 @@ object AudioEngine {
         if (nativeHandle != 0L) nativeEvolveStep()
     }
 
-    // ── Phase oracle ─────────────────────────────────────────────────────────
     fun predictSamples(input: FloatArray, output: FloatArray) {
         if (nativeHandle != 0L && input.size == output.size)
             nativePredictSamples(nativeHandle, input, output, input.size)
@@ -142,18 +139,16 @@ object AudioEngine {
         initialized = false
     }
 
-    // 🔹 NUEVO: Reinicio completo del motor de audio
     fun restart() {
         Log.w(TAG, "Restarting audio engine...")
         shutdown()
-        // Pequeña pausa para liberación completa de recursos
         Thread.sleep(50)
         appContext?.let { initialize(it) }
             ?: Log.e(TAG, "Cannot restart audio: context is null")
-        Log.i(TAG, "Audio engine restarted successfully")
+        Log.i(TAG, "Audio engine restarted")
     }
 
-    // ── JNI declarations ─────────────────────────────────────────────────────
+    // ── JNI ──────────────────────────────────────────────────────────────────
     private external fun nativeCreateEngine(sampleRate: Int, bitDepth: Int): Long
     private external fun nativeStartProcessing(handle: Long)
     private external fun nativeGetLatency(handle: Long): Int
