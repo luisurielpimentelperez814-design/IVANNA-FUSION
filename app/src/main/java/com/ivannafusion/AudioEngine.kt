@@ -10,53 +10,50 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
-import android.media.audiofx.AudioEffect
-import android.os.Build
 import android.os.Process
 
 object AudioEngine {
     private var audioTrack: AudioTrack? = null
     private var nativeHandle: Long = 0
 
-    var audio_fs_hz: Int = 48000
-    var audio_bit_depth: Int = 24
+    var audio_fs_hz: Int = 48_000
+    var audio_bit_depth: Int = 32   // siempre float-32; PROPERTY_OUTPUT_FRAMES_PER_BUFFER
+                                    // devuelve tamaño de buffer en frames, NO bit depth
     var audio_latencia_us: Int = 0
 
-    fun initialize() {
+    fun initialize(context: Context) {
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
 
-        // Detectar capacidades del hardware
-        val audioManager = IVANNAApplication().applicationContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-        audio_fs_hz = audioManager?.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 48000
-        audio_bit_depth = audioManager?.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull() ?: 24
+        // Usar el context real, no IVANNAApplication() que tiene mBase=null → NPE
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
-        // Si hay DAC USB externo, intentar 384 kHz
-        if (hasUsbAudioDevice()) {
-            audio_fs_hz = 384000
-            audio_bit_depth = 32
-        }
+        // PROPERTY_OUTPUT_SAMPLE_RATE ya refleja el DAC USB si es la salida activa
+        val nativeRate = audioManager
+            ?.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
+            ?.toIntOrNull() ?: 48_000
+        // AudioTrack max = 192 kHz en el mejor caso; 384 kHz no está soportado → ERROR_BAD_VALUE
+        audio_fs_hz = nativeRate.coerceIn(8_000, 192_000)
 
         nativeHandle = nativeCreateEngine(audio_fs_hz, audio_bit_depth)
         startAudioTrack()
     }
 
-    private fun hasUsbAudioDevice(): Boolean {
-        return try {
-            val audioManager = IVANNAApplication().applicationContext?.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-                devices.any { it.type == android.media.AudioDeviceInfo.TYPE_USB_DEVICE ||
-                        it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET }
-            } else false
-        } catch (e: Exception) { false }
-    }
-
     private fun startAudioTrack() {
-        val bufferSize = AudioTrack.getMinBufferSize(
+        // ENCODING_PCM_FLOAT: 32-bit float, API 21+, alineado con AAUDIO_FORMAT_PCM_FLOAT
+        var bufferSize = AudioTrack.getMinBufferSize(
             audio_fs_hz,
             AudioFormat.CHANNEL_OUT_STEREO,
-            if (audio_bit_depth == 32) AudioFormat.ENCODING_PCM_FLOAT else AudioFormat.ENCODING_PCM_24BIT_PACKED
+            AudioFormat.ENCODING_PCM_FLOAT
         )
+        // Si la tasa nativa no es soportada, cae a 48 kHz
+        if (bufferSize <= 0) {
+            audio_fs_hz = 48_000
+            bufferSize = AudioTrack.getMinBufferSize(
+                audio_fs_hz,
+                AudioFormat.CHANNEL_OUT_STEREO,
+                AudioFormat.ENCODING_PCM_FLOAT
+            )
+        }
 
         audioTrack = AudioTrack.Builder()
             .setAudioAttributes(
@@ -68,7 +65,7 @@ object AudioEngine {
             .setAudioFormat(
                 AudioFormat.Builder()
                     .setSampleRate(audio_fs_hz)
-                    .setEncoding(if (audio_bit_depth == 32) AudioFormat.ENCODING_PCM_FLOAT else AudioFormat.ENCODING_PCM_24BIT_PACKED)
+                    .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
                     .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
                     .build()
             )
@@ -78,8 +75,6 @@ object AudioEngine {
             .build()
 
         audioTrack?.play()
-
-        // Iniciar thread nativo de procesamiento
         nativeStartProcessing(nativeHandle)
     }
 
@@ -92,14 +87,13 @@ object AudioEngine {
         nativeSetFusionLevel(nativeHandle, level.coerceIn(0f, 1f))
     }
 
-    fun getPhaseErrorRms(): Float {
-        return nativeGetPhaseError(nativeHandle)
-    }
+    fun getPhaseErrorRms(): Float = nativeGetPhaseError(nativeHandle)
 
     fun shutdown() {
         nativeDestroyEngine(nativeHandle)
         audioTrack?.stop()
         audioTrack?.release()
+        audioTrack = null
     }
 
     private external fun nativeCreateEngine(sampleRate: Int, bitDepth: Int): Long

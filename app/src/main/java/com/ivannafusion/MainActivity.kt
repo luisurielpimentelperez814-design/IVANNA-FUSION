@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
         ShmManager.initialize(this)
 
         // Inicializar motor de audio nativo
-        AudioEngine.initialize()
+        AudioEngine.initialize(this)
 
         // Cargar eBPF si estamos en kernel modificado
         ThermalMonitor.initialize(this)
