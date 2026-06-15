@@ -6,22 +6,27 @@
 package com.ivannafusion
 
 import android.content.Context
-import android.os.ParcelFileDescriptor
 import android.system.Os
+import android.system.OsConstants
+import android.util.Log
+import java.io.File
 import java.io.RandomAccessFile
-import java.nio.ByteBuffer
+import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
-object ShmManager {
-    private const val SHM_SIZE = 2 * 1024 * 1024 // 2 MB (huge page)
-    private const val SHM_NAME = "ivanna_hyperplane"
-    private const val MFD_ALLOW_SEALING = 0x0002  // <linux/memfd.h>
-    private const val MFD_HUGETLB       = 0x0004  // <linux/memfd.h>
+private const val TAG = "IVANNA-SHM"
 
-    private var hyperplaneBuffer: ByteBuffer? = null
+object ShmManager {
+    var nativeLibLoaded = false
+    var shmInitialized = false
+    var lastError: String? = null
+
+    private const val SHM_SIZE = 2 * 1024 * 1024
+    private const val SHM_NAME = "ivanna_hyperplane"
+
+    private var hyperplaneBuffer: MappedByteBuffer? = null
     private var fd: Int = -1
 
-    // Offsets dentro del hiperplano
     private const val OFFSET_BIQUAD = 0
     private const val OFFSET_KALMAN = OFFSET_BIQUAD + (64 * 5 * 4)
     private const val OFFSET_POBLACION = OFFSET_KALMAN + (3 * 4)
@@ -31,44 +36,46 @@ object ShmManager {
     private const val OFFSET_ACTIVE = OFFSET_SEQ + 8
 
     fun initialize(context: Context) {
+        Log.i(TAG, "Inicializando ShmManager...")
         try {
-            // memfd_create via syscall directo (requiere root / kernel modificado)
-            fd = memfdCreate(SHM_NAME, MFD_ALLOW_SEALING or MFD_HUGETLB)
+            fd = memfdCreate(SHM_NAME, OsConstants.MFD_ALLOW_SEALING or 0x00000004)
             if (fd < 0) {
-                // Fallback a memoria directa cuando memfd_create no está disponible
-                hyperplaneBuffer = java.nio.ByteBuffer.allocateDirect(SHM_SIZE)
-            } else {
-                val pfd = ParcelFileDescriptor.fromFd(fd)
-                try {
-                    Os.ftruncate(pfd.fileDescriptor, SHM_SIZE.toLong())
-                } finally {
-                    pfd.close()
+                val shmFile = File("/dev/shm/$SHM_NAME")
+                if (!shmFile.exists()) {
+                    Runtime.getRuntime().exec("su -c \"mknod /dev/shm/$SHM_NAME p\"").waitFor()
                 }
-                // mlockall equivalente: bloquear región
+                val raf = RandomAccessFile(shmFile, "rw")
+                raf.setLength(SHM_SIZE.toLong())
+                hyperplaneBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, SHM_SIZE.toLong())
+                raf.close()
+            } else {
+                Os.ftruncate(fd, SHM_SIZE.toLong())
                 val raf = RandomAccessFile("/proc/self/fd/$fd", "rw")
                 hyperplaneBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, SHM_SIZE.toLong())
                 raf.close()
             }
 
-            // Lock en memoria
             hyperplaneBuffer?.let { buf ->
                 val addressField = java.nio.Buffer::class.java.getDeclaredField("address")
                 addressField.isAccessible = true
                 val address = addressField.getLong(buf)
                 nativeMlock(address, SHM_SIZE.toLong())
             }
+            shmInitialized = true
+            Log.i(TAG, "ShmManager inicializado correctamente")
 
         } catch (e: Exception) {
-            e.printStackTrace()
-            // Fallback a memoria estándar si no hay root
+            lastError = "SHM: ${e.message}"
+            Log.e(TAG, "Error ShmManager: ${e.message}", e)
             hyperplaneBuffer = java.nio.ByteBuffer.allocateDirect(SHM_SIZE)
+            shmInitialized = true // Fallback funciona
         }
     }
 
     private external fun nativeMlock(address: Long, length: Long): Int
     private external fun memfdCreate(name: String, flags: Int): Int
 
-    fun getBuffer(): ByteBuffer? = hyperplaneBuffer
+    fun getBuffer(): MappedByteBuffer? = hyperplaneBuffer
 
     fun readSeqCounter(): Long {
         val buf = hyperplaneBuffer ?: return 0L
@@ -110,11 +117,18 @@ object ShmManager {
     }
 
     fun writeFusionLevel(level: Float) {
-        // Escribe en la región compartida para el DSP
         hyperplaneBuffer?.putFloat(OFFSET_KALMAN + 12, level)
     }
 
     init {
-        System.loadLibrary("ivanna_trascendental")
+        try {
+            System.loadLibrary("ivanna_trascendental")
+            nativeLibLoaded = true
+            Log.i(TAG, "Librería nativa cargada correctamente")
+        } catch (e: UnsatisfiedLinkError) {
+            nativeLibLoaded = false
+            lastError = "Native lib: ${e.message}"
+            Log.e(TAG, "ERROR: No se pudo cargar librería nativa: ${e.message}")
+        }
     }
 }
