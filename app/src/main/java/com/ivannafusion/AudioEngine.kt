@@ -164,3 +164,8 @@ object AudioEngine {
         }
     }
 }
+
+    fun restart() {
+        release()
+        initialize(applicationContext)
+    }

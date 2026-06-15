@@ -2,7 +2,6 @@
  * IVANNA-FUSION TRASCENDENTAL
  * © 2025 Luis Uriel Pimentel Pérez. Todos los derechos reservados.
  */
-
 package com.ivannafusion
 
 import android.opengl.GLES20
@@ -25,7 +24,11 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 @Composable
-fun MonitorScreen(navController: NavController) {
+fun MonitorScreen(
+    navController: NavController,
+    audioEngine: AudioEngine,
+    shmManager: ShmManager
+) {
     val context = LocalContext.current
     var audio_fs_hz by remember { mutableIntStateOf(AudioEngine.audio_fs_hz) }
     var audio_bit_depth by remember { mutableIntStateOf(AudioEngine.audio_bit_depth) }
@@ -35,6 +38,8 @@ fun MonitorScreen(navController: NavController) {
     var evo_fitness_mejor by remember { mutableFloatStateOf(0f) }
     var temp_cpu_core0 by remember { mutableIntStateOf(0) }
     var temp_gpu by remember { mutableIntStateOf(0) }
+
+    val shmStatus by shmManager.shmStatus.collectAsState()
 
     LaunchedEffect(Unit) {
         AudioEngine.initializeEvolution()
@@ -56,16 +61,12 @@ fun MonitorScreen(navController: NavController) {
             .background(Color.Black)
             .padding(16.dp)
     ) {
-        Text(
-            "IVANNA MONITOR",
-            color = Color.Cyan,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Text("IVANNA MONITOR", color = Color.Cyan, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(8.dp))
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Text("SHM: $shmStatus", color = Color.Green, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Métricas canónicas
         MetricRow("audio_fs_hz", "$audio_fs_hz Hz")
         MetricRow("audio_bit_depth", "$audio_bit_depth bits")
         MetricRow("audio_latencia_us", "$audio_latencia_us µs")
@@ -76,36 +77,28 @@ fun MonitorScreen(navController: NavController) {
         MetricRow("temp_gpu", "$temp_gpu °C")
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        // Espectrograma OpenGL
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp)
+        Button(
+            onClick = { audioEngine.restart() },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
         ) {
-            AndroidView(
-                factory = { ctx ->
-                    GLSurfaceView(ctx).apply {
-                        setEGLContextClientVersion(2)
-                        setRenderer(SpectrogramRenderer())
-                        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+            Text("REINICIAR AUDIO", color = Color.White)
         }
-
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Campo de error de fase (mapa termográfico simplificado)
+        Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
+            AndroidView(factory = { ctx ->
+                GLSurfaceView(ctx).apply {
+                    setEGLContextClientVersion(2)
+                    setRenderer(SpectrogramRenderer())
+                    renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                }
+            })
+        }
+        Spacer(modifier = Modifier.height(16.dp))
         PhaseErrorField(audio_error_fase_rms)
-
         Spacer(modifier = Modifier.weight(1f))
-
-        Button(
-            onClick = { navController.navigate("simbiosis") },
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Button(onClick = { navController.navigate("simbiosis") }, modifier = Modifier.fillMaxWidth()) {
             Text("VOLVER A SIMBIOSIS")
         }
     }
@@ -113,14 +106,9 @@ fun MonitorScreen(navController: NavController) {
 
 @Composable
 fun MetricRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(text = label, color = Color.Gray, fontSize = 14.sp)
-        Text(text = value, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, color = Color.Gray, fontSize = 14.sp)
+        Text(value, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -132,38 +120,17 @@ fun PhaseErrorField(errorRms: Float) {
         errorRms < 0.1f -> Color.Yellow
         else -> Color.Red
     }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(60.dp)
-            .background(color.copy(alpha = 0.3f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "Error de fase: %.4f rad".format(errorRms),
-            color = color,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
+    Box(modifier = Modifier.fillMaxWidth().height(60.dp).background(color.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
+        Text("Error de fase: %.4f rad".format(errorRms), color = color, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 class SpectrogramRenderer : GLSurfaceView.Renderer {
     private var time = 0f
-
-    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
-    }
-
-    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        GLES20.glViewport(0, 0, width, height)
-    }
-
+    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) { GLES20.glClearColor(0f, 0f, 0f, 1f) }
+    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) { GLES20.glViewport(0, 0, width, height) }
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         time += 0.016f
-        // Renderizado de espectrograma vía shader (simplificado)
-        // En producción: implementar FBO con FFT texture
     }
 }

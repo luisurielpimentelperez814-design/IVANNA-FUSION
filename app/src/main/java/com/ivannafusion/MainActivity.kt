@@ -118,7 +118,7 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     NavHost(navController = navController, startDestination = "simbiosis") {
                         composable("simbiosis") { SimbiosisScreen(navController) }
-                        composable("monitor") { MonitorScreen(navController) }
+                        composable("monitor") { MonitorScreen(navController = navController, audioEngine = AudioEngine, shmManager = ShmManager) }
                         composable("settings") { SettingsAuditScreen(navController) }
                     }
                 }
