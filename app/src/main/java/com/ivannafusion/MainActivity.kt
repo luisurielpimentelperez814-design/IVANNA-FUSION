@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
                         composable("ai")        { AIScreen(navController, AudioEngine) }
                         composable("pf_engine") { PFEngineScreen(navController) }
                         composable("presets")   { PresetsScreen(navController) }
+                        composable("effects")   { EffectsControlScreen(navController) }
                     }
                 }
             }

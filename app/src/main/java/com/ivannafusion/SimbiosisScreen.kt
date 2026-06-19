@@ -256,6 +256,7 @@ fun SimbiosisScreen(navController: NavController) {
                     NavBtn("MONITOR")  { navController.navigate("monitor") }
                     NavBtn("PF ENG")   { navController.navigate("pf_engine") }
                     NavBtn("IA")       { navController.navigate("ai") }
+                    NavBtn("EFECTOS")  { navController.navigate("effects") }
                     NavBtn("AJUSTES")  { navController.navigate("settings") }
                 }
             }
