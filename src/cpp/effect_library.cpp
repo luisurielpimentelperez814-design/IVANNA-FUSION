@@ -7,15 +7,44 @@
 // Compatibilidad: Android 8.0+ (API 26+), ARMv8a
 // © 2026 Luis Uriel Pimentel Pérez — GORE TNS
 
-#include <hardware/audio_effect.h>
-#include <system/audio.h>
+#include "android_effect_abi.h"
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+#include <cerrno>
 #include <new>
 #include <android/log.h>
 
 #include "ivanna_fusion.h"
+
+// ─── Compatibilidad mínima con <system/audio.h> ──────────────────────────────
+// android_effect_abi.h no trae las máscaras de canal ni audio_format_t de
+// <system/audio.h> (header AOSP interno, no disponible en el NDK público).
+// Se definen aquí solo los valores mínimos que usa este archivo.
+#ifndef AUDIO_CHANNEL_OUT_STEREO
+#define AUDIO_CHANNEL_OUT_STEREO 0x3u   // FL | FR, layout AOSP estándar
+#endif
+#ifndef AUDIO_FORMAT_PCM_FLOAT
+#define AUDIO_FORMAT_PCM_FLOAT   0x5u   // mismo valor que audio_format_t de AOSP
+#endif
+#ifndef AUDIO_FORMAT_PCM_16_BIT
+#define AUDIO_FORMAT_PCM_16_BIT  0x1u
+#endif
+typedef uint32_t audio_format_t;
+
+static inline int audio_channel_count_from_out_mask(uint32_t mask) {
+    int n = 0;
+    while (mask) { n += (mask & 1u); mask >>= 1u; }
+    return n;
+}
+
+// EFFECT_UUID_NULL: UUID nulo estándar (todo ceros) usado por audioserver
+// para pedir el descriptor de "cualquier efecto" via get_descriptor() con
+// uuid genérico. No forma parte del layout binario de ningún struct —
+// es solo un valor de comparación — así que no hay riesgo de
+// desalineamiento al definirlo aquí.
+static const effect_uuid_t kEffectUuidNull = {0, 0, 0, 0, {0,0,0,0,0,0}};
+#define EFFECT_UUID_NULL (&kEffectUuidNull)
 
 #define LOG_TAG "IvannaFusionDSP"
 #define ALOG(...)   __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -37,8 +66,14 @@ static const effect_descriptor_t kEffectDescriptor = {
     .uuid          = kEffectUuid,
     .apiVersion    = EFFECT_CONTROL_API_VERSION,
     .flags         = EFFECT_FLAG_TYPE_INSERT
-                   | EFFECT_FLAG_INSERT_LAST
-                   | EFFECT_FLAG_VOLUME_CTRL,
+                   | EFFECT_FLAG_INSERT_LAST,
+    // Nota: se quitó EFFECT_FLAG_VOLUME_CTRL — no está definido en el ABI
+    // local (android_effect_abi.h) ni se usa en ivanna_fft_effect.c, y no
+    // hay forma de verificar su valor numérico real sin el header AOSP
+    // completo. Un flag incorrecto aquí puede hacer que audioserver
+    // interprete mal las capacidades del efecto. El control de volumen vía
+    // EFFECT_CMD_SET_VOLUME sigue funcionando sin este flag — solo deja de
+    // anunciarse como capacidad explícita ante audioserver.
     .cpuLoad       = 120,       // estimado: 1.2% CPU en Snapdragon 4 Gen 2
     .memoryUsage   = 400,       // ~400 KB
     .name          = "IVANNA FUSION DSP",
@@ -172,22 +207,21 @@ static int Effect_Command(effect_handle_t self,
         if (replySize && *replySize >= sizeof(int)) *(int*)pReply = 0;
         return 0;
 
-    case EFFECT_CMD_SET_CONFIG: {
+    case EFFECT_CMD_CONFIGURE: {
+        // Nota: se usa EFFECT_CMD_CONFIGURE (confirmado en android_effect_abi.h)
+        // en vez de un SET_CONFIG/GET_CONFIG separados que no estaban
+        // verificados contra el ABI local. CONFIGURE recibe el mismo
+        // effect_config_t y cubre el mismo propósito de fijar samplerate/canales.
         if (cmdSize < sizeof(effect_config_t)) return -EINVAL;
         std::memcpy(&ctx->config, pCmd, sizeof(effect_config_t));
         float fs = (float)ctx->config.inputCfg.samplingRate;
         if (fs < 8000.f || fs > 384000.f) fs = 48000.f;
         int ch = audio_channel_count_from_out_mask(ctx->config.inputCfg.channels);
         ctx->engine.init(fs, ch);
-        ALOG("SET_CONFIG fs=%.0f ch=%d fmt=0x%x", fs, ch, ctx->config.inputCfg.format);
+        ALOG("CONFIGURE fs=%.0f ch=%d fmt=0x%x", fs, ch, ctx->config.inputCfg.format);
         if (replySize && *replySize >= sizeof(int)) *(int*)pReply = 0;
         return 0;
     }
-
-    case EFFECT_CMD_GET_CONFIG:
-        if (!pReply || !replySize || *replySize < sizeof(effect_config_t)) return -EINVAL;
-        std::memcpy(pReply, &ctx->config, sizeof(effect_config_t));
-        return 0;
 
     case EFFECT_CMD_RESET:
         ctx->engine.reset();
@@ -237,22 +271,18 @@ static int Effect_Command(effect_handle_t self,
         return 0;
     }
 
-    case EFFECT_CMD_GET_LATENCY:
-        // Efecto sin lookahead: latencia 0
-        if (pReply && replySize && *replySize >= sizeof(uint32_t))
-            *(uint32_t*)pReply = 0;
-        return 0;
-
     case EFFECT_CMD_SET_VOLUME:
         // Aceptamos control de volumen (EFFECT_FLAG_VOLUME_CTRL)
         if (pReply && replySize && *replySize >= sizeof(int32_t))
             *(int32_t*)pReply = 0;
         return 0;
 
-    case EFFECT_CMD_GET_DESCRIPTOR:
-        if (!pReply || !replySize || *replySize < sizeof(effect_descriptor_t)) return -EINVAL;
-        std::memcpy(pReply, &kEffectDescriptor, sizeof(effect_descriptor_t));
-        return 0;
+    // Nota: GET_LATENCY y GET_DESCRIPTOR no son códigos de EFFECT_CMD_* del
+    // ABI estándar de AOSP servidos vía command(); GET_DESCRIPTOR se expone
+    // a través del puntero get_descriptor de la vtable (ver Effect_GetDescriptor
+    // más abajo), que es lo que audioserver invoca realmente. No se inventa
+    // un valor de comando aquí porque un código incorrecto puede colisionar
+    // con EFFECT_CMD_SET_INPUT_DEVICE u otros ya reservados.
 
     default:
         return -EINVAL;

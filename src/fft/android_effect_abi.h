@@ -52,6 +52,7 @@ struct audio_buffer_s {
         int32_t *s32;
         int16_t *s16;
         uint8_t *u8;
+        float   *f32;   // alias para PCM float — no cambia tamaño ni offset de la unión
     };
 };
 

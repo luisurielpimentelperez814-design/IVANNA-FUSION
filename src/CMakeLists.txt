@@ -32,6 +32,7 @@ add_library(ivanna_fusion SHARED ${IVANNA_SOURCES})
 
 target_include_directories(ivanna_fusion PRIVATE
     include
+    fft
     # NDK audio headers (disponibles en android.toolchain.cmake)
     ${CMAKE_SYSROOT}/usr/include
 )
