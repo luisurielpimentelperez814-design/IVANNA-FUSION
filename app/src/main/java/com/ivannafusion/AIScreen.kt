@@ -50,6 +50,7 @@ fun AIScreen(navController: NavController, audioEngine: AudioEngine) {
 
     // Refresco de todas las variables canónicas desde SHM
     LaunchedEffect(Unit) {
+        mutationRate = audioEngine.getMutationRate()
         AudioEngine.initializeEvolution()
         while (true) {
             ShmManager.refreshCanonicalVars()
@@ -152,7 +153,10 @@ fun AIScreen(navController: NavController, audioEngine: AudioEngine) {
                 Text("Tasa de mutación: %.3f".format(mutationRate),
                     color = Color.Gray, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
                 Slider(
-                    value = mutationRate, onValueChange = { mutationRate = it },
+                    value = mutationRate, onValueChange = {
+                        mutationRate = it
+                        audioEngine.setMutationRate(it)
+                    },
                     valueRange = 0.005f..0.30f,
                     colors = SliderDefaults.colors(
                         thumbColor = Color(0xFFAA44FF), activeTrackColor = Color(0xFFAA44FF))

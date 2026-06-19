@@ -61,7 +61,10 @@ fun SettingsAuditScreen(navController: NavController) {
             listOf(44100, 48000, 96000, 192000, 384000).forEach { rate ->
                 FilterChip(
                     selected = selectedSampleRate == rate,
-                    onClick = { selectedSampleRate = rate; AudioEngine.audio_fs_hz = rate },
+                    onClick = {
+                        selectedSampleRate = rate
+                        AudioEngine.setPreferredAudioConfig(selectedSampleRate, selectedBitDepth)
+                    },
                     label = { Text("${rate / 1000} kHz") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = Color.Cyan,
@@ -82,7 +85,10 @@ fun SettingsAuditScreen(navController: NavController) {
             listOf(16, 24, 32).forEach { bits ->
                 FilterChip(
                     selected = selectedBitDepth == bits,
-                    onClick = { selectedBitDepth = bits; AudioEngine.audio_bit_depth = bits },
+                    onClick = {
+                        selectedBitDepth = bits
+                        AudioEngine.setPreferredAudioConfig(selectedSampleRate, selectedBitDepth)
+                    },
                     label = { Text("$bits bits") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = Color.Cyan,
@@ -90,6 +96,27 @@ fun SettingsAuditScreen(navController: NavController) {
                     )
                 )
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                try {
+                    AudioEngine.setPreferredAudioConfig(selectedSampleRate, selectedBitDepth)
+                    if (AudioEngine.initialized) {
+                        AudioEngine.restart()
+                    } else {
+                        AudioEngine.initialize(context)
+                    }
+                    Toast.makeText(context, "Audio reiniciado con la configuración seleccionada", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "No se pudo reiniciar el audio: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("APLICAR Y REINICIAR AUDIO")
         }
 
         Spacer(modifier = Modifier.height(24.dp))

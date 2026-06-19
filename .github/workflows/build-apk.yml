@@ -19,6 +19,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Instalar Gradle 8.5
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.5'
+
       # ubuntu-latest ya trae Android SDK en $ANDROID_HOME.
       # Solo se acepta licencias y se instala NDK r25c directamente.
       - name: Aceptar licencias Android SDK

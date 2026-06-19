@@ -30,6 +30,8 @@ object AudioEngine {
     private var nativeHandle: Long = 0
     var initialized = false
     private var appContext: Context? = null
+    private var preferredSampleRateHz: Int? = null
+    private var preferredBitDepth: Int? = null
 
     var audio_fs_hz: Int = 48_000
     var audio_bit_depth: Int = 32
@@ -47,11 +49,18 @@ object AudioEngine {
         val nativeRate = audioManager
             ?.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
             ?.toIntOrNull() ?: 48_000
-        audio_fs_hz = nativeRate.coerceIn(8_000, 192_000)
+        val requestedRate = (preferredSampleRateHz ?: nativeRate).coerceIn(8_000, 192_000)
+        val requestedBitDepth = (preferredBitDepth ?: audio_bit_depth).coerceIn(16, 32)
+
+        audio_fs_hz = requestedRate
+        audio_bit_depth = requestedBitDepth
 
         nativeHandle = nativeCreateEngine(audio_fs_hz, audio_bit_depth)
         if (nativeHandle == 0L) {
             Log.e(TAG, "nativeCreateEngine retornó 0")
+        } else {
+            audio_fs_hz = nativeGetSampleRate().coerceIn(8_000, 192_000)
+            nativeInitializeEvolution()
         }
 
         // Conectar SHM antes de start
@@ -144,12 +153,25 @@ object AudioEngine {
         if (nativeHandle != 0L) nativeSetFusionLevel(nativeHandle, level.coerceIn(0f, 1f))
     }
 
+    fun setPreferredAudioConfig(sampleRate: Int, bitDepth: Int = audio_bit_depth) {
+        preferredSampleRateHz = sampleRate.coerceIn(8_000, 192_000)
+        preferredBitDepth = bitDepth.coerceIn(16, 32)
+        audio_fs_hz = preferredSampleRateHz ?: audio_fs_hz
+        audio_bit_depth = preferredBitDepth ?: audio_bit_depth
+    }
+
     fun getPhaseErrorRms(): Float =
         if (nativeHandle != 0L) nativeGetPhaseError(nativeHandle) else 0f
 
     fun initializeEvolution() {
         if (nativeHandle != 0L) nativeInitializeEvolution()
     }
+
+    fun setMutationRate(rate: Float) {
+        nativeSetMutationRate(rate.coerceIn(0.001f, 1f))
+    }
+
+    fun getMutationRate(): Float = nativeGetMutationRate()
 
     fun getBestFitness(): Float =
         if (nativeHandle != 0L) nativeGetBestFitness() else 0f
@@ -185,6 +207,7 @@ object AudioEngine {
     // ── JNI ──────────────────────────────────────────────────────────────────
     private external fun nativeCreateEngine(sampleRate: Int, bitDepth: Int): Long
     private external fun nativeStartProcessing(handle: Long)
+    private external fun nativeGetSampleRate(): Int
     private external fun nativeGetLatency(handle: Long): Int
     private external fun nativeSetFusionLevel(handle: Long, level: Float)
     private external fun nativeGetPhaseError(handle: Long): Float
@@ -196,6 +219,8 @@ object AudioEngine {
     private external fun nativeGetBestFitness(): Float
     private external fun nativeGetGeneration(): Int
     private external fun nativeEvolveStep()
+    private external fun nativeSetMutationRate(rate: Float)
+    private external fun nativeGetMutationRate(): Float
     private external fun nativePredictSamples(handle: Long, input: FloatArray, output: FloatArray, n: Int)
 
     init {

@@ -35,7 +35,7 @@ fun MonitorScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val shmStatus by shmManager.shmStatus.collectAsState()
-    val isRealShm = !shmStatus.contains("fallback") && !shmStatus.contains("Error")
+    val isRealShm = !shmStatus.contains("fallback", ignoreCase = true) && !shmStatus.contains("error", ignoreCase = true)
 
     var audioFs by remember { mutableIntStateOf(AudioEngine.audio_fs_hz) }
     var bitDepth by remember { mutableIntStateOf(AudioEngine.audio_bit_depth) }
@@ -78,10 +78,12 @@ fun MonitorScreen(
 
     fun changeSampleRate(rate: Int) {
         selectedRate = rate
+        audioEngine.setPreferredAudioConfig(rate, bitDepth)
         scope.launch {
             audioEngine.restart()
             delay(200)
             audioFs = AudioEngine.audio_fs_hz
+            bitDepth = AudioEngine.audio_bit_depth
         }
     }
 
@@ -149,7 +151,11 @@ fun MonitorScreen(
             Button(onClick = { AudioEngine.evolveStep() }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2266AA))) {
                 Text("Evolucionar 1 paso")
             }
-            Button(onClick = { audioEngine.restart() }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFAA4422))) {
+            Button(onClick = {
+                audioEngine.initializeEvolution()
+                generation = AudioEngine.getGeneration()
+                bestFitness = AudioEngine.getBestFitness()
+            }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFAA4422))) {
                 Text("Reset evolución")
             }
         }

@@ -62,4 +62,11 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        ThermalMonitor.shutdown()
+        AudioEngine.shutdown()
+        ShmManager.close()
+        super.onDestroy()
+    }
 }
