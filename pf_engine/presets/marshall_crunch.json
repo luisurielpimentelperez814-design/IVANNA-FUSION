@@ -1,0 +1,8 @@
+{
+  "name": "marshall_crunch",
+  "amp": 0,
+  "alpha": 1.10, "beta": 0.55, "gamma": 0.60, "delta": 0.75, "sigma": 0.40,
+  "drive": 3.20, "wet": 0.85,
+  "low_gain": 3.0, "mid_gain": -1.5, "high_gain": 4.0,
+  "mid_freq": 700.0, "presence": 5.0, "sag": 0.25, "bias": 0.45
+}

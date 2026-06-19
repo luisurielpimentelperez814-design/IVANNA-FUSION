@@ -55,6 +55,8 @@ class MainActivity : ComponentActivity() {
                         composable("monitor")   { MonitorScreen(navController, AudioEngine, ShmManager) }
                         composable("settings")  { SettingsAuditScreen(navController) }
                         composable("ai")        { AIScreen(navController, AudioEngine) }
+                        composable("pf_engine") { PFEngineScreen(navController) }
+                        composable("presets")   { PresetsScreen(navController) }
                     }
                 }
             }

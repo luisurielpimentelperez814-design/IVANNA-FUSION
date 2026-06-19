@@ -254,7 +254,7 @@ fun SimbiosisScreen(navController: NavController) {
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     NavBtn("MONITOR")  { navController.navigate("monitor") }
-                    NavBtn("ABUELO")   { showGrandpaMode = true }
+                    NavBtn("PF ENG")   { navController.navigate("pf_engine") }
                     NavBtn("IA")       { navController.navigate("ai") }
                     NavBtn("AJUSTES")  { navController.navigate("settings") }
                 }

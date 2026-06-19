@@ -66,3 +66,31 @@ target_compile_definitions(ivanna_fusion PRIVATE
 message(STATUS "IVANNA FUSION DSP — build para ABI: ${ANDROID_ABI}")
 message(STATUS "  Samplerate target: 48000 Hz stereo")
 message(STATUS "  NEON SIMD: habilitado para arm64-v8a")
+
+# ─── IVANNA FFT EFFECT ────────────────────────────────────────────────────────
+# Compilar como efecto AudioFlinger independiente (libivanna_fft_effect.so)
+add_library(ivanna_fft_effect SHARED
+    fft/ivanna_fft_effect.c
+)
+
+target_include_directories(ivanna_fft_effect PRIVATE
+    fft
+    include
+    ${CMAKE_SYSROOT}/usr/include
+)
+
+target_compile_definitions(ivanna_fft_effect PRIVATE
+    ANDROID
+    __ANDROID__
+)
+
+target_link_libraries(ivanna_fft_effect PRIVATE
+    ${log-lib}
+    ${android-lib}
+)
+
+set_target_properties(ivanna_fft_effect PROPERTIES
+    LINK_FLAGS "-Wl,--gc-sections -Wl,--strip-all -Wl,-soname,libivanna_fft_effect.so"
+)
+
+message(STATUS "IVANNA FFT Effect — ABI: ${ANDROID_ABI}")

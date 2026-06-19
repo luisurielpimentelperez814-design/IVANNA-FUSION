@@ -1,16 +1,25 @@
+# Android
 *.iml
-.gradle
-/local.properties
-.idea
+.gradle/
+local.properties
+.idea/
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-*.apk
+build/
+captures/
 *.jks
 *.keystore
-*.aab
+app/release/
+app/debug/
 
-# Never commit signing secrets
-ivanna-keystore.jks
+# NDK build artifacts
+*.o
+*.a
+cmake-build-*/
+
+# No rastrear APK compilado (descargarlo de Actions)
+app-release.apk
+
+# Rastrear .so precompilados (artefactos de despliegue Magisk)
+!system/lib64/soundfx/*.so
+!system/vendor/lib64/soundfx/*.so
+!system/vendor/lib/soundfx/*.so
