@@ -344,14 +344,35 @@ static int EffectGetDescriptor(const effect_uuid_t* uuid,
     return 0;
 }
 
+// ─── Funciones requeridas por audio_effect_library_t ──────────────────────────
+// query_num_effects: indica cuántos efectos expone esta librería (solo 1)
+static int QueryNumEffects(uint32_t* pNumEffects) {
+    if (!pNumEffects) return -EINVAL;
+    *pNumEffects = 1;
+    return 0;
+}
+
+// query_effect: devuelve el descriptor del efecto en el índice dado
+static int QueryEffect(uint32_t index, effect_descriptor_t* pDescriptor) {
+    if (!pDescriptor) return -EINVAL;
+    if (index != 0) return -ENOENT;
+    std::memcpy(pDescriptor, &kEffectDescriptor, sizeof(effect_descriptor_t));
+    return 0;
+}
+
 // ─── Símbolo exportado — AudioFlinger busca exactamente este nombre ───────────
+// IMPORTANTE: El nombre del símbolo debe ser literalmente AUDIO_EFFECT_LIBRARY_INFO_SYM
+// para que audioserver lo encuentre al hacer dlopen() y las herramientas de
+// verificación (nm, readelf) lo detecten correctamente.
 extern "C" __attribute__((visibility("default")))
-audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM = {
-    .tag              = AUDIO_EFFECT_LIBRARY_TAG,
-    .version          = EFFECT_LIBRARY_API_VERSION,
-    .name             = "IVANNA FUSION DSP Library",
-    .implementor      = "GORE TNS",
-    .create_effect    = EffectCreate,
-    .release_effect   = EffectRelease,
-    .get_descriptor   = EffectGetDescriptor,
+const audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM = {
+    .tag               = AUDIO_EFFECT_LIBRARY_TAG,
+    .version           = EFFECT_LIBRARY_API_VERSION,
+    .name              = "IVANNA FUSION DSP Library",
+    .implementor       = "GORE TNS",
+    .query_num_effects = QueryNumEffects,
+    .query_effect      = QueryEffect,
+    .create_effect     = EffectCreate,
+    .release_effect    = EffectRelease,
+    .get_descriptor    = EffectGetDescriptor,
 };
