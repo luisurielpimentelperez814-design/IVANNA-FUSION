@@ -137,6 +137,9 @@ typedef struct audio_effect_library_s {
     int32_t (*get_descriptor)(const effect_uuid_t *uuid, effect_descriptor_t *pDescriptor);
 } audio_effect_library_t;
 
-#define AUDIO_EFFECT_LIBRARY_INFO_SYM AELI
+/* El símbolo se exporta literalmente como AUDIO_EFFECT_LIBRARY_INFO_SYM
+ * para que audioserver lo encuentre al hacer dlopen() y las herramientas
+ * de verificación (nm, readelf) lo detecten con su nombre estándar AOSP.
+ * No se usa un alias/macro que cambie el nombre del símbolo en el ELF. */
 
 #endif /* ANDROID_EFFECT_ABI_H */
