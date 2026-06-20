@@ -136,7 +136,7 @@ private fun startProcessingThread() {
 ## 📁 Archivos Creados/Modificados
 
 | Archivo | Propósito | Cambios |
-|---------|-----------|---------|
+|---------|-----------|----------|
 | `IvannaNativeLib.kt` | JNI Bindings | ✅ Todas las funciones completadas |
 | `AudioEngine.kt` | Motor de Audio | ✅ Integración JNI + evolución + fase oracle |
 | `PresetManager.kt` | Persistencia | ✅ DataStore + respaldos locales |
