@@ -59,13 +59,11 @@ private val ACCENT = Color(0xFF7B61FF)
 private val ACCENT2 = Color(0xFF00E5FF)
 private val CARD_BG = Color(0xFF12121E)
 
-// Clase wrapper que usa reflexión para crear AudioEffect con UUID personalizado
 class CustomAudioEffect(priority: Int = 0, vararg uuids: UUID) {
     private var effect: AudioEffect? = null
     
     init {
         try {
-            // Usar reflexión para acceder al constructor protegido de AudioEffect
             val constructor: Constructor<AudioEffect> = AudioEffect::class.java.getDeclaredConstructor(
                 Int::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType,
@@ -73,9 +71,6 @@ class CustomAudioEffect(priority: Int = 0, vararg uuids: UUID) {
                 UUID::class.java
             )
             constructor.isAccessible = true
-            
-            // Crear instancia con UUID personalizado
-            // Parámetros: priority, audioSession, type (UUID), uuid (UUID)
             effect = constructor.newInstance(priority, 0, uuids[0], uuids[0])
             effect?.enabled = true
             Log.i(TAG, "CustomAudioEffect creado exitosamente")
@@ -91,20 +86,17 @@ class CustomAudioEffect(priority: Int = 0, vararg uuids: UUID) {
             val data = ByteBuffer.allocate(8).order(ByteOrder.nativeOrder())
             data.putInt(paramId)
             data.putFloat(value)
-            
-            // Usar command() para enviar datos al efecto nativo
-            // COMMAND_SET_PARAMETER = 2
             val result = eff.command(2, data.array().size, data.array())
             result == AudioEffect.SUCCESS
-        } catch (e: Exception) {            Log.e(TAG, "setParameter error: ${e.message}")
+        } catch (e: Exception) {
+            Log.e(TAG, "setParameter error: ${e.message}")
             false
         }
     }
     
     fun setParameterInt(paramId: Int, value: Int): Boolean {
         val eff = effect ?: return false
-        return try {
-            val data = ByteBuffer.allocate(8).order(ByteOrder.nativeOrder())
+        return try {            val data = ByteBuffer.allocate(8).order(ByteOrder.nativeOrder())
             data.putInt(paramId)
             data.putInt(value)
             val result = eff.command(2, data.array().size, data.array())
@@ -146,6 +138,7 @@ object EffectsController {
         customEffect = null
         isConnected = false
     }
+
     fun setParam(paramId: Int, value: Float): Boolean {
         return customEffect?.setParameter(paramId, value) ?: false
     }
@@ -153,7 +146,6 @@ object EffectsController {
     fun setParamInt(paramId: Int, value: Int): Boolean {
         return customEffect?.setParameterInt(paramId, value) ?: false
     }
-
     fun loadPreset(presetId: Int): Boolean = setParam(EffectParams.PARAM_PRESET_LOAD, presetId.toFloat())
     fun setGlobalBypass(enabled: Boolean): Boolean = setParamInt(EffectParams.PARAM_GLOBAL_BYPASS, if (enabled) 1 else 0)
 }
@@ -195,5 +187,6 @@ fun EffectsControlScreen(navController: NavController) {
             }
         }
     }
+
     DisposableEffect(Unit) { onDispose { EffectsController.disconnect() } }
 }
