@@ -95,7 +95,8 @@ fun AutoEQScreen() {
         headphones.forEachIndexed { i, name ->
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = selected == i, onClick = { selected = i },
-                    colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF4CAF50)))                Text(name, color = Color.White, fontSize = 14.sp)
+                    colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF4CAF50)))
+                Text(name, color = Color.White, fontSize = 14.sp)
             }
         }
         Spacer(Modifier.height(16.dp))

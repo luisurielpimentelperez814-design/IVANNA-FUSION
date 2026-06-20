@@ -46,7 +46,8 @@ fun HomeScreen(navController: NavController) {
             Text("IVANNA-FUSION", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
             Switch(checked = effectEnabled, onCheckedChange = { v -> effectEnabled = v; IvannaNativeLib.setEnabled(v) },
                 colors = SwitchDefaults.colors(checkedTrackColor = Color(0xFF4CAF50)))
-        }        Text(if (effectEnabled) "ACTIVO" else "INACTIVO",
+        }
+        Text(if (effectEnabled) "ACTIVO" else "INACTIVO",
             color = if (effectEnabled) Color(0xFF4CAF50) else Color(0xFF888888), fontSize = 14.sp,
             modifier = Modifier.padding(bottom = 20.dp))
 
