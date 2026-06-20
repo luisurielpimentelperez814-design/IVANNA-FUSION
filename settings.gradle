@@ -1,3 +1,6 @@
+// IVANNA-FUSION TRASCENDENTAL — settings.gradle
+// pluginManagement DEBE ser lo primero en settings.gradle (Gradle 7+)
+
 pluginManagement {
     repositories {
         google()
@@ -5,6 +8,7 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {

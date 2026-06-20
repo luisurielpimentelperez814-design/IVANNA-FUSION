@@ -1,4 +1,6 @@
-// IVANNA-FUSION TRASCENDENTAL - top-level build file
+// IVANNA-FUSION TRASCENDENTAL — top-level build file
+// Solo declaraciones de plugins aquí; pluginManagement y
+// dependencyResolutionManagement pertenecen a settings.gradle.
 plugins {
     id 'com.android.application' version '8.3.2' apply false
     id 'org.jetbrains.kotlin.android' version '1.9.22' apply false
