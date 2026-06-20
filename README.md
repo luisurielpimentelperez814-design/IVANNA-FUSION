@@ -69,3 +69,19 @@ faltaban. **El proyecto ya está completo** según el árbol original
 Ver `docs/instrucciones_compilacion.md` para el flujo en Android Studio con
 tu Moto G85.
  
+
+---
+
+## Errores de compilación resueltos (v2.1)
+
+| # | Archivo | Error | Fix |
+|---|---------|-------|-----|
+| 1 | `build.gradle` / `settings.gradle` | `pluginManagement {}` y `dependencyResolutionManagement {}` en el build script raíz — métodos inválidos fuera de `settings.gradle`, Gradle fallaba antes de compilar cualquier fuente | Movidos a `settings.gradle` (deben ir primero) |
+| 2 | `IvannaNativeLib.kt` | Dos pares de declaraciones `external fun` en la misma línea sin newline ni `;` — error de parseo del compilador Kotlin | Separadas en líneas individuales |
+| 3 | `phase_oracle.cpp` | `#define M_PI …f` redefinía M_PI como float tras `#include <cmath>`; Clang 18 (NDK r27c) lo trata como error con `-Wall` | Eliminado; reemplazado por `static constexpr float kPif` |
+| 4 | `phase_oracle.cpp` | `#include <arm_neon.h>` incondicional: rompía smoke-test de CI en host x86_64 | Guardado con `#ifdef __aarch64__` |
+| 5 | `app/build.gradle` | `-fopenmp -static-openmp` en `cppFlags` sin linking OpenMP en CMakeLists.txt — riesgo de `undefined reference __kmpc_*` en NDK r27c | Flags eliminados (ninguna fuente usa `#pragma omp`) |
+| 6 | `ivanna_fusion.cpp` | `loadPreset()` llamaba `reset()` al terminar, borrando estados de filtros recién configurados → clic audible + inconsistencia con path JNI | Eliminado; comentario documenta la responsabilidad del caller |
+| 7 | `ivanna_fft_effect.c` | Forward-decl `static const struct effect_interface_s ivanna_itfe;` innecesaria (Clang 18 la marca con `-Wextern-initializer`) | Removida; la definición con inicializador es suficiente en C |
+
+> NDK: ambos workflows ahora usan **r27c (27.2.12479018)** para coherencia diagnóstica.

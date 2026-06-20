@@ -100,7 +100,7 @@ typedef struct {
     int ringPos;
 } ivanna_ctx_t;
 
-static const struct effect_interface_s ivanna_itfe; /* fwd decl */
+/* ivanna_itfe definido más abajo — la definición es suficiente como forward decl en C */
 
 /* ---------------------------------------------------------------------
  * process(): llamada en el hilo de audio, debe ser rapida y no bloqueante.
