@@ -24,30 +24,31 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      # ubuntu-latest ya trae Android SDK en $ANDROID_HOME.
-      # Solo se acepta licencias y se instala NDK r25c directamente.
       - name: Aceptar licencias Android SDK
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Cache NDK r25c
+      # NDK r27c: consistente con build-magisk.yml.
+      # Clang 18 del r27c mejora significativamente el diagnóstico de
+      # designadores C++ y el soporte de C++23 respecto a r25c.
+      - name: Cache NDK r27c
         id: cache-ndk
         uses: actions/cache@v4
         with:
-          path: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
-          key: ndk-r25c-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+          path: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+          key: ndk-r27c-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
           restore-keys: |
-            ndk-r25c-${{ runner.os }}-
+            ndk-r27c-${{ runner.os }}-
 
-      - name: Instalar NDK r25c
+      - name: Instalar NDK r27c
         if: steps.cache-ndk.outputs.cache-hit != 'true'
         run: |
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;25.2.9519653"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.2.12479018"
 
       - name: Exportar ANDROID_NDK_HOME
         run: |
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
-          echo "NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653"         >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> $GITHUB_ENV
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018"         >> $GITHUB_ENV
 
       - name: Generar Gradle Wrapper (si no existe)
         run: |

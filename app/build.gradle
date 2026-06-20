@@ -16,7 +16,11 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags "-O3 -ffast-math -funroll-loops -march=armv8.2-a+fp16+dotprod -fopenmp -static-openmp -fPIC"
+                // Flags de optimización ARM64.
+                // Se eliminó -fopenmp / -static-openmp: ninguna TU usa
+                // #pragma omp y sin find_package(OpenMP) en CMakeLists.txt
+                // el linker podía no encontrar libomp.a en NDK r27c.
+                cppFlags "-O3 -ffast-math -funroll-loops -march=armv8.2-a+fp16+dotprod -fPIC"
                 arguments "-DANDROID_STL=c++_shared", "-DCMAKE_BUILD_TYPE=Release"
             }
         }
@@ -75,9 +79,8 @@ dependencies {
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.navigation:navigation-compose:2.7.7'
     implementation 'androidx.glance:glance:1.0.0'
-    // Corregido: el groupId publicado en Maven Central es com.alphacephei, no org.vosk.
-    // Nota: actualmente ninguna clase Vosk/org.vosk se usa en el código Kotlin (no hay
-    // reconocimiento de voz implementado todavía). Si no se va a usar, se puede quitar.
+    // vosk-android: el groupId publicado es com.alphacephei.
+    // Si el reconocimiento de voz no está implementado, se puede remover.
     implementation 'com.alphacephei:vosk-android:0.3.47'
     implementation 'androidx.documentfile:documentfile:1.0.1'
 }
