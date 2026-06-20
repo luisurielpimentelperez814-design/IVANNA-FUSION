@@ -14,6 +14,17 @@ import androidx.compose.ui.unit.sp
 import com.ivannafusion.IvannaNativeLib
 
 @Composable
+fun SpatialSlider(label: String, value: Float, min: Float, max: Float, onChange: (Float) -> Unit) {
+    Column(Modifier.padding(vertical = 4.dp)) {
+        Row {
+            Text(label, color = Color(0xFFAAAAAA), fontSize = 12.sp, modifier = Modifier.weight(1f))
+            Text("%.2f".format(value), color = Color.White, fontSize = 12.sp)
+        }
+        Slider(value, onChange, valueRange = min..max)
+    }
+}
+
+@Composable
 fun SpatialScreen() {
     var sW by remember { mutableStateOf(1f) }
     var sL by remember { mutableStateOf(0.3f) }
@@ -30,33 +41,23 @@ fun SpatialScreen() {
 
         Spacer(Modifier.height(16.dp))
         Text("SURROUND VIRTUALIZER (Dolby)", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
-        SS("Width", sW, 0f, 2f) { sW = it; try { IvannaNativeLib.surroundSetWidth(it) } catch(e: Exception){} }        SS("Surround Level", sL, 0f, 1f) { sL = it; try { IvannaNativeLib.surroundSetLevel(it) } catch(e: Exception){} }
-        SS("Height", sH, 0f, 1f) { sH = it; try { IvannaNativeLib.surroundSetHeight(it) } catch(e: Exception){} }
-        SS("Room Size", sR, 0f, 1f) { sR = it; try { IvannaNativeLib.surroundSetRoom(it) } catch(e: Exception){} }
+        SpatialSlider("Width", sW, 0f, 2f) { v -> sW = v; try { IvannaNativeLib.surroundSetWidth(v) } catch(e: Exception){} }
+        SpatialSlider("Surround Level", sL, 0f, 1f) { v -> sL = v; try { IvannaNativeLib.surroundSetLevel(v) } catch(e: Exception){} }
+        SpatialSlider("Height", sH, 0f, 1f) { v -> sH = v; try { IvannaNativeLib.surroundSetHeight(v) } catch(e: Exception){} }
+        SpatialSlider("Room Size", sR, 0f, 1f) { v -> sR = v; try { IvannaNativeLib.surroundSetRoom(v) } catch(e: Exception){} }
 
         Spacer(Modifier.height(20.dp))
         Text("STEREO WIDENER", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
-        SS("Stereo Width", stW, 0f, 2f) { stW = it; try { IvannaNativeLib.widenerSetWidth(it) } catch(e: Exception){} }
+        SpatialSlider("Stereo Width", stW, 0f, 2f) { v -> stW = v; try { IvannaNativeLib.widenerSetWidth(v) } catch(e: Exception){} }
 
         Spacer(Modifier.height(20.dp))
         Text("BASS ENHANCER (MaxxBass)", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
-        SS("Amount", bA, 0f, 1f) { bA = it; try { IvannaNativeLib.bassSetAmount(it) } catch(e: Exception){} }
-        SS("Frequency (Hz)", bF, 40f, 300f) { bF = it; try { IvannaNativeLib.bassSetFrequency(it) } catch(e: Exception){} }
+        SpatialSlider("Amount", bA, 0f, 1f) { v -> bA = v; try { IvannaNativeLib.bassSetAmount(v) } catch(e: Exception){} }
+        SpatialSlider("Frequency (Hz)", bF, 40f, 300f) { v -> bF = v; try { IvannaNativeLib.bassSetFrequency(v) } catch(e: Exception){} }
 
         Spacer(Modifier.height(20.dp))
         Text("HARMONIC UPSCALER (DSEE)", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
-        SS("Amount", uA, 0f, 1f) { uA = it; try { IvannaNativeLib.upscalerSetAmount(it) } catch(e: Exception){} }
-        SS("Ceiling (Hz)", uC, 8000f, 20000f) { uC = it; try { IvannaNativeLib.upscalerSetCeiling(it) } catch(e: Exception){} }
-    }
-}
-
-@Composable
-fun SS(label: String, value: Float, min: Float, max: Float, onChange: (Float) -> Unit) {
-    Column(Modifier.padding(vertical = 4.dp)) {
-        Row {
-            Text(label, color = Color(0xFFAAAAAA), fontSize = 12.sp, modifier = Modifier.weight(1f))
-            Text("%.2f".format(value), color = Color.White, fontSize = 12.sp)
-        }
-        Slider(value, onChange, valueRange = min..max)
+        SpatialSlider("Amount", uA, 0f, 1f) { v -> uA = v; try { IvannaNativeLib.upscalerSetAmount(v) } catch(e: Exception){} }
+        SpatialSlider("Ceiling (Hz)", uC, 8000f, 20000f) { v -> uC = v; try { IvannaNativeLib.upscalerSetCeiling(v) } catch(e: Exception){} }
     }
 }
