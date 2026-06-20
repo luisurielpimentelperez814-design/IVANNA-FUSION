@@ -96,7 +96,8 @@ fun HomeScreen(navController: NavController) {
         }
         Spacer(Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            row2.forEach { item ->                QuickButton(item.icon, item.label) { navController.navigate(item.route) }
+            row2.forEach { item ->
+                QuickButton(item.icon, item.label) { navController.navigate(item.route) }
             }
         }
     }
