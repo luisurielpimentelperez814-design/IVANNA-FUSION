@@ -144,7 +144,12 @@ void IvannaFusionEngine::loadPreset(int preset_id) noexcept {
         }
         default: break;
     }
-    reset();  // Limpiar estados tras cambio de preset
+    // NOTA: reset() NO se llama aquí. Llamarlo después de setBand/setParam
+    // borraría los estados internos de los filtros biquad, el RMS buffer del
+    // compresor y el envelope follower justo cuando ya tienen los nuevos
+    // coeficientes, produciendo un clic audible y un período de 'warm-up'
+    // innecesario. El caller debe llamar reset() ANTES del cambio de preset
+    // si necesita un arranque limpio (silencio previo garantizado).
 }
 
 } // namespace ivanna
