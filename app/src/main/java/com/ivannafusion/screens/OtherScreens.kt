@@ -20,7 +20,7 @@ import kotlinx.coroutines.delay
 fun CompressorScreen() {
     val bands = listOf("Sub (0-200Hz)", "Low (200-1k)", "Mid (1-5k)", "High (5k+)")
     Column(Modifier.fillMaxSize().background(Color(0xFF121212)).padding(20.dp).verticalScroll(rememberScrollState())) {
-        Text("🎛️ Multiband Compressor", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("Multiband Compressor", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Text("4 bandas (tipo iZotope Ozone)", color = Color(0xFF888888), fontSize = 12.sp)
         Spacer(Modifier.height(16.dp))
         bands.forEachIndexed { i, name ->
@@ -31,14 +31,14 @@ fun CompressorScreen() {
             Card(colors = CardDefaults.cardColors(Color(0xFF1E1E1E)), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Column(Modifier.padding(12.dp)) {
                     Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("Threshold: %.0f dB".format(th), color = Color(0xFFAAAAAA), fontSize = 11.sp)
-                    Slider(th, { v -> th = v; try { IvannaNativeLib.compSetThreshold(i, v) } catch(e: Exception){} }, valueRange = -60f..0f)
-                    Text("Ratio: %.1f:1".format(ra), color = Color(0xFFAAAAAA), fontSize = 11.sp)
-                    Slider(ra, { v -> ra = v; try { IvannaNativeLib.compSetRatio(i, v) } catch(e: Exception){} }, valueRange = 1f..10f)
-                    Text("Attack: %.0f ms".format(at), color = Color(0xFFAAAAAA), fontSize = 11.sp)
-                    Slider(at, { v -> at = v; try { IvannaNativeLib.compSetAttack(i, v) } catch(e: Exception){} }, valueRange = 1f..100f)
-                    Text("Release: %.0f ms".format(re), color = Color(0xFFAAAAAA), fontSize = 11.sp)
-                    Slider(re, { v -> re = v; try { IvannaNativeLib.compSetRelease(i, v) } catch(e: Exception){} }, valueRange = 50f..2000f)
+                    Text("Threshold: " + th.toInt() + " dB", color = Color(0xFFAAAAAA), fontSize = 11.sp)
+                    Slider(value = th, onValueChange = { v -> th = v; try { IvannaNativeLib.compSetThreshold(i, v) } catch(e: Exception){} }, valueRange = -60f..0f)
+                    Text("Ratio: " + ra.toInt() + ":1", color = Color(0xFFAAAAAA), fontSize = 11.sp)
+                    Slider(value = ra, onValueChange = { v -> ra = v; try { IvannaNativeLib.compSetRatio(i, v) } catch(e: Exception){} }, valueRange = 1f..10f)
+                    Text("Attack: " + at.toInt() + " ms", color = Color(0xFFAAAAAA), fontSize = 11.sp)
+                    Slider(value = at, onValueChange = { v -> at = v; try { IvannaNativeLib.compSetAttack(i, v) } catch(e: Exception){} }, valueRange = 1f..100f)
+                    Text("Release: " + re.toInt() + " ms", color = Color(0xFFAAAAAA), fontSize = 11.sp)
+                    Slider(value = re, onValueChange = { v -> re = v; try { IvannaNativeLib.compSetRelease(i, v) } catch(e: Exception){} }, valueRange = 50f..2000f)
                 }
             }
         }
@@ -51,7 +51,7 @@ fun ConvolverScreen() {    var enabled by remember { mutableStateOf(false) }
     var selectedIR by remember { mutableStateOf(0) }
     val irs = listOf("Small Room", "Medium Room", "Large Hall", "Plate Reverb", "Guitar Cabinet", "Headphone Crossfeed")
     Column(Modifier.fillMaxSize().background(Color(0xFF121212)).padding(20.dp)) {
-        Text("🔊 Convolver (Reverb)", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("Convolver (Reverb)", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Spacer(Modifier.height(16.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Enabled", color = Color.White, modifier = Modifier.weight(1f))
@@ -70,7 +70,7 @@ fun ConvolverScreen() {    var enabled by remember { mutableStateOf(false) }
             }
         }
         Spacer(Modifier.height(16.dp))
-        Text("Mix: %.0f%%".format(mix * 100), color = Color.White)
+        Text("Mix: " + (mix * 100).toInt() + "%", color = Color.White)
         Slider(mix, { v -> mix = v; try { IvannaNativeLib.convolverSetMix(v) } catch(e: Exception){} }, valueRange = 0f..1f)
     }
 }
@@ -88,8 +88,8 @@ fun AutoEQScreen() {
     var applied by remember { mutableStateOf("") }
 
     Column(Modifier.fillMaxSize().background(Color(0xFF121212)).padding(20.dp).verticalScroll(rememberScrollState())) {
-        Text("🎧 AutoEQ Headphone Correction", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Text("Corrección a target Harman", color = Color(0xFF888888), fontSize = 12.sp)
+        Text("AutoEQ Headphone Correction", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("Correccion a target Harman", color = Color(0xFF888888), fontSize = 12.sp)
         Spacer(Modifier.height(16.dp))
         Text("Selecciona tus auriculares", color = Color.White, fontWeight = FontWeight.Bold)
         headphones.forEachIndexed { i, name ->
@@ -141,7 +141,7 @@ fun AnalyzerScreen() {
     }
 
     Column(Modifier.fillMaxSize().background(Color(0xFF121212)).padding(20.dp)) {
-        Text("📊 Analyzer (BS.1770-4)", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("Analyzer (BS.1770-4)", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Text("Medicion profesional de loudness", color = Color(0xFF888888), fontSize = 12.sp)
         Spacer(Modifier.height(16.dp))
         MeterCard("Momentary (400ms)", momentary, "LUFS", Color(0xFF4ECDC4))
@@ -162,7 +162,7 @@ fun MeterCard(label: String, value: Float, unit: String, color: Color) {
             verticalAlignment = Alignment.CenterVertically) {
             Column {
                 Text(label, color = Color(0xFF888888), fontSize = 11.sp)
-                Text("%.1f %s".format(value, unit), color = color, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(value.toInt().toString() + " " + unit, color = color, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -170,35 +170,34 @@ fun MeterCard(label: String, value: Float, unit: String, color: Color) {
 
 @Composable
 fun PresetsScreen() {
+    data class PresetItem(val name: String, val desc: String)
     val presets = listOf(
-        Pair("🎵 Flat (Reference)", "Respuesta plana sin modificaciones"),
-        Pair("🎛️ Mastering (iZotope)", "EQ profesional + widener + upscaler"),
-        Pair("🎬 Dolby Cinema", "Surround completo + height + bass"),
-        Pair("🎧 Sony DSEE", "Restauracion de armonicos perdidos"),
-        Pair("🔊 Bass Head", "Graves profundos con armonicos"),
-        Pair("🎤 Vocal Clarity", "Presencia vocal 1-4kHz"),
-        Pair("🎮 Gaming", "Spatial awareness + footsteps"),
-        Pair("🌙 Late Night", "Loudness normalization")
+        PresetItem("Flat (Reference)", "Respuesta plana sin modificaciones"),
+        PresetItem("Mastering (iZotope)", "EQ profesional + widener + upscaler"),
+        PresetItem("Dolby Cinema", "Surround completo + height + bass"),
+        PresetItem("Sony DSEE", "Restauracion de armonicos perdidos"),
+        PresetItem("Bass Head", "Graves profundos con armonicos"),
+        PresetItem("Vocal Clarity", "Presencia vocal 1-4kHz"),
+        PresetItem("Gaming", "Spatial awareness + footsteps"),
+        PresetItem("Late Night", "Loudness normalization")
     )
     var current by remember { mutableStateOf(-1) }
 
     Column(Modifier.fillMaxSize().background(Color(0xFF121212)).padding(20.dp).verticalScroll(rememberScrollState())) {
-        Text("💾 Presets Profesionales", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("Presets Profesionales", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Text(presets.size.toString() + " presets integrados", color = Color(0xFF888888), fontSize = 12.sp)
         Spacer(Modifier.height(16.dp))
-        presets.forEachIndexed { i, pair ->
-            val name = pair.first
-            val desc = pair.second
+        presets.forEachIndexed { i, preset ->
             Card(
                 colors = CardDefaults.cardColors(if (current == i) Color(0xFF4CAF50) else Color(0xFF1E1E1E)),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                     .clickable {
-                        current = i                        try { IvannaNativeLib.setPreset(i) } catch(e: Exception){}
-                    }
+                        current = i
+                        try { IvannaNativeLib.setPreset(i) } catch(e: Exception){}                    }
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text(desc, color = if (current == i) Color.Black else Color(0xFFAAAAAA), fontSize = 12.sp)
+                    Text(preset.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(preset.desc, color = if (current == i) Color.Black else Color(0xFFAAAAAA), fontSize = 12.sp)
                 }
             }
         }
@@ -208,7 +207,7 @@ fun PresetsScreen() {
 @Composable
 fun SettingsScreen() {
     Column(Modifier.fillMaxSize().background(Color(0xFF121212)).padding(20.dp)) {
-        Text("⚙️ Settings", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("Settings", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Spacer(Modifier.height(16.dp))
         Card(colors = CardDefaults.cardColors(Color(0xFF1E1E1E)), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {

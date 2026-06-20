@@ -12,29 +12,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+
+data class MenuItem(val icon: String, val title: String, val desc: String, val route: String)
+
 @Composable
 fun MoreMenuScreen(navController: NavController) {
     val items = listOf(
-        Triple("🎛️", "Compressor", "Multibanda 4 bandas") to "compressor",
-        Triple("🔊", "Convolver", "6 IRs sintetizados") to "convolver",
-        Triple("🎧", "AutoEQ", "14 auriculares") to "autoeq",
-        Triple("📊", "Analyzer", "Spectrogram + LUFS") to "analyzer",
-        Triple("💾", "Presets", "16 presets + export") to "presets",
-        Triple("⚙️", "Settings", "Configuración") to "settings"
+        MenuItem("🎛️", "Compressor", "Multibanda 4 bandas", "compressor"),
+        MenuItem("🔊", "Convolver", "6 IRs sintetizados", "convolver"),
+        MenuItem("🎧", "AutoEQ", "13 auriculares", "autoeq"),
+        MenuItem("📊", "Analyzer", "Spectrogram + LUFS", "analyzer"),
+        MenuItem("💾", "Presets", "8 presets profesionales", "presets"),
+        MenuItem("⚙️", "Settings", "Configuracion", "settings")
     )
     Column(Modifier.fillMaxSize().background(Color(0xFF121212)).padding(20.dp)) {
-        Text("⋮ Más Opciones", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("Menu Completo", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Spacer(Modifier.height(16.dp))
         items.forEach { item ->
-            val ((icon, title, desc), route) = item
-            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { navController.navigate(route) },
-                colors = CardDefaults.cardColors(Color(0xFF1E1E1E))) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { navController.navigate(item.route) },
+                colors = CardDefaults.cardColors(Color(0xFF1E1E1E))
+            ) {
                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(icon, fontSize = 32.sp)
+                    Text(item.icon, fontSize = 32.sp)
                     Spacer(Modifier.width(16.dp))
                     Column {
-                        Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text(desc, color = Color(0xFF888888), fontSize = 12.sp)
+                        Text(item.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(item.desc, color = Color(0xFF888888), fontSize = 12.sp)
                     }
                 }
             }
