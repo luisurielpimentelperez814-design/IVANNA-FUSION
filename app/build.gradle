@@ -16,11 +16,8 @@ android {
 
         externalNativeBuild {
             cmake {
-                // Flags de optimización ARM64.
-                // Se eliminó -fopenmp / -static-openmp: ninguna TU usa
-                // #pragma omp y sin find_package(OpenMP) en CMakeLists.txt
-                // el linker podía no encontrar libomp.a en NDK r27c.
-                cppFlags "-O3 -ffast-math -funroll-loops -march=armv8.2-a+fp16+dotprod -fPIC"
+                // Flags de optimización ARM64 - optimizados para Snapdragon
+                cppFlags "-O3 -ffast-math -funroll-loops -march=armv8.2-a+fp16+dotprod -fPIC -std=c++20"
                 arguments "-DANDROID_STL=c++_shared", "-DCMAKE_BUILD_TYPE=Release"
             }
         }
@@ -46,6 +43,10 @@ android {
                 keyAlias "ivanna"
                 keyPassword signKeyPassword
             }
+        }
+        debug {
+            minifyEnabled false
+            debuggable true
         }
     }
 
@@ -82,18 +83,41 @@ android {
 }
 
 dependencies {
+    // Core Android
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
     implementation 'androidx.activity:activity-compose:1.8.2'
+
+    // Compose UI
     implementation platform('androidx.compose:compose-bom:2024.02.00')
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
     implementation 'androidx.compose.ui:ui-tooling-preview'
     implementation 'androidx.compose.material3:material3'
+    
+    // Navigation
     implementation 'androidx.navigation:navigation-compose:2.7.7'
+    
+    // DataStore for persistent state
+    implementation 'androidx.datastore:datastore-preferences:1.0.0'
+    
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    
+    // Glance widgets
     implementation 'androidx.glance:glance:1.0.0'
-    // vosk-android: el groupId publicado es com.alphacephei.
-    // Si el reconocimiento de voz no está implementado, se puede remover.
+    
+    // Speech recognition (optional - can be removed if not used)
     implementation 'com.alphacephei:vosk-android:0.3.47'
+    
+    // File handling
     implementation 'androidx.documentfile:documentfile:1.0.1'
+    
+    // Logging
+    implementation 'com.jakewharton.timber:timber:5.0.1'
+    
+    // Testing
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
 }
