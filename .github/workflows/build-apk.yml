@@ -60,24 +60,29 @@ jobs:
       - name: Restaurar keystore desde secreto
         env:
           KEYSTORE_B64: ${{ secrets.IVANNA_KEYSTORE_B64 }}
+          REAL_KEYSTORE_PASSWORD: ${{ secrets.IVANNA_KEYSTORE_PASSWORD }}
+          REAL_KEY_PASSWORD: ${{ secrets.IVANNA_KEY_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_B64" ]; then
             echo "$KEYSTORE_B64" | base64 -d > ivanna-keystore.jks
+            echo "IVANNA_KEYSTORE_PASSWORD=$REAL_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "IVANNA_KEY_PASSWORD=$REAL_KEY_PASSWORD"           >> "$GITHUB_ENV"
           else
-            echo "IVANNA_KEYSTORE_B64 no configurado; generando keystore temporal para CI."
+            echo "IVANNA_KEYSTORE_B64 no configurado; generando keystore temporal de CI (no apto para release real)."
+            TMP_PW="ci-$(openssl rand -hex 12)"
             keytool -genkeypair -v \
               -keystore ivanna-keystore.jks \
               -alias ivanna \
               -keyalg RSA -keysize 2048 -validity 365 \
-              -storepass ivanna_trascendental_2025 \
-              -keypass  ivanna_trascendental_2025 \
+              -storepass "$TMP_PW" \
+              -keypass  "$TMP_PW" \
               -dname "CN=IVANNA-FUSION CI, OU=CI, O=GoretNS, L=Tultitlan, S=Mexico, C=MX"
+            echo "::add-mask::$TMP_PW"
+            echo "IVANNA_KEYSTORE_PASSWORD=$TMP_PW" >> "$GITHUB_ENV"
+            echo "IVANNA_KEY_PASSWORD=$TMP_PW"       >> "$GITHUB_ENV"
           fi
 
       - name: Compilar APK release
-        env:
-          IVANNA_KEYSTORE_PASSWORD: ${{ secrets.IVANNA_KEYSTORE_PASSWORD }}
-          IVANNA_KEY_PASSWORD:      ${{ secrets.IVANNA_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Subir APK como artefacto
