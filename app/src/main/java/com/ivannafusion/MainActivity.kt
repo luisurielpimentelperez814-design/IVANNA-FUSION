@@ -1,73 +1,78 @@
 package com.ivannafusion
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
 class MainActivity : ComponentActivity() {
-
-    private val requestRecordAudio =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                AudioEngine.initialize(this)
-            } else {
-                android.widget.Toast.makeText(
-                    this,
-                    "Se necesita el micrófono para operar",
-                    android.widget.Toast.LENGTH_LONG
-                ).show()
-            }
-        }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        ShmManager.initialize(this)
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
-            AudioEngine.initialize(this)
-        } else {
-            requestRecordAudio.launch(Manifest.permission.RECORD_AUDIO)
-        }
-
-        ThermalMonitor.initialize(this)
-
         setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    val navController = rememberNavController()
-                    NavHost(navController = navController, startDestination = "intro") {
-                        composable("intro")     { IntroScreen(navController) }
-                        composable("simbiosis") { SimbiosisScreen(navController) }
-                        composable("monitor")   { MonitorScreen(navController, AudioEngine, ShmManager) }
-                        composable("settings")  { SettingsAuditScreen(navController) }
-                        composable("ai")        { AIScreen(navController, AudioEngine) }
-                        composable("pf_engine") { PFEngineScreen(navController) }
-                        composable("presets")   { PresetsScreen(navController) }
-                        composable("effects")   { EffectsControlScreen(navController) }
-                    }
+            val navController = rememberNavController()
+
+            NavHost(
+                navController = navController,
+                startDestination = "home"
+            ) {
+                composable("home") {
+                    HomeScreen(
+                        onNavigateToEffects = {
+                            navController.navigate("effects")
+                        }
+                    )
+                }
+                composable("effects") {
+                    EffectsControlScreen()
                 }
             }
         }
     }
+}
 
-    override fun onDestroy() {
-        ThermalMonitor.shutdown()
-        AudioEngine.shutdown()
-        ShmManager.close()
-        super.onDestroy()
+@Composable
+fun HomeScreen(onNavigateToEffects: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF121212))
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "IVANNA-FUSION",
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+
+        Spacer(modifier = Modifier.height(48.dp))
+
+        Button(
+            onClick = onNavigateToEffects,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+        ) {
+            Text(
+                text = "Abrir Control de Efectos",
+                fontSize = 18.sp,
+                color = Color.White
+            )
+        }
     }
 }
