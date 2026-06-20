@@ -11,5 +11,8 @@ class IVANNAApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         // Inicialización global del sistema trascendental
+        ShmManager.initialize(this)
+        AudioEngine.initialize(this)
+        ThermalMonitor.initialize(this)
     }
 }

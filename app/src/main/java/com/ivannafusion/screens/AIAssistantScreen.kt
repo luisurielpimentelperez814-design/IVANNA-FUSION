@@ -37,7 +37,11 @@ fun AIAssistantScreen() {
                 colors = SwitchDefaults.colors(checkedTrackColor = Color(0xFF4CAF50)))
         }
         Text("Sensibilidad: %.2f".format(sensitivity), color = Color(0xFFAAAAAA))
-        Slider(sensitivity, { sensitivity = it; try { IvannaNativeLib.aiSetSensitivity(it) } catch(e: Exception){} }, 0f..1f)
+        Slider(
+            value = sensitivity,
+            onValueChange = { sensitivity = it; try { IvannaNativeLib.aiSetSensitivity(it) } catch(e: Exception){} },
+            valueRange = 0f..1f
+        )
 
         Spacer(Modifier.height(20.dp))
         Card(colors = CardDefaults.cardColors(Color(0xFF1E1E1E)), modifier = Modifier.fillMaxWidth()) {

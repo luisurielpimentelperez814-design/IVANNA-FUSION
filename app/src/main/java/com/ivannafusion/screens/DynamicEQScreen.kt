@@ -34,14 +34,27 @@ fun DynamicEQScreen() {
                         Text("%.1f dB".format(gains[i]), color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
                     }
                     Text("Gain", color = Color(0xFFAAAAAA), fontSize = 10.sp)
-                    Slider(gains[i], { gains[i] = it; try { IvannaNativeLib.eqSetGain(i, it) } catch(e: Exception){} }, -12f..12f)
+                    Slider(
+                        value = gains[i],
+                        onValueChange = { gains[i] = it; try { IvannaNativeLib.eqSetGain(i, it) } catch(e: Exception){} },
+                        valueRange = -12f..12f
+                    )
                     Row(Modifier.fillMaxWidth()) {
                         Column(Modifier.weight(1f).padding(end = 4.dp)) {
                             Text("Threshold", color = Color(0xFFAAAAAA), fontSize = 10.sp)
-                            Slider(thresholds[i], { thresholds[i] = it; try { IvannaNativeLib.eqSetThreshold(i, it) } catch(e: Exception){} }, -60f..0f)                        }
+                            Slider(
+                                value = thresholds[i],
+                                onValueChange = { thresholds[i] = it; try { IvannaNativeLib.eqSetThreshold(i, it) } catch(e: Exception){} },
+                                valueRange = -60f..0f
+                            )
+                        }
                         Column(Modifier.weight(1f).padding(start = 4.dp)) {
                             Text("Ratio", color = Color(0xFFAAAAAA), fontSize = 10.sp)
-                            Slider(ratios[i], { ratios[i] = it; try { IvannaNativeLib.eqSetRatio(i, it) } catch(e: Exception){} }, 1f..10f)
+                            Slider(
+                                value = ratios[i],
+                                onValueChange = { ratios[i] = it; try { IvannaNativeLib.eqSetRatio(i, it) } catch(e: Exception){} },
+                                valueRange = 1f..10f
+                            )
                         }
                     }
                 }

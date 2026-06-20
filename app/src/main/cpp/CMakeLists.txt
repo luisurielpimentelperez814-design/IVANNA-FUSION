@@ -12,6 +12,7 @@ set(IVANNA_SOURCES
     phase_oracle.cpp
     evolutionary_kernel.cpp
     shm_hyperplane.cpp
+    ivanna_native_lib.cpp
 )
 
 add_library(ivanna_trascendental SHARED ${IVANNA_SOURCES})
