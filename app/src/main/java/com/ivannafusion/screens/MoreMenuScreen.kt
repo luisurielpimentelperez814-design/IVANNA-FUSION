@@ -18,6 +18,7 @@ data class MenuItem(val icon: String, val title: String, val desc: String, val r
 @Composable
 fun MoreMenuScreen(navController: NavController) {
     val items = listOf(
+        MenuItem("🌀", "Simbiosis Pro", "Motor avanzado: gestos, Kalman/SHM, PF Engine", "simbiosis"),
         MenuItem("🎛️", "Compressor", "Multibanda 4 bandas", "compressor"),
         MenuItem("🔊", "Convolver", "6 IRs sintetizados", "convolver"),
         MenuItem("🎧", "AutoEQ", "13 auriculares", "autoeq"),

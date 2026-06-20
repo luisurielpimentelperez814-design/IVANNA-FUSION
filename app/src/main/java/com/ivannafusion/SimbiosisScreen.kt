@@ -68,7 +68,7 @@ fun SimbiosisScreen(navController: NavController) {
                 AudioEngine.setFusionLevel(fusionLevel)
             },
             pinchRotate   = { /* ajuste de ancho de banda reservado */ },
-            threeFingerSwipe = { navController.navigate("settings") },
+            threeFingerSwipe = { navController.navigate("settings_audit") },
             doubleTapLatency = { },
             twoFingerCircle  = { active -> isPredictionActive = active }
         )
@@ -257,7 +257,7 @@ fun SimbiosisScreen(navController: NavController) {
                     NavBtn("PF ENG")   { navController.navigate("pf_engine") }
                     NavBtn("IA")       { navController.navigate("ai") }
                     NavBtn("EFECTOS")  { navController.navigate("effects") }
-                    NavBtn("AJUSTES")  { navController.navigate("settings") }
+                    NavBtn("AJUSTES")  { navController.navigate("settings_audit") }
                 }
             }
         }

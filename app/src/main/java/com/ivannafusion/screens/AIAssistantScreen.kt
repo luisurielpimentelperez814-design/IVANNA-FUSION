@@ -11,6 +11,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivannafusion.IvannaNativeLib
+import kotlinx.coroutines.delay
 
 @Composable
 fun AIAssistantScreen() {
@@ -21,6 +22,20 @@ fun AIAssistantScreen() {
     var confidence by remember { mutableStateOf(0f) }
     var tempo by remember { mutableStateOf(0f) }
     var curveName by remember { mutableStateOf("Waiting...") }
+    var curveDescription by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            try {
+                genre = IvannaNativeLib.aiGetDetectedGenre()
+                confidence = IvannaNativeLib.aiGetConfidence()
+                tempo = IvannaNativeLib.aiGetTempo()
+                curveName = IvannaNativeLib.aiGetCurrentCurveName()
+                curveDescription = IvannaNativeLib.aiGetCurrentCurveDescription()
+            } catch (e: Exception) {}
+            delay(500)
+        }
+    }
     Column(Modifier.fillMaxSize().background(Color(0xFF121212)).padding(20.dp)) {
         Text("🧠 AI Assistant", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Text("Análisis autónomo en tiempo real", color = Color(0xFF888888), fontSize = 12.sp)
@@ -67,6 +82,10 @@ fun AIAssistantScreen() {
                 Text("AI-GENERATED CURVE", color = Color(0xFF888888), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 Text(curveName, color = Color(0xFF00FF00), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                if (curveDescription.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(curveDescription, color = Color(0xFFAAAAAA), fontSize = 12.sp)
+                }
             }
         }
 
