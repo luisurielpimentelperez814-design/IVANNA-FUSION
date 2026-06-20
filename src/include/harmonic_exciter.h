@@ -70,6 +70,15 @@ private:
     BiquadStateStereo hpf_post_state_;
 
     float hpf_freq_ = 2000.f;
+
+    // Buffers de trabajo por instancia (antes eran 'static' a nivel de
+    // función en harmonic_exciter.cpp, compartidos entre TODAS las
+    // instancias del efecto -> corrupción de audio si audioserver crea
+    // más de un stream simultáneo con este efecto). Ahora cada instancia
+    // de HarmonicExciter tiene su propio buffer de trabajo.
+    static constexpr int kMaxBlock = 4096;
+    float scratch_l_[kMaxBlock];
+    float scratch_r_[kMaxBlock];
 };
 
 } // namespace ivanna::dsp

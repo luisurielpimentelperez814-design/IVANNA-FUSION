@@ -55,13 +55,15 @@ void HarmonicExciter::process(const float* inL, const float* inR,
     float d_clamped = std::max(drive, 0.01f);
     tanh_norm_inv_ = 1.f / std::tanh(d_clamped);
 
-    // Buffers temporales de armónicos (stack-allocated, seguro para frames cortos)
-    // AudioFlinger usa frames de 240-480 samples típicamente
-    // Para frames más largos usamos buffer estático (no concurrent — single thread)
-    static float hL[4096];
-    static float hR[4096];
+    // Buffers temporales de armónicos — ahora son miembros de instancia
+    // (scratch_l_/scratch_r_ declarados en harmonic_exciter.h) en vez de
+    // 'static' a nivel de función, para que cada instancia del efecto
+    // tenga su propio espacio de trabajo y no se corrompan datos si
+    // audioserver crea más de una instancia simultánea.
+    float* hL = scratch_l_;
+    float* hR = scratch_r_;
 
-    int n = std::min(n_frames, 4096);
+    int n = std::min(n_frames, kMaxBlock);
 
     // ── PASO 1: HPF sobre la señal original ──────────────────────────────────
     // Elimina sub-bajos para no distorsionar frecuencias fundamentales del bajo

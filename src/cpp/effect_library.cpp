@@ -86,6 +86,17 @@ struct IvannaContext {
     effect_config_t       config;
     ivanna::IvannaFusionEngine engine;
     bool                  active = false;
+
+    // Buffers de trabajo por instancia (antes eran 'static' a nivel de
+    // función en Effect_Process, compartidos entre TODAS las instancias
+    // del efecto -> si audioserver crea más de un stream simultáneo con
+    // este efecto activo, los datos de audio de un stream sobrescriben
+    // los del otro mientras ambos procesan. Ahora cada IvannaContext
+    // tiene su propio espacio de trabajo).
+    static constexpr int kMaxBlock = 4096;
+    float scratch_l_[kMaxBlock];
+    float scratch_r_[kMaxBlock];
+    float scratch_m_[kMaxBlock];   // usado para el path mono
 };
 
 // ─── Forward declarations ─────────────────────────────────────────────────────
@@ -125,11 +136,12 @@ static int Effect_Process(effect_handle_t self,
         if (ch == 2) {
             // Stereo intercalado → de-interleave on stack
             // AudioFlinger usa frames de 240-480 típicamente
-            // Para frames > 4096 procesamos en chunks
-            static float tmpL[4096], tmpR[4096];
+            // Para frames > kMaxBlock procesamos en chunks
+            float* tmpL = ctx->scratch_l_;
+            float* tmpR = ctx->scratch_r_;
 
             while (n_frames > 0) {
-                int chunk = (n_frames < 4096) ? n_frames : 4096;
+                int chunk = (n_frames < IvannaContext::kMaxBlock) ? n_frames : IvannaContext::kMaxBlock;
                 // De-interleave
                 for (int i = 0; i < chunk; ++i) {
                     tmpL[i] = in->f32[i*2    ];
@@ -148,9 +160,9 @@ static int Effect_Process(effect_handle_t self,
             }
         } else if (ch == 1) {
             // Mono: L=R
-            static float tmpM[4096];
+            float* tmpM = ctx->scratch_m_;
             while (n_frames > 0) {
-                int chunk = (n_frames < 4096) ? n_frames : 4096;
+                int chunk = (n_frames < IvannaContext::kMaxBlock) ? n_frames : IvannaContext::kMaxBlock;
                 std::memcpy(tmpM, in->f32, chunk * sizeof(float));
                 ctx->engine.process(tmpM, tmpM, tmpM, tmpM, chunk);
                 std::memcpy(out->f32, tmpM, chunk * sizeof(float));
@@ -161,14 +173,15 @@ static int Effect_Process(effect_handle_t self,
         }
     } else if (fmt == AUDIO_FORMAT_PCM_16_BIT) {
         // ── S16 → float → procesar → S16 ────────────────────────────────
-        static float tmpL[4096], tmpR[4096];
+        float* tmpL = ctx->scratch_l_;
+        float* tmpR = ctx->scratch_r_;
         const int16_t* src = in->s16;
         int16_t*       dst = out->s16;
         const float scale   = 1.f / 32768.f;
         const float inv_sc  = 32767.f;
 
         while (n_frames > 0) {
-            int chunk = (n_frames < 4096) ? n_frames : 4096;
+            int chunk = (n_frames < IvannaContext::kMaxBlock) ? n_frames : IvannaContext::kMaxBlock;
             for (int i = 0; i < chunk; ++i) {
                 tmpL[i] = src[i*2    ] * scale;
                 tmpR[i] = src[i*2 + 1] * scale;
