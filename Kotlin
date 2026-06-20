@@ -6,7 +6,6 @@
 package com.ivannafusion
 
 import android.media.audiofx.AudioEffect
-import android.media.audiofx.Equalizer
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -19,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,6 +25,7 @@ import androidx.navigation.NavController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.lang.reflect.Constructor
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
@@ -47,8 +46,8 @@ object EffectParams {
     const val PARAM_COMP_RELEASE = 0x54
     const val PARAM_COMP_MAKEUP = 0x55
     const val PARAM_COMP_BYPASS = 0x56
-    const val PARAM_EXC_DRIVE = 0x60    const val PARAM_EXC_MIX = 0x61
-    const val PARAM_EXC_HPF_FREQ = 0x62
+    const val PARAM_EXC_DRIVE = 0x60
+    const val PARAM_EXC_MIX = 0x61    const val PARAM_EXC_HPF_FREQ = 0x62
     const val PARAM_EXC_BYPASS = 0x63
     const val PARAM_GLOBAL_BYPASS = 0x70
     const val PARAM_PRESET_LOAD = 0x72
@@ -60,17 +59,79 @@ private val ACCENT = Color(0xFF7B61FF)
 private val ACCENT2 = Color(0xFF00E5FF)
 private val CARD_BG = Color(0xFF12121E)
 
+// Clase wrapper que usa reflexión para crear AudioEffect con UUID personalizado
+class CustomAudioEffect(priority: Int = 0, vararg uuids: UUID) {
+    private var effect: AudioEffect? = null
+    
+    init {
+        try {
+            // Usar reflexión para acceder al constructor protegido de AudioEffect
+            val constructor: Constructor<AudioEffect> = AudioEffect::class.java.getDeclaredConstructor(
+                Int::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType,
+                UUID::class.java,
+                UUID::class.java
+            )
+            constructor.isAccessible = true
+            
+            // Crear instancia con UUID personalizado
+            // Parámetros: priority, audioSession, type (UUID), uuid (UUID)
+            effect = constructor.newInstance(priority, 0, uuids[0], uuids[0])
+            effect?.enabled = true
+            Log.i(TAG, "CustomAudioEffect creado exitosamente")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error creando CustomAudioEffect: ${e.message}", e)
+            effect = null
+        }
+    }
+    
+    fun setParameter(paramId: Int, value: Float): Boolean {
+        val eff = effect ?: return false
+        return try {
+            val data = ByteBuffer.allocate(8).order(ByteOrder.nativeOrder())
+            data.putInt(paramId)
+            data.putFloat(value)
+            
+            // Usar command() para enviar datos al efecto nativo
+            // COMMAND_SET_PARAMETER = 2
+            val result = eff.command(2, data.array().size, data.array())
+            result == AudioEffect.SUCCESS
+        } catch (e: Exception) {            Log.e(TAG, "setParameter error: ${e.message}")
+            false
+        }
+    }
+    
+    fun setParameterInt(paramId: Int, value: Int): Boolean {
+        val eff = effect ?: return false
+        return try {
+            val data = ByteBuffer.allocate(8).order(ByteOrder.nativeOrder())
+            data.putInt(paramId)
+            data.putInt(value)
+            val result = eff.command(2, data.array().size, data.array())
+            result == AudioEffect.SUCCESS
+        } catch (e: Exception) {
+            Log.e(TAG, "setParameterInt error: ${e.message}")
+            false
+        }
+    }
+    
+    fun release() {
+        effect?.release()
+        effect = null
+    }
+    
+    fun isEnabled(): Boolean = effect?.enabled == true
+}
+
 object EffectsController {
-    private var equalizer: Equalizer? = null
+    private var customEffect: CustomAudioEffect? = null
     var isConnected = false
         private set
 
     fun connect(context: android.content.Context): Boolean {
         return try {
-            // Usar Equalizer como proxy para comunicarse con el efecto nativo
-            equalizer = Equalizer(0, 0)
-            equalizer?.enabled = true
-            isConnected = equalizer != null
+            customEffect = CustomAudioEffect(0, IVANNA_EFFECT_UUID)
+            isConnected = customEffect != null
             Log.i(TAG, "Effect connected: $isConnected")
             isConnected
         } catch (e: Exception) {
@@ -81,38 +142,16 @@ object EffectsController {
     }
 
     fun disconnect() {
-        equalizer?.release()
-        equalizer = null
+        customEffect?.release()
+        customEffect = null
         isConnected = false
     }
-
     fun setParam(paramId: Int, value: Float): Boolean {
-        val eq = equalizer ?: return false
-        return try {
-            // Enviar comando personalizado a través de Equalizer
-            val data = ByteBuffer.allocate(8).order(ByteOrder.nativeOrder())
-            data.putInt(paramId)
-            data.putFloat(value)
-            // Usar command() para enviar datos personalizados
-            eq.command(AudioEffect.COMMAND_SET_PARAMETER, paramId, data.array())
-            true
-        } catch (e: Exception) {             Log.e(TAG, "setParam error: ${e.message}")
-            false 
-        }
+        return customEffect?.setParameter(paramId, value) ?: false
     }
 
     fun setParamInt(paramId: Int, value: Int): Boolean {
-        val eq = equalizer ?: return false
-        return try {
-            val data = ByteBuffer.allocate(8).order(ByteOrder.nativeOrder())
-            data.putInt(paramId)
-            data.putInt(value)
-            eq.command(AudioEffect.COMMAND_SET_PARAMETER, paramId, data.array())
-            true
-        } catch (e: Exception) { 
-            Log.e(TAG, "setParamInt error: ${e.message}")
-            false 
-        }
+        return customEffect?.setParameterInt(paramId, value) ?: false
     }
 
     fun loadPreset(presetId: Int): Boolean = setParam(EffectParams.PARAM_PRESET_LOAD, presetId.toFloat())
@@ -145,7 +184,8 @@ fun EffectsControlScreen(navController: NavController) {
             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = CARD_BG)) {
                 Text("Estado: ${if (connected) "✅ Conectado" else "❌ Desconectado"}",
                     color = if (connected) Color(0xFF00FF9C) else Color(0xFFFF5555),
-                    modifier = Modifier.padding(16.dp))            }
+                    modifier = Modifier.padding(16.dp))
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -155,6 +195,5 @@ fun EffectsControlScreen(navController: NavController) {
             }
         }
     }
-
     DisposableEffect(Unit) { onDispose { EffectsController.disconnect() } }
 }
