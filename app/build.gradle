@@ -36,9 +36,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.create("release") {
                 storeFile file("../ivanna-keystore.jks")
-                storePassword System.getenv("IVANNA_KEYSTORE_PASSWORD") ?: "ivanna_trascendental_2025"
+                storePassword System.getenv("IVANNA_KEYSTORE_PASSWORD")
+                    ?: throw GradleException("IVANNA_KEYSTORE_PASSWORD env var no definida")
                 keyAlias "ivanna"
-                keyPassword System.getenv("IVANNA_KEY_PASSWORD") ?: "ivanna_trascendental_2025"
+                keyPassword System.getenv("IVANNA_KEY_PASSWORD")
+                    ?: throw GradleException("IVANNA_KEY_PASSWORD env var no definida")
             }
         }
     }
