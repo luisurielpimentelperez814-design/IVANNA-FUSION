@@ -128,6 +128,17 @@ static int Effect_Process(effect_handle_t self,
     int n_frames = (int)in->frameCount;
     if (n_frames <= 0) return 0;
 
+    // Diagnóstico: si AudioFlinger entrega más frames que kMaxBlock,
+    // el procesamiento se divide correctamente en chunks (ver bucles
+    // 'while (n_frames > 0)' más abajo), pero antes esto ocurría sin
+    // dejar ningún rastro. Lo registramos una sola vez por llamada
+    // para poder diagnosticar tamaños de buffer inusuales en campo
+    // sin saturar el log en cada callback de audio.
+    if (n_frames > IvannaContext::kMaxBlock) {
+        ALOG("Effect_Process: n_frames=%d excede kMaxBlock=%d, procesando en chunks",
+             n_frames, IvannaContext::kMaxBlock);
+    }
+
     const audio_format_t fmt = ctx->config.inputCfg.format;
 
     if (fmt == AUDIO_FORMAT_PCM_FLOAT) {
