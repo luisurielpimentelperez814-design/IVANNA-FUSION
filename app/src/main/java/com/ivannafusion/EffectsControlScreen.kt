@@ -40,12 +40,12 @@ private val BG_TOP = Color(0xFF0A0A0F)
 private val BG_BOT = Color(0xFF0D0D1A)
 private val ACCENT2 = Color(0xFF00E5FF)
 private val CARD_BG = Color(0xFF12121E)
-
 class CustomAudioEffect(priority: Int = 0, vararg uuids: UUID) {
     private var effect: AudioEffect? = null
     
     init {
-        try {            val constructor: Constructor<*> = AudioEffect::class.java.getDeclaredConstructor(
+        try {
+            val constructor: Constructor<*> = AudioEffect::class.java.getDeclaredConstructor(
                 Int::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType,
                 UUID::class.java,
@@ -88,13 +88,13 @@ class CustomAudioEffect(priority: Int = 0, vararg uuids: UUID) {
 
 object EffectsController {
     private var customEffect: CustomAudioEffect? = null
-    var isConnected = false
-        private set
+    var isConnected = false        private set
 
     fun connect(context: android.content.Context): Boolean {
         return try {
             customEffect = CustomAudioEffect(0, IVANNA_EFFECT_UUID)
-            isConnected = customEffect != null            isConnected
+            isConnected = customEffect != null
+            isConnected
         } catch (e: Exception) {
             isConnected = false
             false
@@ -137,8 +137,7 @@ fun EffectsControlScreen(navController: NavController) {
                 colors = ButtonDefaults.buttonColors(containerColor = ACCENT2)) {
                 Text("VOLVER", color = Color.Black)
             }
-        }
-    }
+        }    }
 
     DisposableEffect(Unit) { onDispose { EffectsController.disconnect() } }
 }
