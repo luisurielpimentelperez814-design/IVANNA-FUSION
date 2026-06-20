@@ -50,13 +50,6 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> $GITHUB_ENV
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018"         >> $GITHUB_ENV
 
-      - name: Generar Gradle Wrapper (si no existe)
-        run: |
-          if [ ! -f "./gradlew" ]; then
-            gradle wrapper --gradle-version 8.5
-          fi
-          chmod +x ./gradlew
-
       - name: Restaurar keystore desde secreto
         env:
           KEYSTORE_B64: ${{ secrets.IVANNA_KEYSTORE_B64 }}
@@ -81,6 +74,17 @@ jobs:
             echo "IVANNA_KEYSTORE_PASSWORD=$TMP_PW" >> "$GITHUB_ENV"
             echo "IVANNA_KEY_PASSWORD=$TMP_PW"       >> "$GITHUB_ENV"
           fi
+
+      # Debe ir DESPUÉS de restaurar el keystore: cualquier invocación de
+      # gradle (incluido 'gradle wrapper') evalúa app/build.gradle, y ese
+      # build script exige IVANNA_KEYSTORE_PASSWORD/IVANNA_KEY_PASSWORD en
+      # el entorno desde el momento de configuración, no solo al firmar.
+      - name: Generar Gradle Wrapper (si no existe)
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            gradle wrapper --gradle-version 8.5
+          fi
+          chmod +x ./gradlew
 
       - name: Compilar APK release
         run: ./gradlew assembleRelease --stacktrace
