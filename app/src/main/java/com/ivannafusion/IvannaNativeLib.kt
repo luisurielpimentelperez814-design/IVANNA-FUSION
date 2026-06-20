@@ -12,7 +12,8 @@ object IvannaNativeLib {
     // Basic
     @JvmStatic external fun nativeSetEnabled(enabled: Boolean)
     @JvmStatic external fun nativeIsEnabled(): Boolean
-    @JvmStatic external fun nativeSetPreset(id: Int)    @JvmStatic external fun nativeReset()
+    @JvmStatic external fun nativeSetPreset(id: Int)
+    @JvmStatic external fun nativeReset()
 
     // EQ
     @JvmStatic external fun nativeEqSetGain(b: Int, g: Float)
@@ -61,7 +62,8 @@ object IvannaNativeLib {
     @JvmStatic external fun nativeAutoeqApply(name: String)
 
     // AI
-    @JvmStatic external fun nativeAiSetEnabled(e: Boolean)    @JvmStatic external fun nativeAiSetAutoAdapt(a: Boolean)
+    @JvmStatic external fun nativeAiSetEnabled(e: Boolean)
+    @JvmStatic external fun nativeAiSetAutoAdapt(a: Boolean)
     @JvmStatic external fun nativeAiSetSensitivity(s: Float)
     @JvmStatic external fun nativeAiGetDetectedGenre(): String
     @JvmStatic external fun nativeAiGetConfidence(): Float
