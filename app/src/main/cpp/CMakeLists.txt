@@ -56,8 +56,15 @@ target_link_libraries(omega_engine_native
 )
 
 # Librería del efecto Omega (JNI)
+# Librería del efecto Omega (Audio Effect HAL real, cargada por
+# audioserver — ver audio_effects.xml). Necesita android_effect_abi.h
+# (mismo header que ya usa src/cpp/effect_library.cpp para libivanna_fusion.so).
 add_library(omega_effect SHARED
     omega_effect.cpp
+)
+
+target_include_directories(omega_effect PRIVATE
+    "${IVANNA_DSP_DIR}/fft"
 )
 
 target_link_libraries(omega_effect
