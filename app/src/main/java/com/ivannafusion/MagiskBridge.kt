@@ -3,17 +3,24 @@ package com.ivannafusion
 import android.util.Log
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.util.concurrent.TimeUnit
 
 object MagiskBridge {
     private const val TAG = "MagiskBridge"
     private const val SOCKET_PATH = "/data/pf/pf.sock"
+    private const val PROCESS_TIMEOUT_MS = 3000L
     
     fun isModuleInstalled(): Boolean {
         return try {
             val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "test -e $SOCKET_PATH && echo yes"))
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             val result = reader.readLine()?.trim() == "yes"
-            process.waitFor()
+            // FIX: waitFor con timeout para evitar bloqueo del IO thread pool
+            val exited = process.waitFor(PROCESS_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            if (!exited) {
+                process.destroyForcibly()
+                Log.w(TAG, "Process timed out checking module")
+            }
             result
         } catch (e: Exception) {
             Log.e(TAG, "Error checking module", e)
@@ -28,7 +35,12 @@ object MagiskBridge {
             )
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             val result = reader.readText()
-            process.waitFor()
+            // FIX: waitFor con timeout para evitar agotamiento del IO thread pool
+            val exited = process.waitFor(PROCESS_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            if (!exited) {
+                process.destroyForcibly()
+                Log.w(TAG, "Process timed out for command: $command")
+            }
             Log.d(TAG, "Command: $command -> $result")
             result
         } catch (e: Exception) {

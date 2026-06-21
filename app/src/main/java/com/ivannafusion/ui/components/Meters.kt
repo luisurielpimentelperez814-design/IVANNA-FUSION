@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.ivannafusion.ui.theme.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun VUMeter(
@@ -28,11 +29,26 @@ fun VUMeter(
         label = "vu"
     )
     
-    LaunchedEffect(level) {
-        if (level > peakLevel) peakLevel = level
-        if (peakHold && peakLevel - level > 0.02f) {
-            delay(1500)
-            peakLevel = (peakLevel - 0.01f).coerceAtLeast(level)
+    // FIX: Peak hold con Job que se cancela en lugar de LaunchedEffect acumulativo
+    val scope = rememberCoroutineScope()
+    var peakDecayJob by remember { mutableStateOf<androidx.compose.runtime.DisposableEffectResult<*>?>(null) }
+    
+    LaunchedEffect(level, peakLevel) {
+        if (level > peakLevel) {
+            peakLevel = level
+        }
+    }
+    
+    // Peak decay separado - solo se ejecuta cuando peak > level
+    DisposableEffect(peakLevel > level + 0.02f) {
+        if (peakHold && peakLevel > level + 0.02f) {
+            val job = kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                delay(1500)
+                peakLevel = (peakLevel - 0.01f).coerceAtLeast(level)
+            }
+            onDispose { job.cancel() }
+        } else {
+            onDispose { }
         }
     }
     
@@ -46,7 +62,8 @@ fun VUMeter(
             color = Color(0xFF0F172A),
             size = Size(barWidth, barHeight)
         )
-                val activeSegments = (animatedLevel * 40).toInt()
+        
+        val activeSegments = (animatedLevel * 40).toInt()
         for (i in 0 until 40) {
             val y = barHeight - (i + 1) * segmentHeight
             val color = when {
@@ -79,19 +96,14 @@ fun SpectrumVisualizer(
     modifier: Modifier = Modifier,
     accentColor: Color = AccentCyan
 ) {
-    val animatedMagnitudes = remember(magnitudes.size) {
-        List(magnitudes.size) { Animatable(0f) }
-    }
-    
-    LaunchedEffect(magnitudes) {
-        magnitudes.forEachIndexed { index, mag ->
-            if (index < animatedMagnitudes.size) {
-                animatedMagnitudes[index].animateTo(
-                    targetValue = mag.coerceIn(0f, 1f),
-                    animationSpec = spring(dampingRatio = 0.7f, stiffness = 200f)
-                )
-            }
-        }
+    // FIX: Usar animateFloatAsState en lugar de Animatable con LaunchedEffect secuencial
+    // Esto evita la cancelación constante cuando magnitudes cambia cada 80ms
+    val animatedMagnitudes = magnitudes.map { mag ->
+        animateFloatAsState(
+            targetValue = mag.coerceIn(0f, 1f),
+            animationSpec = spring(dampingRatio = 0.7f, stiffness = 200f),
+            label = "spectrum"
+        ).value
     }
     
     Canvas(modifier = modifier.fillMaxSize()) {
@@ -100,19 +112,22 @@ fun SpectrumVisualizer(
         val barWidth = (totalWidth / barCount) * 0.7f
         val gap = (totalWidth / barCount) * 0.3f
         
-        animatedMagnitudes.forEachIndexed { index, anim ->
+        // FIX: Crear el gradient UNA VEZ fuera del loop, no por cada barra
+        val gradient = Brush.verticalGradient(
+            colors = listOf(
+                accentColor,
+                accentColor.copy(alpha = 0.3f)
+            ),
+            startY = 0f,
+            endY = size.height
+        )
+        
+        animatedMagnitudes.forEachIndexed { index, animValue ->
             val x = index * (barWidth + gap)
-            val barHeight = anim.value * size.height
+            val barHeight = animValue * size.height
             
             drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        accentColor,
-                        accentColor.copy(alpha = 0.3f)
-                    ),
-                    startY = size.height - barHeight,
-                    endY = size.height
-                ),
+                brush = gradient,
                 topLeft = Offset(x, size.height - barHeight),
                 size = Size(barWidth, barHeight)
             )
@@ -145,7 +160,8 @@ fun CorrelationMeter(
             start = Offset(width / 2f, 0f),
             end = Offset(width / 2f, size.height),
             strokeWidth = 2f
-        )        
+        )
+        
         val x = (width / 2f) + (animatedCorr * width / 2f)
         val color = when {
             animatedCorr > 0.7f -> SignalCool
