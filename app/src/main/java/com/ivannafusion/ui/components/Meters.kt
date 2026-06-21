@@ -44,7 +44,7 @@ fun VUMeter(
     // Peak decay con coroutine manejada correctamente
     LaunchedEffect(peakLevel, level) {
         if (peakHold && peakLevel > level + 0.02f) {
-            peakDecayJob = kotlinx.coroutines.launch {
+            peakDecayJob = scope.launch {
                 delay(1500)
                 peakLevel = (peakLevel - 0.01f).coerceAtLeast(level)
             }
