@@ -5,6 +5,8 @@
 #include <array>
 #include <complex>
 
+namespace dsp {
+
 // Estructura para un filtro biquad (base del EQ paramétrico)
 struct BiquadFilter {
     float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f;
@@ -252,5 +254,7 @@ private:
         }
     }
 };
+
+} // namespace dsp
 
 #endif // PARAMETRIC_EQ_H

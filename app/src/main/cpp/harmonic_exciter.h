@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <array>
 
+namespace dsp {
+
 // Excitador armónico (genera armónicos para enriquecer el contenido)
 class HarmonicExciter {
 public:
@@ -147,5 +149,7 @@ private:
         return std::pow(10.0f, db / 20.0f);
     }
 };
+
+} // namespace dsp
 
 #endif // HARMONIC_EXCITER_H

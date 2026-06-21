@@ -4,6 +4,8 @@
 #include <cmath>
 #include <algorithm>
 
+namespace dsp {
+
 // Compresor de dinámica de audio
 class Compressor {
 public:
@@ -130,5 +132,7 @@ private:
         return 20.0f * std::log10(linear);
     }
 };
+
+} // namespace dsp
 
 #endif // COMPRESSOR_H
