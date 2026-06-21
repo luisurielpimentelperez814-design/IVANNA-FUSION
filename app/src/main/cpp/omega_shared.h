@@ -1,53 +1,44 @@
 #ifndef OMEGA_SHARED_H
 #define OMEGA_SHARED_H
 
-#include <stdatomic.h>
-#include <stdint.h>
-#include <stddef.h>
+#include <atomic>
+#include <cstdint>
 
-// ═══════════════════════════════════════════════════════════════
-// CONSTANTES COMPARTIDAS (plugin ↔ daemon ↔ APK)
-// ═══════════════════════════════════════════════════════════════
-#define OMEGA_SHM_PATH         "/dev/shm/omega_shared"
-#define OMEGA_SOCKET_PATH      "/data/omega/control.sock"
-#define OMEGA_BUFFER_FRAMES    4096
-#define OMEGA_MAX_CHANNELS     2
+// Constantes del motor
 #define OMEGA_BLOCK_SIZE       512
+#define OMEGA_SAMPLE_RATE      48000
+#define OMEGA_MAX_CHANNELS     2
+#define OMEGA_BUFFER_SLOTS     16
 
-// ═══════════════════════════════════════════════════════════════
-// ESTRUCTURA DE SHARED MEMORY (mmap entre plugin y daemon)
-// ═══════════════════════════════════════════════════════════════
-typedef struct {
-    // Control flags (escritos por daemon, leídos por plugin)
-    atomic_bool    daemon_ready;
-    atomic_bool    bypass_mode;
-
-    // Parámetros (escritos por APK via socket, leídos por daemon)
-    atomic_float   intensity;
-    atomic_int     preset_id;
-    atomic_int     swd_projections;
-    atomic_float   phase_coherence;
-    atomic_float   collapse_strength;
-    atomic_float   vocoder_mix;
-
-    // Telemetría (escrita por daemon, leída por APK via socket)
-    atomic_float   current_temperature;
-    atomic_float   current_latency_ms;
-    atomic_int     npu_usage_percent;
-    atomic_bool    thermal_throttling;
-    atomic_int     processed_blocks;
-    atomic_int     dropped_blocks;
-
-    // ═══ SPSC Ring Buffer: INPUT (plugin → daemon) ═══
-    atomic_size_t  in_write_pos;
-    atomic_size_t  in_read_pos;
-    float          input_buffer[OMEGA_BUFFER_FRAMES * OMEGA_MAX_CHANNELS];
-
-    // ═══ SPSC Ring Buffer: OUTPUT (daemon → plugin) ═══
-    atomic_size_t  out_write_pos;
-    atomic_size_t  out_read_pos;
-    float          output_buffer[OMEGA_BUFFER_FRAMES * OMEGA_MAX_CHANNELS];
-
-} OmegaSharedData;
+// Estructura de estado compartido (compatible con Android NDK)
+struct OmegaSharedState {
+    std::atomic<float>   intensity;
+    std::atomic<bool>    is_processing;
+    std::atomic<bool>    bypass_enabled;
+    std::atomic<float>   phase_coherence;
+    std::atomic<float>   collapse_strength;
+    std::atomic<float>   vocoder_mix;
+    std::atomic<float>   current_temperature;
+    std::atomic<float>   current_latency_ms;
+    
+    // Buffers circulares para audio
+    float input_buffer[OMEGA_BUFFER_SLOTS][OMEGA_BLOCK_SIZE * OMEGA_MAX_CHANNELS];
+    float output_buffer[OMEGA_BUFFER_SLOTS][OMEGA_BLOCK_SIZE * OMEGA_MAX_CHANNELS];
+    
+    std::atomic<uint32_t> write_pos;
+    std::atomic<uint32_t> read_pos;
+    
+    OmegaSharedState() : 
+        intensity(0.8f),
+        is_processing(false),
+        bypass_enabled(false),
+        phase_coherence(1.0f),
+        collapse_strength(0.5f),
+        vocoder_mix(0.8f),
+        current_temperature(35.0f),
+        current_latency_ms(0.0f),
+        write_pos(0),
+        read_pos(0) {}
+};
 
 #endif // OMEGA_SHARED_H
