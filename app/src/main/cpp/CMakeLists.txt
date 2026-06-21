@@ -5,7 +5,7 @@ project("ivanna_fusion")
 # Configuración de optimización para ARM64
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math -funroll-loops -march=armv8.2-a+fp16+dotprod")
 
-# Librería principal de Ivanna
+# Librería principal de Ivanna (usa AAudio)
 add_library(ivanna_native SHARED
     ivanna_native_lib.cpp
     audio_orchestrator.cpp
@@ -17,6 +17,7 @@ target_link_libraries(ivanna_native
     android
     log
     atomic
+    aaudio
 )
 
 # Librería del motor Omega (JNI)
@@ -41,7 +42,7 @@ target_link_libraries(omega_effect
     atomic
 )
 
-# Librería del daemon Omega (JNI, NO ejecutable)
+# Librería del daemon Omega (JNI)
 add_library(omega_daemon SHARED
     omega_daemon.cpp
 )
