@@ -15,7 +15,8 @@ import com.ivannafusion.PresetManager
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(engine: AudioEngine, presetMgr: PresetManager, nav: NavController) {
-    var state by remember { mutableStateOf("Listo") }    var running by remember { mutableStateOf(false) }
+    var state by remember { mutableStateOf("Listo") }
+    var running by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
 
     LaunchedEffect(Unit) {
@@ -23,7 +24,7 @@ fun HomeScreen(engine: AudioEngine, presetMgr: PresetManager, nav: NavController
         state = "Inicializado"
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("🎵 IVANNA FUSION") }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text("IVANNA FUSION") }) }) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -40,23 +41,23 @@ fun HomeScreen(engine: AudioEngine, presetMgr: PresetManager, nav: NavController
                     onClick = { engine.startAudioCapture(); running = true; state = "Ejecutando" },
                     modifier = Modifier.weight(1f),
                     enabled = !running
-                ) { Text("▶ Iniciar") }
+                ) { Text("Iniciar") }
                 Button(
                     onClick = { engine.stopAudioCapture(); running = false; state = "Detenido" },
                     modifier = Modifier.weight(1f),
                     enabled = running
-                ) { Text("⏹ Detener") }
+                ) { Text("Detener") }
             }
             Spacer(Modifier.height(24.dp))
             listOf(
-                "pf_engine" to "🧬 PF Engine",
-                "presets" to "🎛️ Presets",
-                "spatial" to "🎧 Espacial",
-                "eq" to "📊 EQ Dinámico",
-                "ai" to "🤖 Asistente IA",
-                "simbiosis" to "🔗 Simbiosis",
-                "monitor" to "📈 Monitor",
-                "settings" to "⚙️ Configuración"
+                "pf_engine" to "PF Engine",
+                "presets" to "Presets",
+                "spatial" to "Espacial",
+                "eq" to "EQ Dinamico",
+                "ai" to "Asistente IA",
+                "simbiosis" to "Simbiosis",
+                "monitor" to "Monitor",
+                "settings" to "Configuracion"
             ).forEach { (route, label) ->
                 Button(
                     onClick = { nav.navigate(route) },
@@ -64,4 +65,5 @@ fun HomeScreen(engine: AudioEngine, presetMgr: PresetManager, nav: NavController
                 ) { Text(label) }
             }
         }
-    }}
+    }
+}
