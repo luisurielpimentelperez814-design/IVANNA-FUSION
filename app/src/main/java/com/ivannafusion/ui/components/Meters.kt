@@ -32,7 +32,7 @@ fun VUMeter(
     
     // FIX: Peak hold con Job que se cancela correctamente
     val scope = rememberCoroutineScope()
-    var peakDecayJob by remember { mutableStateOf<Job?>(null) }
+    var peakDecayJob: Job? by remember { mutableStateOf(null) }
     
     LaunchedEffect(level) {
         if (level > peakLevel) {
