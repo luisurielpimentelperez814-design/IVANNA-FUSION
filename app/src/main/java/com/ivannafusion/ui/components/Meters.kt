@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.ivannafusion.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 @Composable
 fun VUMeter(
