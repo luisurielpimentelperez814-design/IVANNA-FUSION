@@ -46,7 +46,8 @@ fun EffectsScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
                 1 -> CompressorPanel(audioEngine)
                 2 -> ConvolverPanel(audioEngine)
                 3 -> SpatialPanel(audioEngine)
-            }            Spacer(Modifier.height(100.dp))
+                else -> {}            }
+            Spacer(Modifier.height(100.dp))
         }
     }
 }
@@ -94,8 +95,8 @@ private fun CompressorPanel(audioEngine: AudioEngine) {
             IVANNAKnob(value = attack, onValueChange = { attack = it; audioEngine.compSetAttack(it * 100f) }, size = 72.dp, label = "ATK", unit = "ms", accentColor = AccentMagenta)
             IVANNAKnob(value = release, onValueChange = { release = it; audioEngine.compSetRelease(it * 1000f) }, size = 72.dp, label = "REL", unit = "ms", accentColor = AccentMagenta)
         }
-    }
-}
+    }}
+
 @Composable
 private fun ConvolverPanel(audioEngine: AudioEngine) {
     var enabled by remember { mutableStateOf(false) }
