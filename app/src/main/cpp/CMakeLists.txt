@@ -67,6 +67,7 @@ target_link_libraries(omega_effect
 )
 
 # Librería del daemon Omega (JNI)
+# Necesita el thread real de la NDK (std::thread, sockets, sched_setaffinity)
 add_library(omega_daemon SHARED
     omega_daemon.cpp
 )
@@ -75,6 +76,8 @@ target_link_libraries(omega_daemon
     android
     log
     atomic
+    # El NDK moderno (r23+) ya integra pthread en libc, pero se referencia
+    # explícitamente como buena práctica documentada para std::thread.
 )
 
 # ── Motor PF Engine ─────────────────────────────────────────────────────────
