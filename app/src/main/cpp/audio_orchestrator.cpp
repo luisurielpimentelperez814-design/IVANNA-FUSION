@@ -325,4 +325,62 @@ Java_com_ivannafusion_AudioEngine_nativeSetHyperplane(
     LOGI("Hyperplane connected at 0x%llx", (long long)address);
 }
 
+// ── Bindings para IvannaNativeLib.kt ───────────────────────────────────────
+// IvannaNativeLib.kt pide un ciclo de vida simplificado de 3 pasos
+// (init/process/release) sin AAudio propio — pensado para procesar
+// buffers ya capturados/entregados por Kotlin, en vez de manejar el
+// stream de salida AAudio directamente (eso ya lo hace AudioEngine vía
+// nativeCreateEngine/nativeStartProcessing). Se reutiliza el mismo
+// filtro de Kalman (kalmanStep, g_engine.kalman) para no duplicar estado.
+
+JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeInitAudioEngine(
+        JNIEnv * /*env*/, jobject /*thiz*/, jint sampleRate, jint /*bufferSize*/) {
+    g_engine.sampleRate = sampleRate;
+    kalmanInit(g_engine.kalman, sampleRate);
+    g_engine.phase_error_rms.store(0.0f);
+    LOGI("IvannaNativeLib.nativeInitAudioEngine: sampleRate=%d", sampleRate);
+    return JNI_TRUE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeProcessAudio(
+        JNIEnv *env, jobject /*thiz*/, jfloatArray inputBuffer, jfloatArray outputBuffer) {
+    jsize n = env->GetArrayLength(inputBuffer);
+    jsize nOut = env->GetArrayLength(outputBuffer);
+    if (nOut < n) n = nOut;  // nunca escribir más allá del buffer de salida
+
+    jfloat *inBuf  = env->GetFloatArrayElements(inputBuffer,  nullptr);
+    jfloat *outBuf = env->GetFloatArrayElements(outputBuffer, nullptr);
+
+    const float dt = (g_engine.sampleRate > 0) ? 1.0f / (float)g_engine.sampleRate
+                                                : 1.0f / 48000.0f;
+    for (int i = 0; i < n; i++) {
+        float innov = kalmanStep(g_engine.kalman, inBuf[i], dt);
+        outBuf[i] = inBuf[i] - innov * 0.0f + 0.0f; // passthrough explícito;
+        // el suavizado/predicción real vive en nativePredictSamples
+        // (phase_oracle.cpp) y en el motor DSP de ivanna_native_lib_v2.cpp
+        // (EQ/Compresor/Exciter), que procesan el mismo audio capturado
+        // a través de processBlock(). Este binding mantiene actualizado
+        // el estado de fase (kalmanStep) en cada bloque entregado.
+        outBuf[i] = inBuf[i];
+    }
+
+    env->ReleaseFloatArrayElements(inputBuffer,  inBuf,  JNI_ABORT);
+    env->ReleaseFloatArrayElements(outputBuffer, outBuf, 0);
+    return (jint)n;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeReleaseAudioEngine(
+        JNIEnv * /*env*/, jobject /*thiz*/) {
+    if (g_engine.stream) {
+        AAudioStream_requestStop(g_engine.stream);
+        AAudioStream_close(g_engine.stream);
+        g_engine.stream = nullptr;
+    }
+    LOGI("IvannaNativeLib.nativeReleaseAudioEngine: motor liberado");
+    return JNI_TRUE;
+}
+
 } // extern "C"

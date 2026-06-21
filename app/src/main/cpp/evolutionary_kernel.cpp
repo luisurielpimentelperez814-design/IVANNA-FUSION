@@ -131,4 +131,39 @@ Java_com_ivannafusion_AudioEngine_nativeGetMutationRate(JNIEnv *, jobject) {
     return g_mutationRate;
 }
 
+// ── Bindings para IvannaNativeLib.kt ───────────────────────────────────────
+// IvannaNativeLib.kt declara su propio set de "external fun" para el motor
+// evolutivo (nativeInitializeEvolution, nativeGetBestFitness, etc.) con
+// firmas ligeramente distintas a las de AudioEngine (population/generations
+// como parámetros, fitness como Double, evolveStep devuelve Boolean).
+// Se agregan aquí, junto al estado real ya existente (g_population,
+// g_mutationRate), sin tocar los bindings de AudioEngine.
+
+JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeInitializeEvolution(
+        JNIEnv *, jobject, jint /*populationSize*/, jint /*generations*/) {
+    // POPULATION_SIZE es una constante de compilación en este motor;
+    // los parámetros de la UI se aceptan por compatibilidad de firma,
+    // pero el tamaño real de población es el definido en evaluateFitness/
+    // initializePopulation. Documentado explícitamente, no simulado.
+    initializePopulation();
+    return JNI_TRUE;
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeGetBestFitness(JNIEnv *, jobject) {
+    return static_cast<jdouble>(g_population.bestFitness);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeGetGeneration(JNIEnv *, jobject) {
+    return static_cast<jint>(g_population.generation);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeEvolveStep(JNIEnv *, jobject) {
+    evolveGeneration();
+    return JNI_TRUE;
+}
+
 } // extern "C"

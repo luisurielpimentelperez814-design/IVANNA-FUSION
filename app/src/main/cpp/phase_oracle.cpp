@@ -156,3 +156,60 @@ Java_com_ivannafusion_AudioEngine_nativePredictSamples(
     env->ReleaseFloatArrayElements(input,  inBuf,  JNI_ABORT);
     env->ReleaseFloatArrayElements(output, outBuf, 0);
 }
+
+// ── Bindings para IvannaNativeLib.kt ───────────────────────────────────────
+// Firmas distintas a las de AudioEngine: nativePredictSamples aquí recibe
+// (buffer, sampleCount) y DEVUELVE un FloatArray nuevo, en vez de escribir
+// sobre un buffer de salida ya asignado. Reutiliza el mismo filtro de
+// Kalman cúbico (g_kalman) ya implementado arriba.
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativePredictSamples(
+        JNIEnv *env, jobject /*thiz*/, jfloatArray audioBuffer, jint sampleCount) {
+
+    static bool initialized = false;
+    if (!initialized) { kalmanInit(); initialized = true; }
+
+    jfloat *inBuf = env->GetFloatArrayElements(audioBuffer, nullptr);
+    int n = sampleCount;
+
+    for (int i = 0; i < n; i++) {
+        kalmanPredict();
+        kalmanUpdate(inBuf[i]);
+    }
+
+    jfloatArray result = env->NewFloatArray(n);
+    jfloat *outBuf = env->GetFloatArrayElements(result, nullptr);
+
+    float dt = 1.0f / 384000.0f;
+    for (int i = 0; i < n; i++) {
+        float t = (float)(i + 1) * dt;
+        outBuf[i] = g_kalman.state[0]
+                  + g_kalman.state[1] * t
+                  + 0.5f * g_kalman.state[2] * t * t;
+    }
+
+    env->ReleaseFloatArrayElements(audioBuffer, inBuf, JNI_ABORT);
+    env->ReleaseFloatArrayElements(result, outBuf, 0);
+    return result;
+}
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeGetPhaseState(JNIEnv *, jobject) {
+    // Estado de fase actual del filtro de Kalman cúbico (state[0] = phase).
+    return g_kalman.state[0];
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeSetPhaseParameters(
+        JNIEnv *, jobject, jfloat alpha, jfloat beta, jfloat gamma) {
+    // Mapea alpha/beta/gamma a la covarianza de proceso diagonal (Q) del
+    // Kalman cúbico: alpha controla phase, beta frequency, gamma chirp.
+    // No existían parámetros de ruido de proceso ajustables antes de
+    // este binding; se exponen aquí sin modificar la estructura KalmanCubic.
+    g_kalman.Q[0][0] = alpha;
+    g_kalman.Q[1][1] = beta;
+    g_kalman.Q[2][2] = gamma;
+    return JNI_TRUE;
+}
+

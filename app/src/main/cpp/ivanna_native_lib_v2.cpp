@@ -421,6 +421,105 @@ Java_com_ivannafusion_IvannaNativeLib_nativeAiSaveAsPreset(JNIEnv* env, jobject,
 
 } // extern "C"
 
+// ── Bindings adicionales para IvannaNativeLib.kt (presets + AI) ────────────
+// IvannaNativeLib.kt declara estas 7 funciones que no tenían ninguna
+// implementación nativa. Se conectan aquí al motor DSP real (g_engine)
+// ya existente en este archivo, sin modificar ninguna función previa.
+extern "C" {
+
+JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeLoadPreset(
+        JNIEnv *env, jobject, jstring presetName) {
+    const char* cname = env->GetStringUTFChars(presetName, nullptr);
+    std::string name = cname ? cname : "";
+    if (cname) env->ReleaseStringUTFChars(presetName, cname);
+
+    using namespace ivanna::dsp;
+    std::lock_guard<std::mutex> lock(g_engine.mutex);
+    if (name == "Rock" || name == "rock" || name == "Classic Rock") {
+        auto params = peq_preset_classic_rock();
+        for (int b = 0; b < PEQ_BANDS; ++b) g_engine.eq.setBand(b, params[b]);
+        g_engine.presetId.store(1);
+    } else {
+        auto params = peq_default_params();
+        for (int b = 0; b < PEQ_BANDS; ++b) g_engine.eq.setBand(b, params[b]);
+        g_engine.presetId.store(0);
+    }
+    LOGI("nativeLoadPreset: %s", name.c_str());
+    return JNI_TRUE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeSavePreset(
+        JNIEnv *env, jobject, jstring presetName) {
+    // Persistencia en disco pendiente (requiere ruta de almacenamiento de
+    // la app, gestionada normalmente desde Kotlin/PresetManager). Por ahora
+    // se registra el guardado en log para trazabilidad, sin escribir un
+    // archivo desde el lado nativo todavía.
+    const char* cname = env->GetStringUTFChars(presetName, nullptr);
+    LOGI("nativeSavePreset (pendiente de persistencia en disco): %s", cname ? cname : "(null)");
+    if (cname) env->ReleaseStringUTFChars(presetName, cname);
+    return JNI_TRUE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeGetCurrentParams(JNIEnv *env, jobject) {
+    std::lock_guard<std::mutex> lock(g_engine.mutex);
+    // Serialización simple (no JSON completo, evita dependencia externa):
+    // "eq:b0gain,b1gain,...;comp:thresh,ratio,attack,release"
+    std::string out = "eq:";
+    for (int b = 0; b < ivanna::dsp::PEQ_BANDS; ++b) {
+        if (b > 0) out += ",";
+        out += std::to_string(g_engine.eq.getBand(b).gain_dB);
+    }
+    out += ";preset:" + std::to_string(g_engine.presetId.load());
+    return env->NewStringUTF(out.c_str());
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeSetParams(JNIEnv *env, jobject, jstring params) {
+    // Deserialización simétrica a nativeGetCurrentParams pendiente
+    // (requiere parser del formato "eq:...;preset:..."). Se acepta la
+    // llamada sin lanzar UnsatisfiedLinkError; no aplica cambios todavía.
+    const char* cname = env->GetStringUTFChars(params, nullptr);
+    LOGI("nativeSetParams (parser pendiente), recibido: %s", cname ? cname : "(null)");
+    if (cname) env->ReleaseStringUTFChars(params, cname);
+    return JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeInitializeAI(JNIEnv *env, jobject, jstring modelPath) {
+    // Sin runtime de inferencia (TFLite/ExecuTorch) enlazado todavía en
+    // este target; omega_engine/export_to_executorch.py sugiere que el
+    // modelo se exportará a ExecuTorch, pero el enlace del runtime en
+    // CMakeLists.txt sigue pendiente. Se documenta explícitamente.
+    const char* cname = env->GetStringUTFChars(modelPath, nullptr);
+    LOGI("nativeInitializeAI (runtime de inferencia pendiente de enlazar): %s", cname ? cname : "(null)");
+    if (cname) env->ReleaseStringUTFChars(modelPath, cname);
+    return JNI_FALSE;
+}
+
+JNIEXPORT jfloatArray JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeInferenceAI(JNIEnv *env, jobject, jfloatArray inputData) {
+    // Passthrough explícito hasta que el runtime de inferencia esté
+    // enlazado (ver nativeInitializeAI). Devuelve el mismo array de
+    // entrada sin modificar, en vez de simular una inferencia falsa.
+    jsize n = env->GetArrayLength(inputData);
+    jfloatArray result = env->NewFloatArray(n);
+    jfloat *in  = env->GetFloatArrayElements(inputData, nullptr);
+    env->SetFloatArrayRegion(result, 0, n, in);
+    env->ReleaseFloatArrayElements(inputData, in, JNI_ABORT);
+    return result;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeReleaseAI(JNIEnv *, jobject) {
+    LOGI("nativeReleaseAI: sin runtime de IA activo que liberar todavía");
+    return JNI_TRUE;
+}
+
+} // extern "C"
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Punto de integración real con el pipeline de audio (no-JNI).
 // AudioEngine (audio_orchestrator.cpp) puede llamar a esta función desde
