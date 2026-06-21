@@ -35,3 +35,12 @@ val BorderFocus = Color(0xFF00E5FF)
 val GradientMaster = listOf(Color(0xFF00E5FF), Color(0xFF8B5CF6))
 val GradientWarm = listOf(Color(0xFFFFAB00), Color(0xFFFF3D00))
 val GradientCool = listOf(Color(0xFF00E5FF), Color(0xFF10B981))
+
+// Colores adicionales para VisualComponents
+val PrecisionCyan = Color(0xFF00E5FF)
+val MasterGradient = listOf(Color(0xFF00E5FF), Color(0xFF8B5CF6), Color(0xFFFF006E))
+val Carbon = Color(0xFF0A0E1A)
+val Graphite = Color(0xFF1F2937)
+val Titanium = Color(0xFF334155)
+val Platinum = Color(0xFFF1F5F9)
+val Silver = Color(0xFF94A3B8)
