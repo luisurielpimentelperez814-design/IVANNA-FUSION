@@ -1,214 +1,115 @@
 package com.ivannafusion
 
-import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.net.Socket
 
 /**
- * Puente JNI para el motor Ω_in Edge AI
- * Conecta la UI con el pipeline C++/ExecuTorch
+ * OmegaEngineBridge: Controla el daemon root de Magisk (omega_daemon) 
+ * mediante sockets para el motor Omega_in.
  */
-object OmegaEngineBridge {
-    private const val TAG = "OmegaEngineBridge"
+class OmegaEngineBridge {
+
+    companion object {
+        private const val TAG = "OmegaEngineBridge"
+        private const val DAEMON_PORT = 8500 
+    }
+
+    // --- VARIABLES DE ESTADO DECLARADAS A NIVEL DE CLASE (CORRECCIÓN DE ERRORES) ---
     
-    // Cargar librería nativa
-    init {
+    private val _isProcessing = MutableStateFlow(false)
+    val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
+
+    private val _vocoderMix = MutableStateFlow(0.8f) 
+    val vocoderMix: StateFlow<Float> = _vocoderMix.asStateFlow()
+
+    private val _deviceTemp = MutableStateFlow(35.0f)
+    val deviceTemp: StateFlow<Float> = _deviceTemp.asStateFlow()
+
+    private var socket: Socket? = null
+    private var writer: PrintWriter? = null
+    private var reader: BufferedReader? = null
+
+    // --- MÉTODOS DE CONTROL ---
+
+    fun connectToDaemon() {
         try {
-            System.loadLibrary("omega_engine_native")
-            Log.i(TAG, "Native library loaded successfully")
-        } catch (e: UnsatisfiedLinkError) {
-            Log.e(TAG, "Failed to load native library", e)
+            socket = Socket("127.0.0.1", DAEMON_PORT)
+            writer = PrintWriter(socket!!.getOutputStream(), true)
+            reader = BufferedReader(InputStreamReader(socket!!.getInputStream()))
+            Log.d(TAG, "Conectado al daemon Omega")
+            startTelemetryListener()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error conectando al daemon: ${e.message}")
         }
     }
-    
-    // ═══════════════════════════════════════════════════════════════════════
-    // DECLARACIONES JNI (implementadas en audio_pipeline_android.cpp)
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    @JvmStatic
-    external fun nativeInitialize(modelPath: String): Boolean
-    
-    @JvmStatic
-    external fun nativeStartAudio(): Boolean
-    
-    @JvmStatic
-    external fun nativeStopAudio()
-    
-    @JvmStatic
-    external fun nativeIsInitialized(): Boolean
-    
-    @JvmStatic
-    external fun nativeIsProcessing(): Boolean
-    
-    @JvmStatic
-    external fun nativeGetLatencyMs(): Float
-    
-    // ═══════════════════════════════════════════════════════════════════════
-    // API DE ALTO NIVEL (para la UI)
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    private var initialized = false    private var processing = false
-    
-    fun initialize(context: Context): Boolean {
-        if (initialized) {
-            Log.w(TAG, "Already initialized")
-            return true
-        }
-        
-        // Ruta del modelo .pte en assets o almacenamiento
-        val modelPath = "${context.filesDir}/omega_engine_int8.pte"
-        
-        // TODO: Copiar modelo desde assets si no existe
-        // copyModelFromAssets(context, modelPath)
-        
-        initialized = nativeInitialize(modelPath)
-        Log.i(TAG, "Initialization result: $initialized")
-        return initialized
+
+    fun setProcessingState(state: Boolean) {
+        _isProcessing.value = state
+        sendCommandToDaemon("SET_STATE", if (state) "1" else "0")
     }
-    
-    fun start(): Boolean {
-        if (!initialized) {
-            Log.e(TAG, "Cannot start: not initialized")
-            return false
-        }
-        
-        processing = nativeStartAudio()
-        Log.i(TAG, "Start result: $processing")
-        return processing
-    }
-    
-    fun stop() {
-        nativeStopAudio()
-        processing = false
-        Log.i(TAG, "Stopped")
-    }
-    
-    fun isInitialized(): Boolean = initialized && nativeIsInitialized()
-    
-    fun isProcessing(): Boolean = processing && nativeIsProcessing()
-    
-    fun getLatencyMs(): Float = if (processing) nativeGetLatencyMs() else 0f
-    
-    // ═══════════════════════════════════════════════════════════════════════
-    // PARÁMETROS DEL MOTOR Ω_in (para controles de UI)
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    data class OmegaParams(
-        var swdProjections: Int = 64,        // L en SWD (16-128)
-        var phaseCoherence: Float = 0.8f,    // Intensidad de phase locking (0-1)
-        var collapseStrength: Float = 0.5f,  // Fuerza de denoising (0-1)        var vocoderMix: Float = 0.0f,        // Blend vocoder/iSTFT (0-1)
-        var targetAlignment: Float = 0.0f    // Fuerza de alineación a target (0-1)
-    )
-    
-    private var params = OmegaParams()
-    
-    fun setSwdProjections(n: Int) {
-        params.swdProjections = n.coerceIn(16, 128)
-        // TODO: Enviar al motor nativo
-        Log.d(TAG, "SWD projections: ${params.swdProjections}")
-    }
-    
-    fun setPhaseCoherence(strength: Float) {
-        params.phaseCoherence = strength.coerceIn(0f, 1f)
-        Log.d(TAG, "Phase coherence: ${params.phaseCoherence}")
-    }
-    
-    fun setCollapseStrength(strength: Float) {
-        params.collapseStrength = strength.coerceIn(0f, 1f)
-        Log.d(TAG, "Collapse strength: ${params.collapseStrength}")
-    }
-    
+
     fun setVocoderMix(mix: Float) {
-        params.vocoderMix = mix.coerceIn(0f, 1f)
-        Log.d(TAG, "Vocoder mix: ${params.vocoderMix}")
+        val clampedMix = mix.coerceIn(0f, 1f)
+        _vocoderMix.value = clampedMix
+        sendCommandToDaemon("SET_VOCODER_MIX", clampedMix.toString())
     }
-    
-    fun setTargetAlignment(strength: Float) {
-        params.targetAlignment = strength.coerceIn(0f, 1f)
-        Log.d(TAG, "Target alignment: ${params.targetAlignment}")
+
+    fun applyPreset(presetName: String) {
+        Log.d(TAG, "Aplicando preset: $presetName")
+        sendCommandToDaemon("SET_PRESET", presetName)
     }
-    
-    fun getParams(): OmegaParams = params
-    
-    // ═══════════════════════════════════════════════════════════════════════
-    // MÉTRICAS EN TIEMPO REAL (para visualizadores)
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    data class OmegaMetrics(
-        val latencyMs: Float,
-        val swdCost: Float,
-        val phaseCoherence: Float,
-        val cpuUsage: Float,
-        val npuUsage: Float,
-        val gpuUsage: Float
-    )
-    
-    fun getMetrics(): OmegaMetrics {
-        return OmegaMetrics(
-            latencyMs = getLatencyMs(),            swdCost = 0f,  // TODO: Obtener del motor nativo
-            phaseCoherence = params.phaseCoherence,
-            cpuUsage = 0f,  // TODO: Obtener de ThermalMonitor
-            npuUsage = 0f,
-            gpuUsage = 0f
-        )
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════
-    // PRESETS (configuraciones predefinidas)
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    enum class Preset(val displayName: String, val description: String) {
-        BYPASS("Bypass", "Sin procesamiento, solo routing"),
-        PHASE_LOCK("Phase Lock", "Máxima coherencia de fase"),
-        TRANSPORT("Transport", "Alineación espectral fuerte"),
-        DENOISE("Denoise", "Colapso de ruido agresivo"),
-        VOCODER("Vocoder", "Síntesis neural completa"),
-        BALANCED("Balanced", "Configuración equilibrada")
-    }
-    
-    fun applyPreset(preset: Preset) {
-        when (preset) {
-            Preset.BYPASS -> {
-                setSwdProjections(16)
-                setPhaseCoherence(0f)
-                setCollapseStrength(0f)
-                setVocoderMix(0f)
-                setTargetAlignment(0f)
+
+    // --- COMUNICACIÓN CON EL DAEMON ---
+
+    private fun sendCommandToDaemon(action: String, value: String) {
+        try {
+            if (writer == null) {
+                Log.w(TAG, "Daemon no conectado.")
+                return
             }
-            Preset.PHASE_LOCK -> {
-                setSwdProjections(32)
-                setPhaseCoherence(1f)
-                setCollapseStrength(0.3f)
-                setVocoderMix(0f)
-                setTargetAlignment(0.5f)
-            }
-            Preset.TRANSPORT -> {
-                setSwdProjections(128)
-                setPhaseCoherence(0.6f)
-                setCollapseStrength(0.4f)
-                setVocoderMix(0f)
-                setTargetAlignment(1f)
-            }
-            Preset.DENOISE -> {
-                setSwdProjections(48)
-                setPhaseCoherence(0.5f)
-                setCollapseStrength(1f)
-                setVocoderMix(0f)
-                setTargetAlignment(0.3f)            }
-            Preset.VOCODER -> {
-                setSwdProjections(64)
-                setPhaseCoherence(0.7f)
-                setCollapseStrength(0.6f)
-                setVocoderMix(1f)
-                setTargetAlignment(0.8f)
-            }
-            Preset.BALANCED -> {
-                setSwdProjections(64)
-                setPhaseCoherence(0.8f)
-                setCollapseStrength(0.5f)
-                setVocoderMix(0f)
-                setTargetAlignment(0.5f)
-            }
+            val payload = "{\"action\":\"$action\",\"value\":\"$value\"}\n"
+            writer?.print(payload)
+            writer?.flush()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error enviando comando: ${e.message}")
         }
-        Log.i(TAG, "Applied preset: ${preset.name}")
+    }
+
+    private fun startTelemetryListener() {
+        Thread {
+            try {
+                var line: String?
+                while (reader?.readLine().also { line = it } != null) {
+                    if (line != null) {
+                        parseTelemetry(line!!)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Hilo de telemetría cerrado: ${e.message}")
+            }
+        }.start()
+    }
+
+    private fun parseTelemetry(jsonLine: String) {
+        if (jsonLine.contains("temp")) {
+            _deviceTemp.value = 38.5f // Placeholder de telemetría
+        }
+    }
+
+    fun disconnect() {
+        try {
+            reader?.close()
+            writer?.close()
+            socket?.close()
+            Log.d(TAG, "Desconectado del daemon")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al desconectar: ${e.message}")
+        }
     }
 }
