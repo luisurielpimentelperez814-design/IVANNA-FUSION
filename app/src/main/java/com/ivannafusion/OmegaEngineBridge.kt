@@ -34,6 +34,8 @@ class OmegaEngineBridge {
     private var socket: Socket? = null
     private var writer: PrintWriter? = null
     private var reader: BufferedReader? = null
+    private var telemetryThread: Thread? = null
+    private var isListening = false
 
     // --- MÉTODOS DE CONTROL ---
 
@@ -82,18 +84,25 @@ class OmegaEngineBridge {
     }
 
     private fun startTelemetryListener() {
-        Thread {
+        isListening = true
+        telemetryThread = Thread {
             try {
-                var line: String?
-                while (reader?.readLine().also { line = it } != null) {
-                    if (line != null) {
-                        parseTelemetry(line!!)
+                while (isListening) {
+                    val line = reader?.readLine() ?: break
+                    if (line.isNotEmpty()) {
+                        parseTelemetry(line)
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Hilo de telemetría cerrado: ${e.message}")
+                if (isListening) {
+                    Log.e(TAG, "Hilo de telemetría cerrado: ${e.message}")
+                }
             }
-        }.start()
+        }.apply {
+            name = "Omega-Telemetry"
+            isDaemon = true
+            start()
+        }
     }
 
     private fun parseTelemetry(jsonLine: String) {
@@ -103,10 +112,13 @@ class OmegaEngineBridge {
     }
 
     fun disconnect() {
+        isListening = false
         try {
             reader?.close()
             writer?.close()
             socket?.close()
+            telemetryThread?.join(1000)
+            telemetryThread = null
             Log.d(TAG, "Desconectado del daemon")
         } catch (e: Exception) {
             Log.e(TAG, "Error al desconectar: ${e.message}")

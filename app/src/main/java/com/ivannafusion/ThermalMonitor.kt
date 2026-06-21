@@ -43,24 +43,37 @@ object ThermalMonitor {
             val bpfPath = "/system/etc/ivanna/thermal_sched.bpf.o"
             val bpfFile = File(bpfPath)
             if (bpfFile.exists()) {
-                Runtime.getRuntime().exec("su -c \"bpftool prog load $bpfPath /sys/fs/bpf/ivanna_thermal\"").waitFor()
+                val process = Runtime.getRuntime().exec("su -c \"bpftool prog load $bpfPath /sys/fs/bpf/ivanna_thermal\"")
+                val exited = process.waitFor(3000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                if (!exited) {
+                    process.destroyForcibly()
+                    android.util.Log.w("ThermalMonitor", "eBPF load timed out")
+                }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ThermalMonitor", "Error loading eBPF", e)
         }
     }
 
     private fun startMonitoring() {
         isMonitoring = true
         monitoringThread = Thread {
-            while (isMonitoring) {
-                readThermalZones()
-                updateHyperplane()
-                Thread.sleep(100) // 10 Hz
+            while (isMonitoring && !Thread.currentThread().isInterrupted) {
+                try {
+                    readThermalZones()
+                    updateHyperplane()
+                    Thread.sleep(100) // 10 Hz
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
+                } catch (e: Exception) {
+                    android.util.Log.e("ThermalMonitor", "Error in monitoring loop", e)
+                }
             }
         }.apply {
             name = "IVANNA-Thermal"
-            priority = Thread.MAX_PRIORITY
+            priority = Thread.NORM_PRIORITY  // Cambiado de MAX_PRIORITY para no afectar al sistema
+            isDaemon = true
             start()
         }
     }
@@ -110,6 +123,8 @@ object ThermalMonitor {
 
     fun shutdown() {
         isMonitoring = false
+        monitoringThread?.interrupt()
         monitoringThread?.join(1000)
+        monitoringThread = null
     }
 }

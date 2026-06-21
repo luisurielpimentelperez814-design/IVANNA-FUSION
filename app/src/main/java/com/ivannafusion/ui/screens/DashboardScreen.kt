@@ -29,12 +29,16 @@ fun DashboardScreen(audioEngine: AudioEngine, onNavigate: (String) -> Unit) {
     var correlation by remember { mutableStateOf(0.85f) }
     
     LaunchedEffect(isProcessing) {
-        while (isProcessing) {
-            spectrum = List(32) { (0.2f + kotlin.random.Random.nextFloat() * 0.7f) }
-            loudness = (audioEngine.getMomentaryLoudness() + 30f) / 30f
-            correlation = audioEngine.getCorrelation()
-            delay(80)
+        if (!isProcessing) return@LaunchedEffect
+        val job = kotlinx.coroutines.launch {
+            while (isActive && isProcessing) {
+                spectrum = List(32) { (0.2f + kotlin.random.Random.nextFloat() * 0.7f) }
+                loudness = (audioEngine.getMomentaryLoudness() + 30f) / 30f
+                correlation = audioEngine.getCorrelation()
+                delay(80)
+            }
         }
+        // El job se cancela automáticamente cuando isProcessing cambia o la composición se destruye
     }
     
     Column(

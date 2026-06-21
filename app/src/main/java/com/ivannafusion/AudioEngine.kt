@@ -112,7 +112,8 @@ class AudioEngine {
                 Log.e(TAG, "Error", e)
             }
         }
-        engineScope.cancel()
+        // NO cancelar el scope - puede ser necesario para reiniciar
+        // engineScope.cancel()
     }
 
     fun restart() {

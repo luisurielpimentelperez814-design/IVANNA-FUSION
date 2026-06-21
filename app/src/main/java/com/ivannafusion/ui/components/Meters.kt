@@ -29,26 +29,25 @@ fun VUMeter(
         label = "vu"
     )
     
-    // FIX: Peak hold con Job que se cancela en lugar de LaunchedEffect acumulativo
+    // FIX: Peak hold con Job que se cancela correctamente
     val scope = rememberCoroutineScope()
-    var peakDecayJob by remember { mutableStateOf<androidx.compose.runtime.DisposableEffectResult<*>?>(null) }
+    var peakDecayJob by remember { mutableStateOf<Job?>(null) }
     
-    LaunchedEffect(level, peakLevel) {
+    LaunchedEffect(level) {
         if (level > peakLevel) {
             peakLevel = level
         }
+        // Cancelar job anterior si existe
+        peakDecayJob?.cancel()
     }
     
-    // Peak decay separado - solo se ejecuta cuando peak > level
-    DisposableEffect(peakLevel > level + 0.02f) {
+    // Peak decay con coroutine manejada correctamente
+    LaunchedEffect(peakLevel, level) {
         if (peakHold && peakLevel > level + 0.02f) {
-            val job = kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            peakDecayJob = kotlinx.coroutines.launch {
                 delay(1500)
                 peakLevel = (peakLevel - 0.01f).coerceAtLeast(level)
             }
-            onDispose { job.cancel() }
-        } else {
-            onDispose { }
         }
     }
     

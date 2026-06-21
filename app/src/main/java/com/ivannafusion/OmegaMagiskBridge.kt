@@ -39,6 +39,9 @@ class OmegaMagiskBridge {
     private var scope: CoroutineScope? = null
 
     fun connect() {
+        // Cancelar scope anterior si existe
+        disconnect()
+        
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         scope?.launch {
             try {
