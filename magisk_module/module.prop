@@ -1,0 +1,7 @@
+id=omega_in_engine
+name=Ω_in Edge AI Audio Engine
+version=v1.0.0
+versionCode=100
+author=Luis Uriel Pimentel Pérez
+description=Motor de audio Ω_in con Sliced Wasserstein + Complex 1D CNN + Mamba-Tiny. Procesamiento de audio global del sistema en tiempo real (<15ms latencia) con delegación a NPU Hexagon/GPU Adreno.
+minMagisk=24000
