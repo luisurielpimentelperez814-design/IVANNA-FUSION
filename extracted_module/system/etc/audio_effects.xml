@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<audio_effects_conf version="2.0" xmlns="http://schemas.android.com/audio/audio_effects_conf/v2_0">
+    <libraries>
+        <library name="omega_engine" path="libomega_effect.so"/>
+    </libraries>
+    <effects>
+        <effect name="omega_in_processor" library="omega_engine" uuid="a1b2c3d4-e5f6-7890-abcd-ef1234567890"/>
+    </effects>
+    <preprocess>
+        <stream type="music">
+            <apply effect="omega_in_processor"/>
+        </stream>
+    </preprocess>
+</audio_effects_conf>
