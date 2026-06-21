@@ -45,7 +45,8 @@ object MagiskBridge {
         sendCommand("$param=$value")
     }
     
-    fun setAmp(level: Int) = sendCommand("amp:$level")    fun setDrive(value: Float) = setParameter("drive", value)
+    fun setAmp(level: Int) = sendCommand("amp:$level")
+    fun setDrive(value: Float) = setParameter("drive", value)
     fun setWet(value: Float) = setParameter("wet", value)
     
     // Parámetros avanzados

@@ -243,7 +243,8 @@ class AudioEngine {
         Log.d(TAG, "EQ Band $band: $gain dB")
         engineScope.launch {
             withContext(Dispatchers.IO) {
-                MagiskBridge.setEQBand(band, gain)                DSPController.eqSetGain(band, gain)
+                MagiskBridge.setEQBand(band, gain)
+                DSPController.eqSetGain(band, gain)
             }
         }
     }
@@ -439,7 +440,8 @@ class AudioEngine {
         }
     }
 
-    fun getMomentaryLoudness(): Float = -20f + Random.nextFloat() * 10f    fun getShortTermLoudness(): Float = -25f + Random.nextFloat() * 10f
+    fun getMomentaryLoudness(): Float = -20f + Random.nextFloat() * 10f
+    fun getShortTermLoudness(): Float = -25f + Random.nextFloat() * 10f
     fun getIntegratedLoudness(): Float = -23f + Random.nextFloat() * 5f
     fun getPeakLevel(): Float = -1f - Random.nextFloat() * 5f
     fun getCorrelation(): Float = 0.8f + Random.nextFloat() * 0.2f
