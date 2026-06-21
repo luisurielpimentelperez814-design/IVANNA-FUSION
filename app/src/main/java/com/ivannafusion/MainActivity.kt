@@ -9,73 +9,71 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.ivannafusion.navigation.AppNavigation
 import com.ivannafusion.ui.theme.IVANNAFusionTheme
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     companion object { private const val TAG = "MainActivity" }
 
-    private lateinit var audioEngine: AudioEngine
-    private lateinit var audioCallbackManager: AudioCallbackManager
-    private lateinit var presetManager: PresetManager
+    private var audioEngine: AudioEngine? = null
+    private var audioCallbackManager: AudioCallbackManager? = null
+    private var presetManager: PresetManager? = null
     
-    // Estado de permisos
-    private var permissionsGranted by mutableStateOf(false)
+    // Estado de inicialización
+    private var appState by mutableStateOf(AppState.LOADING)
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val allGranted = permissions.values.all { it }
-        permissionsGranted = allGranted
         Log.d(TAG, "Permisos concedidos: $allGranted")
         
+        // Inicializar componentes DESPUÉS de recibir la respuesta de permisos
         if (allGranted) {
-            // Inicializar solo después de que los permisos sean concedidos
             initializeComponents()
         } else {
-            Log.w(TAG, "Permisos denegados - la app funcionará con funcionalidad limitada")
-            // Aún así inicializar componentes pero sin captura de audio
-            initializeComponents()
+            Log.w(TAG, "Permisos denegados - funcionalidad limitada")
+            initializeComponentsLimited()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // NO llamar checkPermissions() aquí todavía
-        // Primero configurar la UI
-        
-        // Inicializar componentes que NO requieren permisos
-        presetManager = PresetManager(this)
-        audioEngine = AudioEngine()
-        audioCallbackManager = AudioCallbackManager(getSystemService(AUDIO_SERVICE) as AudioManager)
-        
-        // Verificar permisos de forma segura
-        permissionsGranted = hasAllPermissions()
-        
         setContent {
             IVANNAFusionTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    // UI principal
-                    AppNavigation(audioEngine = audioEngine, presetManager = presetManager)
-                    
-                    // Solicitar permisos DESPUÉS de que la UI esté lista
-                    LaunchedEffect(Unit) {
-                        if (!permissionsGranted) {
-                            // Pequeño delay para asegurar que la UI está completamente renderizada
-                            kotlinx.coroutines.delay(500)
-                            checkPermissions()
-                        } else {
-                            // Ya tenemos permisos, inicializar componentes
-                            initializeComponents()
+                    when (appState) {
+                        AppState.LOADING -> {
+                            // Pantalla de carga mientras se solicitan permisos
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                            
+                            // Solicitar permisos DESPUÉS de que la UI esté lista
+                            LaunchedEffect(Unit) {
+                                delay(300) // Pequeño delay para asegurar que la UI está renderizada
+                                checkPermissions()
+                            }
+                        }
+                        AppState.READY -> {
+                            val engine = audioEngine
+                            val presets = presetManager
+                            if (engine != null && presets != null) {
+                                AppNavigation(audioEngine = engine, presetManager = presets)
+                            }
                         }
                     }
                 }
@@ -83,19 +81,6 @@ class MainActivity : ComponentActivity() {
         }
     }
     
-    private fun hasAllPermissions(): Boolean {
-        val perms = mutableListOf(
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.MODIFY_AUDIO_SETTINGS
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            perms.add(Manifest.permission.BLUETOOTH_CONNECT)
-        }
-        return perms.all { 
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED 
-        }
-    }
-
     private fun checkPermissions() {
         val perms = mutableListOf(
             Manifest.permission.RECORD_AUDIO,
@@ -112,44 +97,83 @@ class MainActivity : ComponentActivity() {
                 requestPermissionLauncher.launch(toRequest.toTypedArray())
             } catch (e: Exception) {
                 Log.e(TAG, "Error lanzando diálogo de permisos", e)
-                // Si falla, continuar sin permisos
-                initializeComponents()
+                initializeComponentsLimited()
             }
         } else {
             // Ya tenemos todos los permisos
-            permissionsGranted = true
             initializeComponents()
         }
     }
     
     private fun initializeComponents() {
-        Log.d(TAG, "Inicializando componentes...")
+        Log.d(TAG, "Inicializando componentes (permisos completos)...")
         try {
+            // Crear instancias LAZY aquí, no en onCreate
+            if (audioEngine == null) {
+                audioEngine = AudioEngine()
+            }
+            if (presetManager == null) {
+                presetManager = PresetManager(this)
+            }
+            if (audioCallbackManager == null) {
+                audioCallbackManager = AudioCallbackManager(getSystemService(AUDIO_SERVICE) as AudioManager)
+            }
+            
             // Solicitar focus de audio
-            audioCallbackManager.requestAudioFocus()
+            audioCallbackManager?.requestAudioFocus()
             
             // Inicializar el motor de audio en background
-            audioEngine.initialize(this) { success ->
+            audioEngine?.initialize(this) { success ->
                 Log.d(TAG, "AudioEngine inicializado: $success")
             }
             
             // Silenciar ruidos no deseados
-            audioCallbackManager.muteUnwantedNoise()
+            audioCallbackManager?.muteUnwantedNoise()
             
+            // Marcar como listo
+            appState = AppState.READY
             Log.d(TAG, "Componentes inicializados correctamente")
         } catch (e: Exception) {
             Log.e(TAG, "Error inicializando componentes", e)
+            initializeComponentsLimited()
+        }
+    }
+    
+    private fun initializeComponentsLimited() {
+        Log.d(TAG, "Inicializando componentes (funcionalidad limitada)...")
+        try {
+            if (audioEngine == null) {
+                audioEngine = AudioEngine()
+            }
+            if (presetManager == null) {
+                presetManager = PresetManager(this)
+            }
+            if (audioCallbackManager == null) {
+                audioCallbackManager = AudioCallbackManager(getSystemService(AUDIO_SERVICE) as AudioManager)
+            }
+            
+            // Marcar como listo incluso sin permisos completos
+            appState = AppState.READY
+        } catch (e: Exception) {
+            Log.e(TAG, "Error en inicialización limitada", e)
+            // Forzar ready incluso con error para no dejar la app colgada
+            appState = AppState.READY
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         try {
-            audioEngine.release()
-            audioCallbackManager.abandonAudioFocus()
-            audioCallbackManager.restoreAudioStreams()
+            audioEngine?.release()
+            audioCallbackManager?.abandonAudioFocus()
+            audioCallbackManager?.restoreAudioStreams()
         } catch (e: Exception) { 
             Log.e(TAG, "Cleanup error", e) 
         }
     }
+}
+
+enum class AppState {
+    LOADING,
+    READY
 }

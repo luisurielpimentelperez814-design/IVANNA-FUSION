@@ -23,18 +23,22 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun DashboardScreen(audioEngine: AudioEngine, onNavigate: (String) -> Unit) {
-    var isProcessing by remember { mutableStateOf(true) }
-    var spectrum by remember { mutableStateOf(List(32) { 0.3f }) }
-    var loudness by remember { mutableStateOf(0.6f) }
+    var isProcessing by remember { mutableStateOf(false) } // Empezar en false
+    var spectrum by remember { mutableStateOf(List(32) { 0f }) } // Empezar con ceros
+    var loudness by remember { mutableStateOf(0f) }
     var correlation by remember { mutableStateOf(0.85f) }
     
+    // FIX: Usar LaunchedEffect con clave estable que se active solo cuando isProcessing = true
     LaunchedEffect(isProcessing) {
         if (!isProcessing) return@LaunchedEffect
+        
+        // Loop con frecuencia reducida para evitar saturar el main thread
+        // 150ms en lugar de 80ms = menos recomposiciones
         while (isProcessing) {
             spectrum = List(32) { (0.2f + kotlin.random.Random.nextFloat() * 0.7f) }
-            loudness = (audioEngine.getMomentaryLoudness() + 30f) / 30f
+            loudness = ((audioEngine.getMomentaryLoudness() + 30f) / 30f).coerceIn(0f, 1f)
             correlation = audioEngine.getCorrelation()
-            delay(80)
+            delay(150) // Reducido de 80ms a 150ms para evitar saturación
         }
     }
     
@@ -47,7 +51,12 @@ fun DashboardScreen(audioEngine: AudioEngine, onNavigate: (String) -> Unit) {
         IVANNAHeader(title = "IVANNA FUSION", subtitle = "Motor Evolutivo Activo") {
             StatusChip(text = if (isProcessing) "LIVE" else "IDLE", color = if (isProcessing) SignalCool else SignalMute)
             Spacer(Modifier.width(8.dp))
-            IconButton(onClick = { isProcessing = !isProcessing }) {                Icon(imageVector = if (isProcessing) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = "Toggle", tint = AccentCyan)
+            IconButton(onClick = { isProcessing = !isProcessing }) {
+                Icon(
+                    imageVector = if (isProcessing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = "Toggle",
+                    tint = AccentCyan
+                )
             }
         }
         
@@ -96,7 +105,8 @@ fun DashboardScreen(audioEngine: AudioEngine, onNavigate: (String) -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuickActionRow(icon = Icons.Default.GraphicEq, title = "Ecualizador", subtitle = "10 bandas paramétricas", onClick = { onNavigate("effects") })
                 QuickActionRow(icon = Icons.Default.AutoAwesome, title = "IA Adaptativa", subtitle = "Detección de género activa", onClick = { onNavigate("ai") })
-                QuickActionRow(icon = Icons.Default.LibraryMusic, title = "Presets", subtitle = "12 configuraciones", onClick = { onNavigate("presets") })            }
+                QuickActionRow(icon = Icons.Default.LibraryMusic, title = "Presets", subtitle = "12 configuraciones", onClick = { onNavigate("presets") })
+            }
         }
         
         Spacer(Modifier.height(100.dp))

@@ -1,6 +1,5 @@
 package com.ivannafusion.ui.components
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
@@ -13,9 +12,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.ivannafusion.ui.theme.*
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
+import kotlin.math.abs
 
 @Composable
 fun VUMeter(
@@ -23,43 +23,41 @@ fun VUMeter(
     modifier: Modifier = Modifier,
     peakHold: Boolean = true
 ) {
+    // FIX: Usar remember con el valor inicial, no actualizar directamente
     var peakLevel by remember { mutableStateOf(level) }
+    var lastUpdateTime by remember { mutableStateOf(0L) }
+    
     val animatedLevel by animateFloatAsState(
         targetValue = level.coerceIn(0f, 1f),
         animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f),
         label = "vu"
     )
     
-    // FIX MEJORADO: Usar un solo LaunchedEffect que maneje tanto el peak hold como el decay
+    // FIX: Usar un solo LaunchedEffect con clave estable (Unit) que maneje el peak decay
+    // en lugar de uno que se ejecute en cada cambio de level
     val scope = rememberCoroutineScope()
-    val peakDecayJob = remember { mutableStateOf<Job?>(null) }
+    var peakDecayJob by remember { mutableStateOf<Job?>(null) }
     
-    // Un solo LaunchedEffect que se ejecute cuando cambia el nivel
-    LaunchedEffect(level) {
-        // Actualizar peak si el nivel actual es mayor
-        if (level > peakLevel) {
-            peakLevel = level
-            // Cancelar decay anterior cuando hay nuevo peak
-            peakDecayJob.value?.cancel()
-        } else if (peakHold && peakLevel > level + 0.02f) {
-            // Iniciar decay solo si no hay uno activo
-            if (peakDecayJob.value?.isActive != true) {
-                peakDecayJob.value = scope.launch {
-                    delay(1500)
-                    // Decrementar peak gradualmente
-                    while (peakLevel > level + 0.02f) {
-                        peakLevel = (peakLevel - 0.01f).coerceAtLeast(level)
-                        delay(50)
-                    }
+    // Este efecto se ejecuta solo una vez al montar el composable
+    LaunchedEffect(Unit) {
+        // Loop de decay del peak - se ejecuta cada 50ms pero solo actualiza si es necesario
+        while (true) {
+            delay(50)
+            val currentTime = System.currentTimeMillis()
+            if (peakHold && peakLevel > level + 0.02f) {
+                if (currentTime - lastUpdateTime > 1500) {
+                    peakLevel = (peakLevel - 0.01f).coerceAtLeast(level)
+                    lastUpdateTime = currentTime
                 }
             }
         }
     }
     
-    // Limpiar job cuando el composable se destruye
-    DisposableEffect(Unit) {
-        onDispose {
-            peakDecayJob.value?.cancel()
+    // Actualizar peak inmediatamente cuando el nivel sube
+    LaunchedEffect(level) {
+        if (level > peakLevel) {
+            peakLevel = level
+            lastUpdateTime = System.currentTimeMillis()
         }
     }
     
@@ -107,35 +105,48 @@ fun SpectrumVisualizer(
     modifier: Modifier = Modifier,
     accentColor: Color = AccentCyan
 ) {
-    // FIX: Usar animateFloatAsState en lugar de Animatable con LaunchedEffect secuencial
-    // Esto evita la cancelación constante cuando magnitudes cambia cada 80ms
-    val animatedMagnitudes = magnitudes.map { mag ->
-        animateFloatAsState(
-            targetValue = mag.coerceIn(0f, 1f),
-            animationSpec = spring(dampingRatio = 0.7f, stiffness = 200f),
-            label = "spectrum"
-        ).value
+    // FIX CRÍTICO: NO crear animateFloatAsState dentro de .map {} en cada recomposición
+    // Esto creaba 32 nuevas animaciones cada 80ms = saturación del main thread
+    
+    // Usar remember con una clave que no cambie para mantener las mismas animaciones
+    // Inicializar las animaciones una sola vez con los primeros valores
+    val animatedMagnitudes = remember(magnitudes.size) {
+        List(magnitudes.size) { 
+            mutableStateOf(magnitudes.getOrNull(it) ?: 0f)
+        }
+    }
+    
+    // Actualizar los valores de las animaciones cuando magnitudes cambia
+    LaunchedEffect(magnitudes) {
+        magnitudes.forEachIndexed { index, value ->
+            if (index < animatedMagnitudes.size) {
+                animatedMagnitudes[index].value = value.coerceIn(0f, 1f)
+            }
+        }
+    }
+    
+    // Crear el gradient UNA VEZ fuera del Canvas
+    val gradientColors = remember(accentColor) {
+        listOf(accentColor, accentColor.copy(alpha = 0.3f))
     }
     
     Canvas(modifier = modifier.fillMaxSize()) {
         val barCount = magnitudes.size
+        if (barCount == 0) return@Canvas
+        
         val totalWidth = size.width
         val barWidth = (totalWidth / barCount) * 0.7f
         val gap = (totalWidth / barCount) * 0.3f
         
-        // FIX: Crear el gradient UNA VEZ fuera del loop, no por cada barra
         val gradient = Brush.verticalGradient(
-            colors = listOf(
-                accentColor,
-                accentColor.copy(alpha = 0.3f)
-            ),
+            colors = gradientColors,
             startY = 0f,
             endY = size.height
         )
         
-        animatedMagnitudes.forEachIndexed { index, animValue ->
+        animatedMagnitudes.forEachIndexed { index, state ->
             val x = index * (barWidth + gap)
-            val barHeight = animValue * size.height
+            val barHeight = state.value * size.height
             
             drawRect(
                 brush = gradient,
