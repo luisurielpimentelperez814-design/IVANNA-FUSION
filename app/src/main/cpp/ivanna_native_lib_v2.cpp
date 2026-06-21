@@ -4,10 +4,20 @@
  *
  * Implementación JNI para com.ivannafusion.IvannaNativeLib.
  *
- * Esta versión conecta los controles de la UI con el motor DSP real
- * (ivanna::dsp::ParametricEQ, Compressor, HarmonicExciter — los mismos
- * que usa el efecto de audioserver en src/cpp/effect_library.cpp) en
- * vez de solo guardar floats en variables atómicas sin procesar.
+ * CORRECCIÓN: este archivo se escribió originalmente contra la API de
+ * src/include/{parametric_eq,compressor,harmonic_exciter}.h
+ * (namespace ivanna::dsp, camelCase: setBand/setThreshold/setMix...).
+ * En otra sesión de trabajo se crearon versiones NUEVAS y más completas
+ * de esos mismos headers directamente en app/src/main/cpp/ (namespace
+ * dsp plano, snake_case: set_band/set_threshold/set_mix...). Como
+ * app/src/main/cpp ya está en el include path antes que src/include,
+ * el compilador resuelve los #include "parametric_eq.h" etc. contra
+ * ESA versión nueva, no la original -> de ahí los errores
+ * "no member named 'setBand'; did you mean 'set_band'" del CI.
+ *
+ * Se adapta aquí el código a la API real que efectivamente se compila
+ * (app/src/main/cpp/*.h), sin modificar ningún header de ninguno de
+ * los dos lados, y preservando los mismos 41 símbolos JNI exportados.
  *
  * processBlock() queda expuesta como función C++ (no JNI) para que
  * AudioEngine (audio_orchestrator.cpp) pueda invocarla directamente
@@ -21,6 +31,7 @@
 #include <cmath>
 #include <algorithm>
 #include <mutex>
+#include <string>
 
 #include "parametric_eq.h"
 #include "compressor.h"
@@ -35,11 +46,17 @@ namespace ivanna::nativelib {
 // Un único bloque de procesamiento por proceso (la app sólo tiene un motor
 // IvannaNativeLib en Kotlin — object, no class), por lo que no hace falta
 // un contexto por instancia como en effect_library.cpp.
+//
+// dsp::ParametricEQ/Compressor/HarmonicExciter (app/src/main/cpp/*.h) NO
+// tienen un método process(L, R, ...) con canales separados — solo
+// process_stereo(buffer_intercalado, n) y process_mono(buffer, n). Para
+// no reinventar el des/re-entrelazado en cada función, este motor opera
+// directamente sobre buffers intercalados LRLRLR (ver processBlock()).
 struct Engine {
-    std::mutex                mutex;     // protege contra setParam concurrente con process
-    dsp::ParametricEQ         eq;
-    dsp::Compressor           comp;
-    dsp::HarmonicExciter      exciter;
+    std::mutex       mutex;     // protege contra setParam concurrente con process
+    dsp::ParametricEQ eq;
+    dsp::Compressor   comp;
+    dsp::HarmonicExciter exciter;
 
     std::atomic<bool> enabled{false};
     std::atomic<int>  presetId{0};
@@ -55,7 +72,7 @@ using ivanna::nativelib::g_engine;
 
 namespace {
 
-constexpr int kNumBands = ivanna::dsp::PEQ_BANDS;  // 8 — el EQ real soporta 8 bandas
+constexpr int kNumBands = dsp::PEQ_BANDS;  // 8 — el EQ real soporta 8 bandas
 
 // Surround / Widener / Bass / Upscaler — todavía no tienen motor DSP propio
 // en src/cpp; se mantienen como parámetros controlables (placeholders
@@ -96,6 +113,28 @@ inline int clampBand(int b) {
     return b;
 }
 
+// Aplica el preset "default" (flat, banda 0 highpass 80Hz como en el
+// constructor de ParametricEQ) a las bandas 1-4 que sí están activas
+// por defecto, dejando el resto sin cambios de tipo (ya están
+// deshabilitadas en el constructor de ParametricEQ).
+void applyDefaultEqPreset() {
+    g_engine.eq.set_band(0, dsp::FilterType::HIGHPASS, 80.0f,   0.0f, 0.707f, true);
+    g_engine.eq.set_band(1, dsp::FilterType::PEAK,     250.0f,  0.0f, 1.0f,   true);
+    g_engine.eq.set_band(2, dsp::FilterType::PEAK,     1000.0f, 0.0f, 1.0f,   true);
+    g_engine.eq.set_band(3, dsp::FilterType::PEAK,     4000.0f, 0.0f, 1.0f,   true);
+    g_engine.eq.set_band(4, dsp::FilterType::LOWSHELF, 8000.0f, 0.0f, 0.707f, true);
+}
+
+// Preset "rock clásico": realce de graves y agudos, medios ligeramente
+// retraídos (curva "sonrisa" típica de presets de rock/metal).
+void applyClassicRockEqPreset() {
+    g_engine.eq.set_band(0, dsp::FilterType::HIGHPASS, 60.0f,    0.0f, 0.707f, true);
+    g_engine.eq.set_band(1, dsp::FilterType::LOWSHELF, 120.0f,   4.0f, 0.707f, true);
+    g_engine.eq.set_band(2, dsp::FilterType::PEAK,     500.0f,  -2.0f, 1.0f,   true);
+    g_engine.eq.set_band(3, dsp::FilterType::PEAK,     3000.0f,  3.0f, 1.0f,   true);
+    g_engine.eq.set_band(4, dsp::FilterType::HIGHSHELF,8000.0f,  3.5f, 0.707f, true);
+}
+
 } // namespace
 
 extern "C" {
@@ -113,54 +152,43 @@ Java_com_ivannafusion_IvannaNativeLib_nativeIsEnabled(JNIEnv*, jobject) {
 
 JNIEXPORT void JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeSetPreset(JNIEnv*, jobject, jint id) {
-    using namespace ivanna::dsp;
     std::lock_guard<std::mutex> lock(g_engine.mutex);
     g_engine.presetId.store(id);
 
-    // Preset 0 = flat / referencia; preset 1 = rock clásico (reutiliza los
-    // mismos presets calibrados que ivanna_fusion.cpp para mantener
-    // consistencia entre el efecto de audioserver y este motor de la app).
     if (id == 1) {
-        auto params = peq_preset_classic_rock();
-        for (int b = 0; b < PEQ_BANDS; ++b) g_engine.eq.setBand(b, params[b]);
-        g_engine.comp.setThreshold(-20.f); g_engine.comp.setRatio(3.f); g_engine.comp.setMakeup(2.f);
-        g_engine.comp.setAttack(5.f); g_engine.comp.setRelease(80.f);
-        g_engine.exciter.setDrive(3.5f); g_engine.exciter.setMix(0.25f); g_engine.exciter.setHpfFreq(2500.f);
+        applyClassicRockEqPreset();
+        g_engine.comp.set_threshold(-20.f); g_engine.comp.set_ratio(3.f); g_engine.comp.set_makeup_gain(2.f);
+        g_engine.comp.set_attack(5.f); g_engine.comp.set_release(80.f);
+        g_engine.exciter.set_drive(3.5f); g_engine.exciter.set_mix(0.25f); g_engine.exciter.set_harmonic_freq(2500.f);
     } else {
-        auto params = peq_default_params();
-        for (int b = 0; b < PEQ_BANDS; ++b) g_engine.eq.setBand(b, params[b]);
-        g_engine.comp.setThreshold(-18.f); g_engine.comp.setRatio(2.f); g_engine.comp.setMakeup(1.f);
-        g_engine.exciter.setDrive(2.f); g_engine.exciter.setMix(0.15f);
+        applyDefaultEqPreset();
+        g_engine.comp.set_threshold(-18.f); g_engine.comp.set_ratio(2.f); g_engine.comp.set_makeup_gain(1.f);
+        g_engine.exciter.set_drive(2.f); g_engine.exciter.set_mix(0.15f);
     }
 }
 
 JNIEXPORT void JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeReset(JNIEnv*, jobject) {
-    using namespace ivanna::dsp;
     std::lock_guard<std::mutex> lock(g_engine.mutex);
 
     g_engine.enabled.store(false);
     g_engine.presetId.store(0);
 
-    auto params = peq_default_params();
-    for (int b = 0; b < PEQ_BANDS; ++b) g_engine.eq.setBand(b, params[b]);
-    g_engine.eq.resetState();
-    g_engine.eq.setBypass(false);
+    applyDefaultEqPreset();
+    g_engine.eq.reset();
 
-    g_engine.comp.setThreshold(-18.f);
-    g_engine.comp.setRatio(4.f);
-    g_engine.comp.setKnee(6.f);
-    g_engine.comp.setAttack(5.f);
-    g_engine.comp.setRelease(80.f);
-    g_engine.comp.setMakeup(3.f);
-    g_engine.comp.setBypass(false);
-    g_engine.comp.resetState();
+    g_engine.comp.set_threshold(-18.f);
+    g_engine.comp.set_ratio(4.f);
+    g_engine.comp.set_knee(6.f);
+    g_engine.comp.set_attack(5.f);
+    g_engine.comp.set_release(80.f);
+    g_engine.comp.set_makeup_gain(3.f);
+    g_engine.comp.reset();
 
-    g_engine.exciter.setDrive(3.f);
-    g_engine.exciter.setMix(0.25f);
-    g_engine.exciter.setHpfFreq(2000.f);
-    g_engine.exciter.setBypass(false);
-    g_engine.exciter.resetState();
+    g_engine.exciter.set_drive(3.f);
+    g_engine.exciter.set_mix(0.25f);
+    g_engine.exciter.set_harmonic_freq(2000.f);
+    g_engine.exciter.reset();
 
     for (int i = 0; i < kNumBands; i++) g_engine.lastGainReduction[i] = 0.f;
 
@@ -181,17 +209,17 @@ Java_com_ivannafusion_IvannaNativeLib_nativeReset(JNIEnv*, jobject) {
     LOGI("nativeReset: motor DSP y estado restablecidos");
 }
 
-// ── EQ — ahora respaldado por ivanna::dsp::ParametricEQ real ───────────────
+// ── EQ — respaldado por dsp::ParametricEQ real (app/src/main/cpp/parametric_eq.h) ──
 JNIEXPORT void JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeEqSetGain(JNIEnv*, jobject, jint b, jfloat g) {
     std::lock_guard<std::mutex> lock(g_engine.mutex);
-    g_engine.eq.setBandGain(clampBand(b), g);
+    g_engine.eq.set_band_gain(clampBand(b), g);
 }
 
 JNIEXPORT jfloat JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeEqGetGain(JNIEnv*, jobject, jint b) {
     std::lock_guard<std::mutex> lock(g_engine.mutex);
-    return g_engine.eq.getBand(clampBand(b)).gain_dB;
+    return g_engine.eq.get_band(clampBand(b)).gain_db;
 }
 
 JNIEXPORT void JNICALL
@@ -203,14 +231,14 @@ Java_com_ivannafusion_IvannaNativeLib_nativeEqSetThreshold(JNIEnv*, jobject, jin
     // con la firma JNI existente; la última banda en escribir "gana".
     (void)b;
     std::lock_guard<std::mutex> lock(g_engine.mutex);
-    g_engine.comp.setThreshold(t);
+    g_engine.comp.set_threshold(t);
 }
 
 JNIEXPORT void JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeEqSetRatio(JNIEnv*, jobject, jint b, jfloat r) {
     (void)b;
     std::lock_guard<std::mutex> lock(g_engine.mutex);
-    g_engine.comp.setRatio(r);
+    g_engine.comp.set_ratio(r);
 }
 
 JNIEXPORT jfloat JNICALL
@@ -223,28 +251,28 @@ JNIEXPORT void JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeCompSetThreshold(JNIEnv*, jobject, jint b, jfloat t) {
     (void)b;
     std::lock_guard<std::mutex> lock(g_engine.mutex);
-    g_engine.comp.setThreshold(t);
+    g_engine.comp.set_threshold(t);
 }
 
 JNIEXPORT void JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeCompSetRatio(JNIEnv*, jobject, jint b, jfloat r) {
     (void)b;
     std::lock_guard<std::mutex> lock(g_engine.mutex);
-    g_engine.comp.setRatio(r);
+    g_engine.comp.set_ratio(r);
 }
 
 JNIEXPORT void JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeCompSetAttack(JNIEnv*, jobject, jint b, jfloat a) {
     (void)b;
     std::lock_guard<std::mutex> lock(g_engine.mutex);
-    g_engine.comp.setAttack(a);
+    g_engine.comp.set_attack(a);
 }
 
 JNIEXPORT void JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeCompSetRelease(JNIEnv*, jobject, jint b, jfloat r) {
     (void)b;
     std::lock_guard<std::mutex> lock(g_engine.mutex);
-    g_engine.comp.setRelease(r);
+    g_engine.comp.set_release(r);
 }
 
 // ── Surround / Widener / Bass / Upscaler ────────────────────────────────────
@@ -280,22 +308,20 @@ Java_com_ivannafusion_IvannaNativeLib_nativeWidenerSetWidth(JNIEnv*, jobject, jf
 JNIEXPORT void JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeBassSetAmount(JNIEnv*, jobject, jfloat a) {
     // Aproximación real con el motor existente: sube la ganancia de la
-    // banda 0 (sub-bass, low-shelf 63Hz) del EQ paramétrico en proporción
-    // a 'amount' (0..1 -> 0..+9dB), en vez de solo guardar el valor.
+    // banda 0 (low-shelf si se reconfigura, o simplemente la banda más
+    // baja activa) del EQ paramétrico en proporción a 'amount' (0..1 ->
+    // 0..+9dB), en vez de solo guardar el valor.
     g_bassAmount.store(a);
     std::lock_guard<std::mutex> lock(g_engine.mutex);
     float gain_dB = std::clamp(a, 0.f, 1.f) * 9.f;
-    g_engine.eq.setBandGain(0, gain_dB);
+    g_engine.eq.set_band_gain(0, gain_dB);
 }
 
 JNIEXPORT void JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeBassSetFrequency(JNIEnv*, jobject, jfloat f) {
     g_bassFrequency.store(f);
     std::lock_guard<std::mutex> lock(g_engine.mutex);
-    auto band = g_engine.eq.getBand(0);
-    ivanna::dsp::PeqBandParams p = band;
-    p.frequency_hz = f;
-    g_engine.eq.setBand(0, p);
+    g_engine.eq.set_band_frequency(0, f);
 }
 
 JNIEXPORT void JNICALL
@@ -434,15 +460,12 @@ Java_com_ivannafusion_IvannaNativeLib_nativeLoadPreset(
     std::string name = cname ? cname : "";
     if (cname) env->ReleaseStringUTFChars(presetName, cname);
 
-    using namespace ivanna::dsp;
     std::lock_guard<std::mutex> lock(g_engine.mutex);
     if (name == "Rock" || name == "rock" || name == "Classic Rock") {
-        auto params = peq_preset_classic_rock();
-        for (int b = 0; b < PEQ_BANDS; ++b) g_engine.eq.setBand(b, params[b]);
+        applyClassicRockEqPreset();
         g_engine.presetId.store(1);
     } else {
-        auto params = peq_default_params();
-        for (int b = 0; b < PEQ_BANDS; ++b) g_engine.eq.setBand(b, params[b]);
+        applyDefaultEqPreset();
         g_engine.presetId.store(0);
     }
     LOGI("nativeLoadPreset: %s", name.c_str());
@@ -466,11 +489,11 @@ JNIEXPORT jstring JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeGetCurrentParams(JNIEnv *env, jobject) {
     std::lock_guard<std::mutex> lock(g_engine.mutex);
     // Serialización simple (no JSON completo, evita dependencia externa):
-    // "eq:b0gain,b1gain,...;comp:thresh,ratio,attack,release"
+    // "eq:b0gain,b1gain,...;preset:N"
     std::string out = "eq:";
-    for (int b = 0; b < ivanna::dsp::PEQ_BANDS; ++b) {
+    for (int b = 0; b < dsp::PEQ_BANDS; ++b) {
         if (b > 0) out += ",";
-        out += std::to_string(g_engine.eq.getBand(b).gain_dB);
+        out += std::to_string(g_engine.eq.get_band(b).gain_db);
     }
     out += ";preset:" + std::to_string(g_engine.presetId.load());
     return env->NewStringUTF(out.c_str());
@@ -489,10 +512,10 @@ Java_com_ivannafusion_IvannaNativeLib_nativeSetParams(JNIEnv *env, jobject, jstr
 
 JNIEXPORT jboolean JNICALL
 Java_com_ivannafusion_IvannaNativeLib_nativeInitializeAI(JNIEnv *env, jobject, jstring modelPath) {
-    // Sin runtime de inferencia (TFLite/ExecuTorch) enlazado todavía en
-    // este target; omega_engine/export_to_executorch.py sugiere que el
-    // modelo se exportará a ExecuTorch, pero el enlace del runtime en
-    // CMakeLists.txt sigue pendiente. Se documenta explícitamente.
+    // Sin runtime de inferencia (ExecuTorch) enlazado todavía en este
+    // target; ver ai_inference.h para el punto de integración ya
+    // preparado y omega_engine/export_to_executorch.py para el pipeline
+    // de exportación. Se documenta explícitamente, sin simular carga.
     const char* cname = env->GetStringUTFChars(modelPath, nullptr);
     LOGI("nativeInitializeAI (runtime de inferencia pendiente de enlazar): %s", cname ? cname : "(null)");
     if (cname) env->ReleaseStringUTFChars(modelPath, cname);
@@ -526,32 +549,37 @@ Java_com_ivannafusion_IvannaNativeLib_nativeReleaseAI(JNIEnv *, jobject) {
 // nativeProcessCapture / el callback AAudio para aplicar EQ -> Compresor ->
 // Exciter sobre el bloque de audio real, y actualizar las métricas de
 // loudness reportadas a la UI vía nativeGetXxxLoudness().
+//
+// IMPORTANTE: dsp::ParametricEQ/Compressor/HarmonicExciter (app/src/main/
+// cpp/*.h) operan sobre buffers INTERCALADOS (LRLRLR) vía process_stereo(),
+// no sobre canales L/R separados. processBlock() recibe el buffer
+// intercalado directamente, sin necesidad de des/re-entrelazar.
 // ─────────────────────────────────────────────────────────────────────────────
 namespace ivanna::nativelib {
 
-void processBlock(float* L, float* R, int n_frames) noexcept {
+void processBlock(float* interleaved, int n_frames) noexcept {
     if (!g_engine.enabled.load(std::memory_order_relaxed)) return;
     if (n_frames <= 0) return;
 
     std::lock_guard<std::mutex> lock(g_engine.mutex);
 
-    g_engine.eq.process(L, R, L, R, n_frames);
-    g_engine.comp.process(L, R, L, R, n_frames);
-    g_engine.exciter.process(L, R, L, R, n_frames);
+    int n_samples = n_frames * 2;  // estéreo intercalado
+    g_engine.eq.process_stereo(interleaved, n_samples);
+    g_engine.comp.process_stereo(interleaved, n_samples);
+    g_engine.exciter.process_stereo(interleaved, n_samples);
 
     // Gain reduction actual del compresor, reflejado en todas las bandas
     // (compresor de banda única -> mismo valor para todas; mantiene
     // compatibilidad con la API existente nativeEqGetGainReduction(b)).
-    float gr = -g_engine.comp.currentGainDB();
+    float gr = -g_engine.comp.get_gain_reduction_db();
     if (gr < 0.f) gr = 0.f;
     for (int i = 0; i < dsp::PEQ_BANDS; ++i) g_engine.lastGainReduction[i] = gr;
 
     // Peak level simple del bloque procesado, en dB (placeholder de
     // loudness más sofisticado tipo ITU-R BS.1770, pendiente).
     float peak = 0.f;
-    for (int i = 0; i < n_frames; ++i) {
-        peak = std::max(peak, std::fabs(L[i]));
-        peak = std::max(peak, std::fabs(R[i]));
+    for (int i = 0; i < n_samples; ++i) {
+        peak = std::max(peak, std::fabs(interleaved[i]));
     }
     float peak_dB = (peak > 1e-9f) ? 20.f * std::log10(peak) : -100.f;
     g_peakLevel.store(peak_dB, std::memory_order_relaxed);
@@ -559,9 +587,9 @@ void processBlock(float* L, float* R, int n_frames) noexcept {
 
 void setSamplerate(float fs) noexcept {
     std::lock_guard<std::mutex> lock(g_engine.mutex);
-    g_engine.eq.setSamplerate(fs);
-    g_engine.comp.setSamplerate(fs);
-    g_engine.exciter.setSamplerate(fs);
+    g_engine.eq.set_sample_rate(fs);
+    g_engine.comp.set_sample_rate(fs);
+    g_engine.exciter.set_sample_rate(fs);
 }
 
 } // namespace ivanna::nativelib
