@@ -144,7 +144,8 @@ class AudioEngine {
     }
 
     fun aiApplyCurrentCurve() {
-        currentCurveName = "Applied"        MagiskBridge.sendCommand("ai:apply")
+        currentCurveName = "Applied"
+        MagiskBridge.sendCommand("ai:apply")
     }
 
     fun eqSetGain(band: Int, gain: Float) {
@@ -193,7 +194,8 @@ class AudioEngine {
     }
 
     fun convolverSetMix(mix: Float) {
-        Log.d(TAG, "Convolver mix: $mix")        MagiskBridge.setWet(mix)
+        Log.d(TAG, "Convolver mix: $mix")
+        MagiskBridge.setWet(mix)
     }
 
     fun surroundSetWidth(w: Float) {
