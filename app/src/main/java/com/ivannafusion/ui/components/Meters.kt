@@ -30,25 +30,36 @@ fun VUMeter(
         label = "vu"
     )
     
-    // FIX: Peak hold con Job que se cancela correctamente
+    // FIX MEJORADO: Usar un solo LaunchedEffect que maneje tanto el peak hold como el decay
     val scope = rememberCoroutineScope()
-    var peakDecayJob: Job? by remember { mutableStateOf(null) }
+    val peakDecayJob = remember { mutableStateOf<Job?>(null) }
     
+    // Un solo LaunchedEffect que se ejecute cuando cambia el nivel
     LaunchedEffect(level) {
+        // Actualizar peak si el nivel actual es mayor
         if (level > peakLevel) {
             peakLevel = level
+            // Cancelar decay anterior cuando hay nuevo peak
+            peakDecayJob.value?.cancel()
+        } else if (peakHold && peakLevel > level + 0.02f) {
+            // Iniciar decay solo si no hay uno activo
+            if (peakDecayJob.value?.isActive != true) {
+                peakDecayJob.value = scope.launch {
+                    delay(1500)
+                    // Decrementar peak gradualmente
+                    while (peakLevel > level + 0.02f) {
+                        peakLevel = (peakLevel - 0.01f).coerceAtLeast(level)
+                        delay(50)
+                    }
+                }
+            }
         }
-        // Cancelar job anterior si existe
-        peakDecayJob?.cancel()
     }
     
-    // Peak decay con coroutine manejada correctamente
-    LaunchedEffect(peakLevel, level) {
-        if (peakHold && peakLevel > level + 0.02f) {
-            peakDecayJob = scope.launch {
-                delay(1500)
-                peakLevel = (peakLevel - 0.01f).coerceAtLeast(level)
-            }
+    // Limpiar job cuando el composable se destruye
+    DisposableEffect(Unit) {
+        onDispose {
+            peakDecayJob.value?.cancel()
         }
     }
     
