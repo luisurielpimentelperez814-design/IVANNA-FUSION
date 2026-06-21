@@ -7,6 +7,8 @@
 
 namespace dsp {
 
+constexpr int PEQ_BANDS = 8;  // Número de bandas del ecualizador
+
 // Estructura para un filtro biquad (base del EQ paramétrico)
 struct BiquadFilter {
     float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f;
@@ -145,7 +147,7 @@ struct EQBand {
 // Ecualizador paramétrico completo
 class ParametricEQ {
 public:
-    static constexpr int MAX_BANDS = 8;
+    static constexpr int MAX_BANDS = PEQ_BANDS;
     
     ParametricEQ() {
         // Configurar bandas por defecto (EQ de 5 bandas)
