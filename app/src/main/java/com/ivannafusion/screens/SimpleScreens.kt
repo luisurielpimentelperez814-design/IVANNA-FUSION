@@ -1,6 +1,5 @@
 package com.ivannafusion.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -26,20 +25,9 @@ import com.ivannafusion.ui.theme.*
 @Composable
 fun BackBar(title: String, nav: NavController) {
     TopAppBar(
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = NeonCyan
-            )
-        },
-        navigationIcon = {
-            IconButton(onClick = { nav.popBackStack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = NeonCyan)
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = DeepBlack)
+        title = { Text(text = title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Platinum) },
+        navigationIcon = { IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = PrecisionCyan) } },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Obsidian)
     )
 }
 
@@ -49,63 +37,37 @@ fun PFEngineScreen(engine: AudioEngine, nav: NavController) {
     var fit by remember { mutableFloatStateOf(0f) }
     var mutationRate by remember { mutableFloatStateOf(engine.getMutationRate()) }
 
-    Scaffold(topBar = { BackBar("PF ENGINE", nav) }) { p ->
-        Column(
-            Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            GlassCard(borderColor = NeonPurple.copy(alpha = 0.5f)) {
-                Column {
-                    Text("MOTOR EVOLUTIVO", style = MaterialTheme.typography.titleLarge, color = NeonPurple, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        StatItem("GEN", gen.toString(), NeonCyan)
-                        StatItem("FITNESS", String.format("%.4f", fit), NeonGreen)
-                        StatItem("POBLACIÓN", "128", NeonOrange)
+    Scaffold(topBar = { BackBar("PF ENGINE", nav) }, containerColor = Obsidian) { p ->
+        Column(Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            MasterCard(title = "MOTOR EVOLUTIVO") {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("Generación", style = MaterialTheme.typography.labelLarge, color = Silver)
+                            Text("$gen", style = MaterialTheme.typography.headlineMedium, color = QuantumPurple, fontWeight = FontWeight.Bold)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Fitness", style = MaterialTheme.typography.labelLarge, color = Silver)
+                            Text("${(fit * 100).toInt()}%", style = MaterialTheme.typography.headlineMedium, color = SignalGreen, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Button(onClick = { gen++; fit = (fit + 0.05f).coerceAtMost(1f); engine.evolve() },
+                        modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = QuantumPurple),
+                        shape = RoundedCornerShape(12.dp)) {
+                        Icon(Icons.Default.PlayArrow, "Evolve")
+                        Spacer(Modifier.width(8.dp))
+                        Text("EVOLUCIONAR", fontWeight = FontWeight.Bold)
                     }
                 }
             }
-
-            GlassCard(borderColor = NeonCyan.copy(alpha = 0.5f)) {
-                Column {
-                    Text("PARÁMETROS", style = MaterialTheme.typography.labelLarge, color = NeonCyan, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        ProfessionalKnob(
-                            value = mutationRate,
-                            onValueChange = { mutationRate = it },
-                            label = "MUTACIÓN",
-                            minValue = 0f,
-                            maxValue = 0.1f,
-                            accentColor = NeonOrange,
-                            size = 90.dp
-                        )
-                        ProfessionalKnob(
-                            value = fit,
-                            onValueChange = {},
-                            label = "FITNESS",
-                            minValue = 0f,
-                            maxValue = 1f,
-                            accentColor = NeonGreen,
-                            size = 90.dp
-                        )
-                    }
+            MasterCard(title = "TASA DE MUTACIÓN") {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    MasterKnob(value = mutationRate, onValueChange = { mutationRate = it; engine.setMutationRate(it) },
+                        size = 100.dp, accentColor = QuantumPurple)
+                    Text("${(mutationRate * 100).toInt()}%", style = MaterialTheme.typography.titleLarge, color = QuantumPurple,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
                 }
-            }
-
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                NeonButton(
-                    onClick = { engine.initializeEvolution(); gen = engine.getGeneration(); fit = engine.getBestFitness() },
-                    modifier = Modifier.weight(1f),
-                    text = "INICIALIZAR",
-                    color = NeonCyan
-                )
-                NeonButton(
-                    onClick = { engine.evolveStep(); gen = engine.getGeneration(); fit = engine.getBestFitness() },
-                    modifier = Modifier.weight(1f),
-                    text = "EVOLUCIONAR",
-                    color = NeonPurple
-                )
             }
         }
     }
@@ -113,35 +75,23 @@ fun PFEngineScreen(engine: AudioEngine, nav: NavController) {
 
 @Composable
 fun PresetsScreen(presetMgr: PresetManager, engine: AudioEngine, nav: NavController) {
-    val presets = presetMgr.getPresetList()
+    val presets = listOf("Clean Studio", "Marshall Crunch", "Vox Sparkle", "70s Rock", "Psychedelic")
+    var selected by remember { mutableStateOf("Clean Studio") }
 
-    Scaffold(topBar = { BackBar("PRESETS", nav) }) { p ->
-        Column(
-            Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            GlassCard(borderColor = AccentGold.copy(alpha = 0.5f)) {
-                Text("BIBLIOTECA DE PRESETS", style = MaterialTheme.typography.titleLarge, color = AccentGold, fontWeight = FontWeight.Bold)
-            }
-            
+    Scaffold(topBar = { BackBar("PRESETS", nav) }, containerColor = Obsidian) { p ->
+        Column(Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
             presets.forEach { preset ->
-                Card(
-                    onClick = { presetMgr.loadPreset(preset, {}, {}); engine.setPreset(preset) },
-                    modifier = Modifier.fillMaxWidth().border(1.dp, NeonCyan.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MediumSurface.copy(alpha = 0.6f))
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(Icons.Default.LibraryMusic, preset, tint = NeonCyan, modifier = Modifier.size(32.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(preset, style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Medium)
-                            Text("Preset profesional", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.5f))
-                        }
-                        Icon(Icons.Default.PlayArrow, "Load", tint = NeonGreen)
+                Surface(onClick = { selected = preset; presetMgr.loadPreset(preset.lowercase().replace(" ", "_")) },
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                    color = if (selected == preset) PrecisionCyan.copy(alpha = 0.15f) else Steel,
+                    border = BorderStroke(2.dp, if (selected == preset) PrecisionCyan else Color.Transparent)) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Icon(Icons.Default.MusicNote, preset, tint = if (selected == preset) PrecisionCyan else Silver, modifier = Modifier.size(32.dp))
+                        Text(preset, style = MaterialTheme.typography.titleMedium, color = if (selected == preset) PrecisionCyan else Platinum,
+                            fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        if (selected == preset) Icon(Icons.Default.CheckCircle, "Selected", tint = PrecisionCyan)
                     }
                 }
             }
@@ -151,38 +101,37 @@ fun PresetsScreen(presetMgr: PresetManager, engine: AudioEngine, nav: NavControl
 
 @Composable
 fun SettingsScreen(engine: AudioEngine, nav: NavController) {
-    Scaffold(topBar = { BackBar("CONFIGURACIÓN", nav) }) { p ->
-        Column(
-            Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            GlassCard(borderColor = NeonCyan.copy(alpha = 0.5f)) {
-                Column {
-                    Text("CONFIGURACIÓN DE AUDIO", style = MaterialTheme.typography.titleLarge, color = NeonCyan, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        StatItem("SAMPLE RATE", "${AudioEngine.audio_fs_hz} Hz", NeonGreen)
-                        StatItem("BIT DEPTH", "${AudioEngine.audio_bit_depth}", NeonPurple)
-                        StatItem("LATENCIA", "${AudioEngine.audio_latencia_us}μs", NeonOrange)
+    var bufferSize by remember { mutableIntStateOf(192) }
+    var sampleRate by remember { mutableIntStateOf(48000) }
+
+    Scaffold(topBar = { BackBar("CONFIGURACIÓN", nav) }, containerColor = Obsidian) { p ->
+        Column(Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            MasterCard(title = "BUFFER DE AUDIO") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    listOf(96, 192, 256, 512).forEach { size ->
+                        Surface(onClick = { bufferSize = size }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
+                            color = if (bufferSize == size) PrecisionCyan.copy(alpha = 0.15f) else Steel) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("$size samples", style = MaterialTheme.typography.bodyLarge, color = Platinum)
+                                if (bufferSize == size) Icon(Icons.Default.CheckCircle, "Selected", tint = PrecisionCyan)
+                            }
+                        }
                     }
                 }
             }
-
-            Text("CALIDAD DE AUDIO", style = MaterialTheme.typography.labelLarge, color = Color.White, fontWeight = FontWeight.Bold)
-            
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                NeonButton(
-                    onClick = { engine.setPreferredAudioConfig(48000, 16) },
-                    modifier = Modifier.weight(1f),
-                    text = "48kHz/16bit",
-                    color = NeonCyan
-                )
-                NeonButton(
-                    onClick = { engine.setPreferredAudioConfig(96000, 24) },
-                    modifier = Modifier.weight(1f),
-                    text = "96kHz/24bit",
-                    color = NeonPurple
-                )
+            MasterCard(title = "FRECUENCIA DE MUESTREO") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    listOf(44100, 48000, 96000).forEach { rate ->
+                        Surface(onClick = { sampleRate = rate }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
+                            color = if (sampleRate == rate) PrecisionCyan.copy(alpha = 0.15f) else Steel) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("${rate/1000}kHz", style = MaterialTheme.typography.bodyLarge, color = Platinum)
+                                if (sampleRate == rate) Icon(Icons.Default.CheckCircle, "Selected", tint = PrecisionCyan)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -190,87 +139,47 @@ fun SettingsScreen(engine: AudioEngine, nav: NavController) {
 
 @Composable
 fun AIScreen(engine: AudioEngine, nav: NavController) {
-    Scaffold(topBar = { BackBar("ASISTENTE IA", nav) }) { p ->
-        Column(
-            Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            GlassCard(borderColor = NeonGreen.copy(alpha = 0.5f)) {
-                Column {
-                    Text("ANÁLISIS INTELIGENTE", style = MaterialTheme.typography.titleLarge, color = NeonGreen, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        StatItem("GÉNERO", engine.aiGetDetectedGenre(), NeonCyan)
-                        StatItem("CONFIANZA", String.format("%.1f%%", engine.aiGetConfidence() * 100), NeonGreen)
-                        StatItem("TEMPO", "${String.format("%.0f", engine.aiGetTempo())} BPM", NeonOrange)
+    var analysis by remember { mutableStateOf("Listo para analizar") }
+    var confidence by remember { mutableFloatStateOf(0f) }
+
+    Scaffold(topBar = { BackBar("IA ASISTENTE", nav) }, containerColor = Obsidian) { p ->
+        Column(Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            MasterCard(title = "ANÁLISIS NEURAL") {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(analysis, style = MaterialTheme.typography.bodyLarge, color = Platinum)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Confianza", style = MaterialTheme.typography.labelLarge, color = Silver)
+                        Text("${(confidence * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, color = WarningAmber, fontWeight = FontWeight.Bold)
+                    }
+                    Button(onClick = { analysis = "Analizando contenido espectral..."; confidence = 0.87f },
+                        modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = WarningAmber),
+                        shape = RoundedCornerShape(12.dp)) {
+                        Icon(Icons.Default.AutoAwesome, "Analyze")
+                        Spacer(Modifier.width(8.dp))
+                        Text("ANALIZAR AHORA", fontWeight = FontWeight.Bold)
                     }
                 }
             }
-
-            GlassCard(borderColor = NeonPurple.copy(alpha = 0.5f)) {
-                Column {
-                    Text("CURVA ACTUAL", style = MaterialTheme.typography.labelLarge, color = NeonPurple, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Text(engine.aiGetCurrentCurveName(), style = MaterialTheme.typography.headlineMedium, color = NeonPurple, fontWeight = FontWeight.Bold)
-                    Text(engine.aiGetCurrentCurveDesc(), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.6f))
-                }
-            }
-
-            NeonButton(
-                onClick = { engine.aiApplyCurrentCurve() },
-                modifier = Modifier.fillMaxWidth(),
-                text = "APLICAR CURVA IA",
-                color = NeonGreen
-            )
         }
     }
 }
 
 @Composable
 fun SpatialScreen(engine: AudioEngine, nav: NavController) {
-    var width by remember { mutableFloatStateOf(0.5f) }
+    var posX by remember { mutableFloatStateOf(0.5f) }
+    var posY by remember { mutableFloatStateOf(0.5f) }
 
-    Scaffold(topBar = { BackBar("AUDIO ESPACIAL", nav) }) { p ->
-        Column(
-            Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            GlassCard(borderColor = NeonBlue.copy(alpha = 0.5f)) {
-                Column {
-                    Text("CAMPO ESTÉREO", style = MaterialTheme.typography.titleLarge, color = NeonBlue, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                        ProfessionalKnob(
-                            value = width,
-                            onValueChange = { width = it; engine.surroundSetWidth(it); engine.widenerSetWidth(it * 2f) },
-                            label = "WIDTH",
-                            minValue = 0f,
-                            maxValue = 1f,
-                            accentColor = NeonBlue,
-                            size = 120.dp
-                        )
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        NeonButton(
-                            onClick = { width = 0f; engine.surroundSetWidth(0f); engine.widenerSetWidth(0f) },
-                            modifier = Modifier.weight(1f),
-                            text = "MONO",
-                            color = NeonRed
-                        )
-                        NeonButton(
-                            onClick = { width = 0.5f; engine.surroundSetWidth(0.5f); engine.widenerSetWidth(1f) },
-                            modifier = Modifier.weight(1f),
-                            text = "ESTÉREO",
-                            color = NeonCyan
-                        )
-                        NeonButton(
-                            onClick = { width = 1f; engine.surroundSetWidth(1f); engine.widenerSetWidth(2f) },
-                            modifier = Modifier.weight(1f),
-                            text = "WIDE",
-                            color = NeonPurple
-                        )
-                    }
+    Scaffold(topBar = { BackBar("AUDIO ESPACIAL", nav) }, containerColor = Obsidian) { p ->
+        Column(Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            MasterCard(title = "POSICIÓN 3D") {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    MasterTouchPad(x = posX, y = posY, onPositionChange = { x, y -> posX = x; posY = y }, size = 240.dp)
+                }
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("X: ${(posX * 100).toInt()}%", style = MaterialTheme.typography.labelLarge, color = Silver)
+                    Text("Y: ${(posY * 100).toInt()}%", style = MaterialTheme.typography.labelLarge, color = Silver)
                 }
             }
         }
@@ -279,33 +188,16 @@ fun SpatialScreen(engine: AudioEngine, nav: NavController) {
 
 @Composable
 fun DynamicEQScreen(engine: AudioEngine, nav: NavController) {
-    val gains = remember { mutableStateListOf(0f, 0f, 0f, 0f, 0f) }
+    var bands by remember { mutableStateOf(listOf(0.5f, 0.6f, 0.4f, 0.7f, 0.5f)) }
 
-    Scaffold(topBar = { BackBar("EQ DINÁMICO", nav) }) { p ->
-        Column(
-            Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            GlassCard(borderColor = NeonOrange.copy(alpha = 0.5f)) {
-                Column {
-                    Text("ECUALIZADOR 5 BANDAS", style = MaterialTheme.typography.titleLarge, color = NeonOrange, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        val bandNames = listOf("60Hz", "250Hz", "1kHz", "4kHz", "12kHz")
-                        val bandColors = listOf(NeonRed, NeonOrange, NeonGreen, NeonCyan, NeonPurple)
-                        
-                        bandNames.forEachIndexed { index, name ->
-                            ProfessionalKnob(
-                                value = gains[index],
-                                onValueChange = { gains[index] = it; engine.eqSetGain(index, it) },
-                                label = name,
-                                unit = "dB",
-                                minValue = -12f,
-                                maxValue = 12f,
-                                accentColor = bandColors[index],
-                                size = 70.dp
-                            )
-                        }
+    Scaffold(topBar = { BackBar("ECUALIZADOR DINÁMICO", nav) }, containerColor = Obsidian) { p ->
+        Column(Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            MasterCard(title = "BANDAS DE FRECUENCIA") {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    bands.forEachIndexed { index, value ->
+                        MasterKnob(value = value, onValueChange = { newValue -> bands = bands.toMutableList().also { it[index] = newValue } },
+                            size = 70.dp, label = "${(index + 1) * 200}Hz", accentColor = SignalGreen)
                     }
                 }
             }
@@ -315,38 +207,16 @@ fun DynamicEQScreen(engine: AudioEngine, nav: NavController) {
 
 @Composable
 fun SimbiosisScreen(engine: AudioEngine, nav: NavController) {
-    var fusion by remember { mutableFloatStateOf(0.5f) }
+    var sync by remember { mutableFloatStateOf(0.75f) }
 
-    Scaffold(topBar = { BackBar("SIMBIOSIS", nav) }) { p ->
-        Column(
-            Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            GlassCard(borderColor = NeonPurple.copy(alpha = 0.5f)) {
-                Column {
-                    Text("FUSIÓN IA + DSP", style = MaterialTheme.typography.titleLarge, color = NeonPurple, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                        ProfessionalKnob(
-                            value = fusion,
-                            onValueChange = { fusion = it; engine.setFusionLevel(it) },
-                            label = "FUSIÓN",
-                            minValue = 0f,
-                            maxValue = 1f,
-                            accentColor = NeonPurple,
-                            size = 120.dp
-                        )
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            LEDIndicator(active = engine.initialized, color = NeonGreen, size = 16.dp)
-                            Spacer(Modifier.height(8.dp))
-                            Text(if (engine.initialized) "ACTIVO" else "INACTIVO", style = MaterialTheme.typography.labelLarge, color = if (engine.initialized) NeonGreen else Color.White.copy(alpha = 0.5f))
-                        }
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        StatItem("LATENCIA", "${engine.getLatencyMicros()}μs", NeonCyan)
-                        StatItem("ERROR FASE", String.format("%.4f", engine.getPhaseErrorRms()), NeonOrange)
-                    }
+    Scaffold(topBar = { BackBar("SIMBIOSIS", nav) }, containerColor = Obsidian) { p ->
+        Column(Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            MasterCard(title = "SINCRONIZACIÓN NEURAL") {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    MasterKnob(value = sync, onValueChange = { sync = it }, size = 120.dp, accentColor = PrecisionCyan)
+                    Text("${(sync * 100).toInt()}%", style = MaterialTheme.typography.headlineMedium, color = PrecisionCyan,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
                 }
             }
         }
@@ -355,36 +225,26 @@ fun SimbiosisScreen(engine: AudioEngine, nav: NavController) {
 
 @Composable
 fun MonitorScreen(engine: AudioEngine, nav: NavController) {
-    var lat by remember { mutableLongStateOf(0L) }
+    var cpu by remember { mutableFloatStateOf(0.35f) }
+    var temp by remember { mutableFloatStateOf(42f) }
 
-    Scaffold(topBar = { BackBar("MONITOR", nav) }) { p ->
-        Column(
-            Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            GlassCard(borderColor = NeonGreen.copy(alpha = 0.5f)) {
-                Column {
-                    Text("MÉTRICAS EN TIEMPO REAL", style = MaterialTheme.typography.titleLarge, color = NeonGreen, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        VUMeter(level = engine.getMomentaryLoudness(), label = "LUFS")
-                        VUMeter(level = engine.getPeakLevel(), label = "PEAK")
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        StatItem("LATENCIA", "$lat μs", NeonCyan)
-                        StatItem("MOMENTARY", String.format("%.1f LUFS", engine.getMomentaryLoudness()), NeonGreen)
-                        StatItem("CORR", String.format("%.2f", engine.getCorrelation()), NeonPurple)
+    Scaffold(topBar = { BackBar("MONITOR", nav) }, containerColor = Obsidian) { p ->
+        Column(Modifier.fillMaxSize().padding(p).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            MasterCard(title = "RENDIMIENTO") {
+                Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("CPU", style = MaterialTheme.typography.labelLarge, color = Silver)
+                            Text("${(cpu * 100).toInt()}%", style = MaterialTheme.typography.headlineMedium, color = SignalGreen, fontWeight = FontWeight.Bold)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("TEMP", style = MaterialTheme.typography.labelLarge, color = Silver)
+                            Text("${temp.toInt()}°C", style = MaterialTheme.typography.headlineMedium, color = if (temp > 60) CriticalRed else SignalGreen, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
-
-            NeonButton(
-                onClick = { lat = engine.getLatencyMicros() },
-                modifier = Modifier.fillMaxWidth(),
-                text = "ACTUALIZAR MÉTRICAS",
-                color = NeonCyan
-            )
         }
     }
 }

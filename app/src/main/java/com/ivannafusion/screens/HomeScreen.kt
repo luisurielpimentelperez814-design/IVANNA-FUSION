@@ -1,8 +1,6 @@
 package com.ivannafusion.screens
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,14 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.ivannafusion.AudioEngine
 import com.ivannafusion.PresetManager
@@ -38,246 +33,90 @@ fun HomeScreen(engine: AudioEngine, presetMgr: PresetManager, nav: NavController
     
     val infiniteTransition = rememberInfiniteTransition()
     val amplitudes by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * kotlin.math.PI).toFloat(),
+        initialValue = 0f, targetValue = (2 * kotlin.math.PI).toFloat(),
         animationSpec = infiniteRepeatable(animation = tween(3000, easing = LinearEasing), repeatMode = RepeatMode.Restart)
     )
-    
     val spectrumData = remember(amplitudes) {
-        List(32) { i -> ((sin(amplitudes + i * 0.4f) + 1f) / 2f * 0.8f + 0.1f).coerceIn(0f, 1f) }
+        List(64) { i -> ((sin(amplitudes + i * 0.3f) + 1f) / 2f * 0.85f + 0.1f).coerceIn(0f, 1f) }
     }
 
-    LaunchedEffect(Unit) {
-        engine.initialize(ctx)
-        state = "Sistema Activo"
-    }
+    LaunchedEffect(Unit) { engine.initialize(ctx); state = "Sistema Activo"; running = true }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "IVANNA",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = NeonCyan
-                        )
-                        Text(
-                            text = " FUSION",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Light,
-                            color = Color.White.copy(alpha = 0.7f)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp)) {
+                        Text(text = "IVANNA", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Platinum)
+                        Text(text = " FUSION", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Light, color = PrecisionCyan)
                     }
                 },
-                actions = {
-                    LEDIndicator(active = running, color = NeonGreen)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = if (running) "EN VIVO" else "STANDBY",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (running) NeonGreen else Color.White.copy(alpha = 0.5f)
-                    )
-                    Spacer(Modifier.width(16.dp))
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DeepBlack)
+                actions = { IconButton(onClick = { nav.navigate("settings") }) { Icon(Icons.Default.Settings, "Settings", tint = Silver) } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Obsidian)
             )
-        }
+        },
+        containerColor = Obsidian
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Visualizador de espectro principal
-            GlassCard(borderColor = NeonCyan.copy(alpha = 0.5f)) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "ANALIZADOR DE ESPECTRO",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = NeonCyan,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${AudioEngine.audio_fs_hz / 1000}kHz / ${AudioEngine.audio_bit_depth}bit",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    SpectrumVisualizer(
-                        amplitudes = if (running) spectrumData else List(32) { 0.1f },
-                        barColor = NeonCyan
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        StatItem("LATENCIA", "${engine.getLatencyMicros()}μs", NeonGreen)
-                        StatItem("FASE", String.format("%.3f", engine.getPhaseErrorRms()), NeonPurple)
-                        StatItem("FITNESS", String.format("%.2f", engine.getBestFitness()), NeonOrange)
-                    }
-                }
-            }
-
-            // Controles principales
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                NeonButton(
-                    onClick = { engine.startAudioCapture(); running = true; state = "Ejecutando" },
-                    modifier = Modifier.weight(1f),
-                    text = "▶ INICIAR",
-                    color = NeonGreen,
-                    enabled = !running
-                )
-                NeonButton(
-                    onClick = { engine.stopAudioCapture(); running = false; state = "Detenido" },
-                    modifier = Modifier.weight(1f),
-                    text = "■ DETENER",
-                    color = NeonRed,
-                    enabled = running
-                )
-            }
-
-            // Control de fusión
-            GlassCard(borderColor = NeonPurple.copy(alpha = 0.5f)) {
-                Column {
-                    Text(
-                        text = "NIVEL DE FUSIÓN",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = NeonPurple,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ProfessionalKnob(
-                            value = fusionLevel,
-                            onValueChange = { fusionLevel = it; engine.setFusionLevel(it) },
-                            label = "FUSIÓN",
-                            unit = "",
-                            accentColor = NeonPurple,
-                            size = 100.dp
-                        )
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "SIMBIOSIS",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = NeonPurple,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "IA + DSP",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.6f)
-                            )
-                            LEDIndicator(active = fusionLevel > 0.3f, color = NeonPurple, size = 16.dp)
-                        }
-                    }
-                }
-            }
-
-            // Navegación a módulos
-            Text(
-                text = "MÓDULOS",
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+        Column(modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
             
-            val modules = listOf(
-                Triple("simbiosis", "Simbiosis", Icons.Default.Biotech),
-                Triple("pf_engine", "PF Engine", Icons.Default.Psychology),
-                Triple("eq", "EQ Dinámico", Icons.Default.GraphicEq),
-                Triple("spatial", "Audio Espacial", Icons.Default.SurroundSound),
-                Triple("ai", "Asistente IA", Icons.Default.SmartToy),
-                Triple("presets", "Presets", Icons.Default.LibraryMusic),
-                Triple("monitor", "Monitor", Icons.Default.MonitorHeart),
-                Triple("settings", "Configuración", Icons.Default.Settings)
-            )
-            
-            modules.chunked(2).forEach { row ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    row.forEach { (route, label, icon) ->
-                        ModuleCard(
-                            label = label,
-                            icon = icon,
-                            onClick = { nav.navigate(route) },
-                            modifier = Modifier.weight(1f)
-                        )
+            MasterCard(title = "ESTADO DEL SISTEMA") {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text(text = state, style = MaterialTheme.typography.titleLarge, color = if (running) SignalGreen else WarningAmber, fontWeight = FontWeight.Bold)
+                        Text(text = "Motor de audio cuántico activo", style = MaterialTheme.typography.bodyMedium, color = Silver)
                     }
-                    if (row.size == 1) {
-                        Spacer(Modifier.weight(1f))
+                    Surface(shape = RoundedCornerShape(12.dp), color = if (running) SignalGreen.copy(alpha = 0.15f) else WarningAmber.copy(alpha = 0.15f)) {
+                        Text(text = if (running) "ONLINE" else "STANDBY", style = MaterialTheme.typography.labelLarge,
+                            color = if (running) SignalGreen else WarningAmber, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                     }
                 }
             }
+
+            MasterCard(title = "ANALIZADOR ESPECTRAL") {
+                MasterSpectrumVisualizer(amplitudes = spectrumData, gradientColors = MasterGradient)
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("20Hz", style = MaterialTheme.typography.labelMedium, color = Chrome)
+                    Text("1kHz", style = MaterialTheme.typography.labelMedium, color = Chrome)
+                    Text("20kHz", style = MaterialTheme.typography.labelMedium, color = Chrome)
+                }
+            }
+
+            MasterCard(title = "NIVEL DE FUSIÓN CUÁNTICA") {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    MasterKnob(value = fusionLevel, onValueChange = { fusionLevel = it }, size = 120.dp, accentColor = PrecisionCyan)
+                    Text(text = "${(fusionLevel * 100).toInt()}%", style = MaterialTheme.typography.headlineMedium, color = PrecisionCyan,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
+                }
+            }
+
+            MasterCard(title = "MÓDULOS AVANZADOS") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    NavButton("PF ENGINE", "Motor evolutivo", Icons.Default.Psychology, QuantumPurple) { nav.navigate("pf_engine") }
+                    NavButton("ECUALIZADOR", "EQ dinámico", Icons.Default.Equalizer, SignalGreen) { nav.navigate("eq") }
+                    NavButton("AUDIO ESPACIAL", "Sonido 3D", Icons.Default._3dRotation, PrecisionCyan) { nav.navigate("spatial") }
+                    NavButton("IA ASISTENTE", "Análisis inteligente", Icons.Default.AutoAwesome, WarningAmber) { nav.navigate("ai") }
+                }
+            }
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
 
 @Composable
-fun StatItem(label: String, value: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.5f))
-        Text(text = value, style = MaterialTheme.typography.titleLarge, color = color, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-fun ModuleCard(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier
-            .height(100.dp)
-            .border(1.dp, NeonCyan.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MediumSurface.copy(alpha = 0.6f))
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = NeonCyan,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Medium
-            )
+fun NavButton(title: String, subtitle: String, icon: ImageVector, color: Color, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Steel) {
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Surface(shape = RoundedCornerShape(10.dp), color = color.copy(alpha = 0.15f), modifier = Modifier.size(48.dp)) {
+                Box(contentAlignment = Alignment.Center) { Icon(icon, title, tint = color, modifier = Modifier.size(28.dp)) }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, style = MaterialTheme.typography.titleMedium, color = Platinum, fontWeight = FontWeight.Bold)
+                Text(text = subtitle, style = MaterialTheme.typography.bodyMedium, color = Silver)
+            }
+            Icon(Icons.Default.ChevronRight, "Navigate", tint = Chrome)
         }
     }
 }

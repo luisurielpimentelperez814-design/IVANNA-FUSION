@@ -8,45 +8,42 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-val DeepBlack = Color(0xFF0A0A0F)
-val DarkSurface = Color(0xFF12121A)
-val MediumSurface = Color(0xFF1A1A25)
-val LightSurface = Color(0xFF252532)
+val Obsidian = Color(0xFF08080B)
+val Carbon = Color(0xFF0F0F14)
+val Graphite = Color(0xFF16161D)
+val Steel = Color(0xFF1E1E28)
+val Titanium = Color(0xFF282836)
+val Platinum = Color(0xFFE8E8F0)
+val Silver = Color(0xFFB8B8C8)
+val Chrome = Color(0xFF8888A0)
+val PrecisionCyan = Color(0xFF00E5FF)
+val QuantumPurple = Color(0xFFB388FF)
+val SignalGreen = Color(0xFF00E676)
+val WarningAmber = Color(0xFFFFAB00)
+val CriticalRed = Color(0xFFFF1744)
 
-val NeonCyan = Color(0xFF00F5FF)
-val NeonPurple = Color(0xFFBF00FF)
-val NeonGreen = Color(0xFF00FF88)
-val NeonOrange = Color(0xFFFF6B00)
-val NeonRed = Color(0xFFFF0055)
-val NeonBlue = Color(0xFF0088FF)
-val AccentGold = Color(0xFFFFD700)
+val MasterGradient = listOf(Color(0xFF00E5FF), Color(0xFF00B8D4), Color(0xFF0091EA))
 
-private val DarkColorScheme = darkColorScheme(
-    primary = NeonCyan,
-    secondary = NeonPurple,
-    tertiary = NeonGreen,
-    background = DeepBlack,
-    surface = DarkSurface,
-    surfaceVariant = MediumSurface,
-    onPrimary = DeepBlack,
-    onSecondary = Color.White,
-    onBackground = Color.White,
-    onSurface = Color.White,
-    onSurfaceVariant = Color(0xFFE0E0E0),
-    outline = Color(0xFF3A3A4A)
+private val MasterColorScheme = darkColorScheme(
+    primary = PrecisionCyan, secondary = QuantumPurple, tertiary = SignalGreen,
+    background = Obsidian, surface = Carbon, surfaceVariant = Graphite,
+    onPrimary = Obsidian, onSecondary = Color.White, onBackground = Platinum,
+    onSurface = Platinum, onSurfaceVariant = Silver, outline = Chrome
 )
 
-val Typography = Typography(
-    displayLarge = TextStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 57.sp, lineHeight = 64.sp, letterSpacing = (-0.25).sp),
-    headlineLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 40.sp, letterSpacing = 0.sp),
-    headlineMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 36.sp, letterSpacing = 0.sp),
-    titleLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = 0.sp),
-    bodyLarge = TextStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.5.sp),
-    bodyMedium = TextStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.25.sp),
-    labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp)
+val MasterTypography = Typography(
+    displayLarge = TextStyle(FontFamily.SansSerif, FontWeight.Black, 57.sp, 64.sp),
+    headlineLarge = TextStyle(FontFamily.SansSerif, FontWeight.Bold, 32.sp, 40.sp),
+    headlineMedium = TextStyle(FontFamily.SansSerif, FontWeight.Bold, 28.sp, 36.sp),
+    titleLarge = TextStyle(FontFamily.SansSerif, FontWeight.SemiBold, 22.sp, 28.sp),
+    titleMedium = TextStyle(FontFamily.SansSerif, FontWeight.Medium, 16.sp, 24.sp),
+    bodyLarge = TextStyle(FontFamily.SansSerif, FontWeight.Normal, 16.sp, 24.sp),
+    bodyMedium = TextStyle(FontFamily.SansSerif, FontWeight.Normal, 14.sp, 20.sp),
+    labelLarge = TextStyle(FontFamily.SansSerif, FontWeight.Medium, 14.sp, 20.sp),
+    labelMedium = TextStyle(FontFamily.SansSerif, FontWeight.Medium, 12.sp, 16.sp)
 )
 
 @Composable
 fun IVANNATheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = DarkColorScheme, typography = Typography, content = content)
+    MaterialTheme(MasterColorScheme, MasterTypography, content)
 }
