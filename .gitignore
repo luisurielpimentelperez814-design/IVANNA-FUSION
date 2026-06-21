@@ -1,0 +1,25 @@
+# Android
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+*.jks
+*.keystore
+app/release/
+app/debug/
+
+# NDK build artifacts
+*.o
+*.a
+cmake-build-*/
+
+# No rastrear APK compilado (descargarlo de Actions)
+app-release.apk
+
+# Rastrear .so precompilados (artefactos de despliegue Magisk)
+!system/lib64/soundfx/*.so
+!system/vendor/lib64/soundfx/*.so
+!system/vendor/lib/soundfx/*.so

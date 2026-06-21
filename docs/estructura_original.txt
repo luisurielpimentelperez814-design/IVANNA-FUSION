@@ -1,0 +1,27 @@
+IVANNA-FUSION/
+├── app/
+│   ├── src/main/
+│   │   ├── java/com/ivannafusion/
+│   │   │   ├── MainActivity.kt
+│   │   │   ├── SimbiosisScreen.kt
+│   │   │   ├── MonitorScreen.kt
+│   │   │   ├── SettingsAuditScreen.kt
+│   │   │   ├── AudioEngine.kt
+│   │   │   ├── ShmManager.kt
+│   │   │   ├── GestureDetector.kt
+│   │   │   └── ThermalMonitor.kt
+│   │   ├── cpp/
+│   │   │   ├── audio_orchestrator.cpp
+│   │   │   ├── phase_oracle.cpp
+│   │   │   ├── evolutionary_kernel.cpp
+│   │   │   ├── shm_hyperplane.cpp
+│   │   │   └── CMakeLists.txt
+│   │   ├── assets/
+│   │   │   └── thermal_sched.bpf
+│   │   └── res/raw/copyright.txt
+│   └── build.gradle
+├── scripts/
+│   ├── gen_sched_table.py
+│   ├── verify_latency.py
+│   └── build_and_sign.sh
+└── README_TRASCENDENTAL.md

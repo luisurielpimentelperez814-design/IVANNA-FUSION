@@ -1,0 +1,8 @@
+{
+  "name": "clean_studio",
+  "amp": 1,
+  "alpha": 0.95, "beta": 0.15, "gamma": 0.40, "delta": 0.10, "sigma": 0.70,
+  "drive": 0.80, "wet": 0.60,
+  "low_gain": 2.0, "mid_gain": 0.5, "high_gain": 1.5,
+  "mid_freq": 500.0, "presence": 1.5, "sag": 0.05, "bias": 0.55
+}

@@ -1,2 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources><string name="app_name">IVANNA FUSION</string></resources>
+<resources>
+    <string name="app_name">IVANNA FUSION</string>
+    <string name="app_title">IVANNA FUSION TRASCENDENTAL</string>
+    <string name="app_version">1.0.0</string>
+    <string name="copyright">© 2025 Luis Uriel Pimentel Pérez. Todos los derechos reservados.</string>
+    
+    <!-- UI Strings -->
+    <string name="start_button">▶ Iniciar</string>
+    <string name="stop_button">⏹ Detener</string>
+    <string name="save_preset">💾 Guardar Preset</string>
+    <string name="running_status">🟢 EN EJECUCIÓN</string>
+    <string name="stopped_status">🔴 DETENIDO</string>
+    
+    <!-- Audio Engine -->
+    <string name="audio_engine_label">Motor de Audio</string>
+    <string name="audio_focus_label">Audio Focus</string>
+    <string name="presets_label">Presets</string>
+    <string name="preset_name_hint">Nombre de nuevo preset</string>
+    
+    <!-- Error Messages -->
+    <string name="error_audio_engine">ERROR: Audio Engine</string>
+    <string name="error_generic">Error: %s</string>
+</resources>

@@ -1,0 +1,8 @@
+{
+  "name": "psychedelic",
+  "amp": 3,
+  "alpha": 1.00, "beta": 0.55, "gamma": 0.60, "delta": 0.50, "sigma": 0.70,
+  "drive": 2.20, "wet": 0.75,
+  "low_gain": 2.0, "mid_gain": 2.5, "high_gain": 3.5,
+  "mid_freq": 1400.0, "presence": 5.0, "sag": 0.15, "bias": 0.50
+}

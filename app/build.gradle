@@ -2,29 +2,122 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
 }
+
 android {
     namespace 'com.ivannafusion'
     compileSdk 34
+
     defaultConfig {
         applicationId "com.ivannafusion"
         minSdk 29
         targetSdk 34
         versionCode 100
         versionName "1.0.0-TRASCENDENTAL"
+
+        externalNativeBuild {
+            cmake {
+                // Flags de optimización ARM64 - optimizados para Snapdragon
+                cppFlags "-O3 -ffast-math -funroll-loops -march=armv8.2-a+fp16+dotprod -fPIC -std=c++20"
+                arguments "-DANDROID_STL=c++_shared", "-DCMAKE_BUILD_TYPE=Release"
+            }
+        }
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
     }
-    buildTypes { release { minifyEnabled false } }
-    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
-    kotlinOptions { jvmTarget = '1.8' }
-    buildFeatures { compose true }
-    composeOptions { kotlinCompilerExtensionVersion '1.5.8' }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.create("release") {
+                def ksPassword = System.getenv("IVANNA_KEYSTORE_PASSWORD")
+                def signKeyPassword = System.getenv("IVANNA_KEY_PASSWORD")
+                if (ksPassword == null || signKeyPassword == null) {
+                    throw new GradleException(
+                        "IVANNA_KEYSTORE_PASSWORD / IVANNA_KEY_PASSWORD no definidas")
+                }
+                storeFile file("../ivanna-keystore.jks")
+                storePassword ksPassword
+                keyAlias "ivanna"
+                keyPassword signKeyPassword
+            }
+        }
+        debug {
+            minifyEnabled false
+            debuggable true
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            version "3.22.1"
+        }
+    }
+
+    buildFeatures {
+        compose true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion '1.5.8'
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+        freeCompilerArgs += [
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.material.ExperimentalMaterialApi",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            "-opt-in=androidx.compose.animation.ExperimentalAnimationApi",
+            "-opt-in=androidx.compose.ui.ExperimentalComposeUiApi"
+        ]
+    }
+
+    packagingOptions {
+        pickFirst '**/libjsc.so'
+        pickFirst '**/libc++_shared.so'
+    }
 }
+
 dependencies {
+    // Core Android
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
     implementation 'androidx.activity:activity-compose:1.8.2'
-    implementation platform('androidx.compose:compose-bom:2024.01.00')
+
+    // Compose UI
+    implementation platform('androidx.compose:compose-bom:2024.02.00')
     implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
     implementation 'androidx.compose.material3:material3'
-    implementation 'androidx.compose.material:material-icons-extended'
-    implementation 'androidx.navigation:navigation-compose:2.7.6'
+    
+    // Navigation
+    implementation 'androidx.navigation:navigation-compose:2.7.7'
+    
+    // DataStore for persistent state
+    implementation 'androidx.datastore:datastore-preferences:1.0.0'
+    
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    
+    // Glance widgets
+    implementation 'androidx.glance:glance:1.0.0'
+    
+    // Speech recognition (optional - can be removed if not used)
+    implementation 'com.alphacephei:vosk-android:0.3.47'
+    
+    // File handling
+    implementation 'androidx.documentfile:documentfile:1.0.1'
+    
+    // Logging
+    implementation 'com.jakewharton.timber:timber:5.0.1'
+    
+    // Testing
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
 }

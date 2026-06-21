@@ -1,0 +1,96 @@
+name: Build IVANNA-FUSION APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Instalar Gradle 8.5
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.5'
+
+      - name: Aceptar licencias Android SDK
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      # NDK r27c: consistente con build-magisk.yml.
+      # Clang 18 del r27c mejora significativamente el diagnóstico de
+      # designadores C++ y el soporte de C++23 respecto a r25c.
+      - name: Cache NDK r27c
+        id: cache-ndk
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+          key: ndk-r27c-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            ndk-r27c-${{ runner.os }}-
+
+      - name: Instalar NDK r27c
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: |
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.2.12479018"
+
+      - name: Exportar ANDROID_NDK_HOME
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> $GITHUB_ENV
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018"         >> $GITHUB_ENV
+
+      - name: Restaurar keystore desde secreto
+        env:
+          KEYSTORE_B64: ${{ secrets.IVANNA_KEYSTORE_B64 }}
+          REAL_KEYSTORE_PASSWORD: ${{ secrets.IVANNA_KEYSTORE_PASSWORD }}
+          REAL_KEY_PASSWORD: ${{ secrets.IVANNA_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > ivanna-keystore.jks
+            echo "IVANNA_KEYSTORE_PASSWORD=$REAL_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "IVANNA_KEY_PASSWORD=$REAL_KEY_PASSWORD"           >> "$GITHUB_ENV"
+          else
+            echo "IVANNA_KEYSTORE_B64 no configurado; generando keystore temporal de CI (no apto para release real)."
+            TMP_PW="ci-$(openssl rand -hex 12)"
+            keytool -genkeypair -v \
+              -keystore ivanna-keystore.jks \
+              -alias ivanna \
+              -keyalg RSA -keysize 2048 -validity 365 \
+              -storepass "$TMP_PW" \
+              -keypass  "$TMP_PW" \
+              -dname "CN=IVANNA-FUSION CI, OU=CI, O=GoretNS, L=Tultitlan, S=Mexico, C=MX"
+            echo "::add-mask::$TMP_PW"
+            echo "IVANNA_KEYSTORE_PASSWORD=$TMP_PW" >> "$GITHUB_ENV"
+            echo "IVANNA_KEY_PASSWORD=$TMP_PW"       >> "$GITHUB_ENV"
+          fi
+
+      # Debe ir DESPUÉS de restaurar el keystore: cualquier invocación de
+      # gradle (incluido 'gradle wrapper') evalúa app/build.gradle, y ese
+      # build script exige IVANNA_KEYSTORE_PASSWORD/IVANNA_KEY_PASSWORD en
+      # el entorno desde el momento de configuración, no solo al firmar.
+      - name: Generar Gradle Wrapper (si no existe)
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            gradle wrapper --gradle-version 8.5
+          fi
+          chmod +x ./gradlew
+
+      - name: Compilar APK release
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Subir APK como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: IVANNA-FUSION-v1.0-release
+          path: app/build/outputs/apk/release/*.apk

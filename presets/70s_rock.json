@@ -1,0 +1,8 @@
+{
+  "name": "70s_rock",
+  "amp": 3,
+  "alpha": 1.05, "beta": 0.50, "gamma": 0.65, "delta": 0.60, "sigma": 0.50,
+  "drive": 2.80, "wet": 0.80,
+  "low_gain": 4.0, "mid_gain": 1.0, "high_gain": 3.0,
+  "mid_freq": 900.0, "presence": 4.0, "sag": 0.20, "bias": 0.48
+}

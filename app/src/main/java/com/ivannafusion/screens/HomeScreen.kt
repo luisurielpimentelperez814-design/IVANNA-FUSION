@@ -1,76 +1,103 @@
 package com.ivannafusion.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.ivannafusion.navigation.Routes
+import com.ivannafusion.IvannaNativeLib
 
-data class NavItem(val icon: ImageVector, val label: String, val route: String)
+data class QuickItem(val icon: String, val label: String, val route: String)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun QuickButton(icon: String, label: String, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(8.dp).clickable { onClick() }) {
+        Card(
+            colors = CardDefaults.cardColors(Color(0xFF2A2A2A)),
+            modifier = Modifier.size(60.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Text(icon, fontSize = 24.sp)
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(label, color = Color(0xFFAAAAAA), fontSize = 10.sp)
+    }
+}
+
 @Composable
 fun HomeScreen(navController: NavController) {
-    var isEngineActive by remember { mutableStateOf(false) }
-    val navItems = listOf(
-        NavItem(Icons.Default.GraphicEq, "PF Engine", Routes.PF_ENGINE),
-        NavItem(Icons.Default.LibraryMusic, "Presets", Routes.PRESETS),
-        NavItem(Icons.Default.ThreeDRotation, "Espacial", Routes.SPATIAL),
-        NavItem(Icons.Default.Equalizer, "Ecualizador", Routes.EQ),
-        NavItem(Icons.Default.MonitorHeart, "Monitor", Routes.MONITOR),
-        NavItem(Icons.Default.SmartToy, "IA", Routes.AI),
-        NavItem(Icons.Default.Biotech, "Simbiosis", Routes.SIMBIOSIS),
-        NavItem(Icons.Default.Settings, "Config", Routes.SETTINGS)
+    var effectEnabled by remember { mutableStateOf(IvannaNativeLib.isEnabled()) }
+    var currentPreset by remember { mutableStateOf("Flat (Reference)") }
+    val presets = listOf(
+        "Flat (Reference)", "Mastering", "Dolby Cinema",
+        "Sony DSEE", "Bass Head", "Vocal Clarity", "Gaming", "Late Night"
     )
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("IVANNA FUSION", fontWeight = FontWeight.Bold, fontSize = 24.sp) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1E1E1E), titleContentColor = Color(0xFF00BCD4))
-            )
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF121212)).padding(20.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("IVANNA-FUSION", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Switch(checked = effectEnabled, onCheckedChange = { v -> effectEnabled = v; IvannaNativeLib.setEnabled(v) },
+                colors = SwitchDefaults.colors(checkedTrackColor = Color(0xFF4CAF50)))
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(paddingValues).verticalScroll(rememberScrollState()).padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2A2A))) {
-                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (isEngineActive) "MOTOR ACTIVO" else "MOTOR INACTIVO", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (isEngineActive) Color(0xFF4CAF50) else Color(0xFF888888))
+        Text(if (effectEnabled) "ACTIVO" else "INACTIVO",
+            color = if (effectEnabled) Color(0xFF4CAF50) else Color(0xFF888888), fontSize = 14.sp,
+            modifier = Modifier.padding(bottom = 20.dp))
+
+        Text("Preset Activo", color = Color(0xFFAAAAAA), fontSize = 12.sp)
+        var expanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded },
+            modifier = Modifier.padding(vertical = 8.dp)) {
+            OutlinedTextField(value = currentPreset, onValueChange = {}, readOnly = true,
+                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedTextColor = Color.White, focusedTextColor = Color.White,
+                    unfocusedBorderColor = Color(0xFF444444), focusedBorderColor = Color(0xFF4CAF50)),
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) })
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                presets.forEach { p ->
+                    DropdownMenuItem(text = { Text(p) }, onClick = {
+                        currentPreset = p
+                        expanded = false
+                        IvannaNativeLib.setPreset(presets.indexOf(p))
+                    })
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { isEngineActive = true }, modifier = Modifier.weight(1f), enabled = !isEngineActive, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))) { Text("Iniciar") }
-                Button(onClick = { isEngineActive = false }, modifier = Modifier.weight(1f), enabled = isEngineActive, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))) { Text("Detener") }
+        }
+
+        Spacer(Modifier.height(24.dp))
+        Text("Acceso Rapido", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(12.dp))
+
+        val row1 = listOf(
+            QuickItem("🧠", "AI", "ai"),
+            QuickItem("🎚️", "EQ", "eq"),
+            QuickItem("🌌", "Spatial", "spatial"),
+            QuickItem("🎛️", "Comp", "compressor")
+        )
+        val row2 = listOf(
+            QuickItem("🔊", "Reverb", "convolver"),
+            QuickItem("🎧", "AutoEQ", "autoeq"),
+            QuickItem("📊", "Meter", "analyzer"),
+            QuickItem("💾", "Presets", "presets")
+        )
+        
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            row1.forEach { item ->
+                QuickButton(item.icon, item.label) { navController.navigate(item.route) }
             }
-            Text("Módulos", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp))
-            for (row in navItems.chunked(2)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { item ->
-                        Card(modifier = Modifier.weight(1f).height(100.dp).clickable { navController.navigate(item.route) }, colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2A2A))) {
-                            Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                                Icon(item.icon, contentDescription = item.label, tint = Color(0xFF00BCD4), modifier = Modifier.size(32.dp))
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(item.label, fontSize = 14.sp, color = Color.White)
-                            }
-                        }
-                    }
-                    if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
-                }
-                Spacer(modifier = Modifier.height(8.dp))
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            row2.forEach { item ->
+                QuickButton(item.icon, item.label) { navController.navigate(item.route) }
             }
         }
     }

@@ -1,0 +1,12 @@
+IVANNA-FUSION TRASCENDENTAL – © 2025 Luis Uriel Pimentel Pérez.
+Todos los derechos reservados.
+Prohibida la copia, distribución, ingeniería inversa o cualquier uso no autorizado.
+Quien infrinja será perseguido penal y civilmente.
+
+Este software es propiedad intelectual exclusiva de Luis Uriel Pimentel Pérez.
+No se permite la redistribución, modificación, descompilación, ingeniería inversa,
+o cualquier forma de uso no expresamente autorizado por escrito por el titular.
+
+El hardware objetivo es el Motorola Moto G85 (Snapdragon 695) con kernel modificado.
+El sistema requiere acceso root y kernel 5.4+ con soporte eBPF, hugetlb,
+y preempt-rt para operación trascendental.
