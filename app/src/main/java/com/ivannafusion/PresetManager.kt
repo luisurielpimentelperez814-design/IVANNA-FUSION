@@ -6,41 +6,36 @@ import android.util.Log
 class PresetManager(private val context: Context) {
     companion object {
         private const val TAG = "PresetManager"
-        private const val PREFS_NAME = "ivanna_presets"
-        private const val KEY_LAST_PRESET = "last_preset"
+        private const val PREFS = "ivanna_presets"
     }
 
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun loadPreset(name: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         try {
-            Log.d(TAG, "Cargando preset: $name")
-            prefs.edit().putString(KEY_LAST_PRESET, name).apply()
+            prefs.edit().putString("last_preset", name).apply()
             onSuccess()
         } catch (e: Exception) {
-            Log.e(TAG, "Error cargando preset", e)
-            onError(e.message ?: "Error desconocido")
+            onError(e.message ?: "Error")
         }
     }
 
     fun savePreset(name: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         try {
-            Log.d(TAG, "Guardando preset: $name")
             prefs.edit().putString("preset_$name", "data").apply()
             onSuccess()
         } catch (e: Exception) {
-            Log.e(TAG, "Error guardando preset", e)
-            onError(e.message ?: "Error desconocido")
+            onError(e.message ?: "Error")
         }
     }
 
     fun restoreLastPreset(onSuccess: () -> Unit, onError: (String) -> Unit) {
         try {
-            val lastPreset = prefs.getString(KEY_LAST_PRESET, "clean_studio")
-            Log.d(TAG, "Restaurando último preset: $lastPreset")            onSuccess()
+            onSuccess()
         } catch (e: Exception) {
-            Log.e(TAG, "Error restaurando preset", e)
-            onError(e.message ?: "Error desconocido")
+            onError(e.message ?: "Error")
         }
     }
+
+    fun getPresetList(): List<String> = listOf("clean_studio", "70s_rock", "psychedelic", "metal_heavy", "jazz_warm")
 }

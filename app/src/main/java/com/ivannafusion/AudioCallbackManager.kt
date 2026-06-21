@@ -7,35 +7,29 @@ import android.os.Build
 import android.util.Log
 
 class AudioCallbackManager(private val audioManager: AudioManager) {
-    companion object {
-        private const val TAG = "AudioCallbackManager"
-    }
+    companion object { private const val TAG = "AudioCallbackManager" }
 
     private var audioFocusRequest: AudioFocusRequest? = null
     private var isAudioFocusOwned = false
 
     fun requestAudioFocus(): Boolean {
         return try {
-            val audioAttributes = AudioAttributes.Builder()
+            val attrs = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build()
-
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                    .setAudioAttributes(audioAttributes)
-                    .setOnAudioFocusChangeListener { focusChange ->
-                        onAudioFocusChange(focusChange)
-                    }
+                    .setAudioAttributes(attrs)
+                    .setOnAudioFocusChangeListener { onAudioFocusChange(it) }
                     .build()
-
                 val result = audioManager.requestAudioFocus(audioFocusRequest!!)
                 isAudioFocusOwned = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
                 isAudioFocusOwned
             } else {
                 @Suppress("DEPRECATION")
                 val result = audioManager.requestAudioFocus(
-                    { focusChange -> onAudioFocusChange(focusChange) },
+                    { onAudioFocusChange(it) },
                     AudioManager.STREAM_MUSIC,
                     AudioManager.AUDIOFOCUS_GAIN
                 )
@@ -43,7 +37,8 @@ class AudioCallbackManager(private val audioManager: AudioManager) {
                 isAudioFocusOwned
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error solicitando audio focus", e)            false
+            Log.e(TAG, "Error", e)
+            false
         }
     }
 
@@ -54,47 +49,42 @@ class AudioCallbackManager(private val audioManager: AudioManager) {
                 audioFocusRequest = null
             } else {
                 @Suppress("DEPRECATION")
-                audioManager.abandonAudioFocus { }
+                audioManager.abandonAudioFocus(null)
             }
             isAudioFocusOwned = false
         } catch (e: Exception) {
-            Log.e(TAG, "Error liberando audio focus", e)
+            Log.e(TAG, "Error", e)
         }
     }
 
     private fun onAudioFocusChange(focusChange: Int) {
-        Log.d(TAG, "Audio focus change: $focusChange")
+        Log.d(TAG, "Focus change: $focusChange")
     }
 
     fun muteUnwantedNoise() {
         try {
             @Suppress("DEPRECATION")
             audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, 0, 0)
-            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, 0, 0)
         } catch (e: Exception) {
-            Log.e(TAG, "Error silenciando ruidos", e)
+            Log.e(TAG, "Error", e)
         }
     }
 
     fun restoreAudioStreams() {
         try {
             val maxNotif = audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION)
-            val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
             @Suppress("DEPRECATION")
             audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, maxNotif / 2, 0)
-            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarm / 2, 0)
         } catch (e: Exception) {
-            Log.e(TAG, "Error restaurando streams", e)
+            Log.e(TAG, "Error", e)
         }
     }
 
     fun getAudioState(): String {
         return try {
-            val musicVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val focusOwned = if (isAudioFocusOwned) "Sí" else "No"            "Focus: $focusOwned | Vol: $musicVol/$maxMusicVol"
-        } catch (e: Exception) {
-            "Error: ${e.message}"
-        }
+            val vol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            "Focus: ${if (isAudioFocusOwned) "Si" else "No"} | Vol: $vol/$max"
+        } catch (e: Exception) { "Error" }
     }
 }

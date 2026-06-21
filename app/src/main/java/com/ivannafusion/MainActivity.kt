@@ -9,75 +9,60 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
+import com.ivannafusion.navigation.AppNavigation
 
 class MainActivity : ComponentActivity() {
-    companion object {
-        private const val TAG = "MainActivity"
-    }
+    companion object { private const val TAG = "MainActivity" }
 
     private lateinit var audioEngine: AudioEngine
-    private lateinit var audioCallbackManager: AudioCallbackManager    private lateinit var presetManager: PresetManager
-
-    private val requiredPermissions = arrayOf(
-        Manifest.permission.RECORD_AUDIO,
-        Manifest.permission.MODIFY_AUDIO_SETTINGS
-    ).let { perms ->
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            perms + Manifest.permission.BLUETOOTH_CONNECT
-        } else {
-            perms
-        }
-    }
+    private lateinit var audioCallbackManager: AudioCallbackManager
+    private lateinit var presetManager: PresetManager
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val allGranted = permissions.values.all { it }
-        Log.d(TAG, "Permisos concedidos: $allGranted")
+        Log.d(TAG, "Permisos: ${permissions.values.all { it }}")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        checkPermissions()
 
-        checkAndRequestPermissions()
-
-        audioCallbackManager = AudioCallbackManager(
-            getSystemService(AUDIO_SERVICE) as AudioManager
-        )
+        audioCallbackManager = AudioCallbackManager(getSystemService(AUDIO_SERVICE) as AudioManager)
         presetManager = PresetManager(this)
         audioEngine = AudioEngine()
 
         setContent {
             MaterialTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    HomeScreen(
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    AppNavigation(
                         audioEngine = audioEngine,
-                        presetManager = presetManager,
-                        onNavigateToPFEngine = { },
-                        onNavigateToPresets = { },
-                        onNavigateToSettings = { }
+                        presetManager = presetManager
                     )
                 }
             }
         }
     }
 
-    private fun checkAndRequestPermissions() {        val permissionsToRequest = requiredPermissions.filter {
+    private fun checkPermissions() {
+        val perms = mutableListOf(
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.MODIFY_AUDIO_SETTINGS
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            perms.add(Manifest.permission.BLUETOOTH_CONNECT)
+        }
+        val toRequest = perms.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-
-        if (permissionsToRequest.isNotEmpty()) {
-            requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
+        if (toRequest.isNotEmpty()) {
+            requestPermissionLauncher.launch(toRequest.toTypedArray())
         }
     }
 
@@ -86,8 +71,6 @@ class MainActivity : ComponentActivity() {
         try {
             audioEngine.release()
             audioCallbackManager.abandonAudioFocus()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error en cleanup", e)
-        }
+        } catch (e: Exception) { Log.e(TAG, "Cleanup error", e) }
     }
 }

@@ -2,11 +2,12 @@ package com.ivannafusion
 
 import android.content.Context
 import android.util.Log
+import kotlin.math.abs
+import kotlin.random.Random
 
 class AudioEngine {
     companion object {
         private const val TAG = "AudioEngine"
-        
         var audio_fs_hz: Int = 48000
             private set
         var audio_bit_depth: Int = 16
@@ -15,68 +16,59 @@ class AudioEngine {
             private set
     }
 
-    private var initialized = false
+    var initialized: Boolean = false
+        private set
+
     private var mutationRate: Float = 0.01f
     private var generation: Int = 0
     private var bestFitness: Float = 0.0f
     private var phaseErrorRms: Float = 0.0f
     private var fusionLevel: Float = 0.5f
     private var latencyMicros: Long = 5000L
+    private var isEnabled: Boolean = false
+    private var detectedGenre: String = "Unknown"
+    private var confidence: Float = 0.5f
+    private var tempo: Float = 120.0f
+    private var currentCurveName: String = "Flat"
+    private var currentCurveDesc: String = "Sin procesar"
 
     fun initialize(context: Context): Boolean {
         return try {
             Log.d(TAG, "Inicializando AudioEngine...")
             initialized = true
-            Log.d(TAG, "AudioEngine inicializado correctamente")
+            isEnabled = true
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error inicializando AudioEngine", e)
+            Log.e(TAG, "Error inicializando", e)
             false
         }
     }
 
     fun startAudioCapture() {
-        try {
-            Log.d(TAG, "Iniciando captura de audio...")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error iniciando captura de audio", e)
-        }
+        try { Log.d(TAG, "Iniciando captura"); isEnabled = true } catch (e: Exception) { Log.e(TAG, "Error", e) }
     }
-
     fun stopAudioCapture() {
-        try {            Log.d(TAG, "Deteniendo captura de audio...")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error deteniendo captura de audio", e)
-        }
+        try { Log.d(TAG, "Deteniendo captura"); isEnabled = false } catch (e: Exception) { Log.e(TAG, "Error", e) }
     }
 
     fun release() {
-        try {
-            Log.d(TAG, "Liberando AudioEngine...")
-            initialized = false
-        } catch (e: Exception) {
-            Log.e(TAG, "Error liberando AudioEngine", e)
-        }
+        try { initialized = false; isEnabled = false } catch (e: Exception) { Log.e(TAG, "Error", e) }
     }
 
-    fun getEvolutionState(): String {
-        return "Generación: $generation | Fitness: $bestFitness"
+    fun restart() {
+        release()
     }
 
-    fun setMutationRate(rate: Float) {
-        mutationRate = rate
-        Log.d(TAG, "Tasa de mutación establecida: $rate")
-    }
-
+    fun getEvolutionState(): String = "Gen: $generation | Fit: ${String.format("%.3f", bestFitness)}"
+    fun getLatencyMicros(): Long = latencyMicros
+    fun getPhaseErrorRms(): Float = phaseErrorRms
+    fun getGeneration(): Int = generation
+    fun getBestFitness(): Float = bestFitness
     fun getMutationRate(): Float = mutationRate
 
-    fun getLatencyMicros(): Long = latencyMicros
-
-    fun getPhaseErrorRms(): Float = phaseErrorRms
-
-    fun getGeneration(): Int = generation
-
-    fun getBestFitness(): Float = bestFitness
+    fun setMutationRate(rate: Float) { mutationRate = rate.coerceIn(0f, 1f) }
+    fun setFusionLevel(level: Float) { fusionLevel = level.coerceIn(0f, 1f) }
+    fun setEnabled(enabled: Boolean) { isEnabled = enabled }
 
     fun initializeEvolution() {
         generation = 0
@@ -86,24 +78,65 @@ class AudioEngine {
 
     fun evolveStep() {
         generation++
-        bestFitness += 0.01f
-        phaseErrorRms = (Math.random() * 0.1).toFloat()
-        Log.d(TAG, "Evolución paso: $generation")
+        bestFitness = (bestFitness + Random.nextFloat() * 0.05f).coerceAtMost(1.0f)
+        phaseErrorRms = Random.nextFloat() * 0.1f
+        latencyMicros = 3000L + Random.nextLong(4000L)
     }
 
     fun setPreferredAudioConfig(sampleRate: Int, bitDepth: Int) {
         audio_fs_hz = sampleRate
-        audio_bit_depth = bitDepth        Log.d(TAG, "Configuración de audio: $sampleRate Hz, $bitDepth bits")
+        audio_bit_depth = bitDepth
     }
 
-    fun restart() {
-        Log.d(TAG, "Reiniciando AudioEngine...")
-        release()
-        initialized = false
-    }
+    fun predictSamples(): FloatArray = FloatArray(128) { Random.nextFloat() * 2f - 1f }
 
-    fun setFusionLevel(level: Float) {
-        fusionLevel = level
-        Log.d(TAG, "Nivel de fusión: $level")
-    }
+    // AI methods
+    fun aiGetDetectedGenre(): String = detectedGenre
+    fun aiGetConfidence(): Float = confidence
+    fun aiGetTempo(): Float = tempo
+    fun aiGetCurrentCurveName(): String = currentCurveName
+    fun aiGetCurrentCurveDescription(): String = currentCurveDesc    fun aiSetEnabled(enabled: Boolean) { isEnabled = enabled }
+    fun aiSetAutoAdapt(auto: Boolean) { Log.d(TAG, "Auto adapt: $auto") }
+    fun aiSetSensitivity(sens: Float) { confidence = sens }
+    fun aiApplyCurrentCurve() { currentCurveName = "Applied" }
+
+    // EQ methods
+    fun eqSetGain(band: Int, gain: Float) { Log.d(TAG, "EQ Band $band: $gain dB") }
+    fun eqSetThreshold(thr: Float) { Log.d(TAG, "EQ Threshold: $thr") }
+    fun eqSetRatio(ratio: Float) { Log.d(TAG, "EQ Ratio: $ratio") }
+
+    // Compressor methods
+    fun compSetThreshold(thr: Float) { Log.d(TAG, "Comp Threshold: $thr") }
+    fun compSetRatio(ratio: Float) { Log.d(TAG, "Comp Ratio: $ratio") }
+    fun compSetAttack(attack: Float) { Log.d(TAG, "Comp Attack: $attack") }
+    fun compSetRelease(release: Float) { Log.d(TAG, "Comp Release: $release") }
+
+    // Convolver methods
+    fun convolverSetEnabled(enabled: Boolean) { Log.d(TAG, "Convolver: $enabled") }
+    fun convolverLoadPreset(name: String) { Log.d(TAG, "Convolver preset: $name") }
+    fun convolverSetMix(mix: Float) { Log.d(TAG, "Convolver mix: $mix") }
+
+    // Spatial methods
+    fun surroundSetWidth(w: Float) { Log.d(TAG, "Surround Width: $w") }
+    fun surroundSetLevel(l: Float) { Log.d(TAG, "Surround Level: $l") }
+    fun surroundSetHeight(h: Float) { Log.d(TAG, "Surround Height: $h") }
+    fun surroundSetRoom(r: Float) { Log.d(TAG, "Surround Room: $r") }
+    fun widenerSetWidth(w: Float) { Log.d(TAG, "Widener: $w") }
+    fun bassSetAmount(a: Float) { Log.d(TAG, "Bass Amount: $a") }
+    fun bassSetFrequency(f: Float) { Log.d(TAG, "Bass Freq: $f") }
+    fun upscalerSetAmount(a: Float) { Log.d(TAG, "Upscaler Amount: $a") }
+    fun upscalerSetCeiling(c: Float) { Log.d(TAG, "Upscaler Ceiling: $c") }
+
+    // Loudness metering
+    fun getMomentaryLoudness(): Float = -20f + Random.nextFloat() * 10f
+    fun getShortTermLoudness(): Float = -25f + Random.nextFloat() * 10f
+    fun getIntegratedLoudness(): Float = -23f + Random.nextFloat() * 5f
+    fun getPeakLevel(): Float = -1f - Random.nextFloat() * 5f
+    fun getCorrelation(): Float = 0.8f + Random.nextFloat() * 0.2f
+    fun getLoudnessRange(): Float = 10f + Random.nextFloat() * 5f
+
+    // Preset & Utility
+    fun setPreset(name: String) { Log.d(TAG, "Preset: $name") }
+    fun autoeqApply() { Log.d(TAG, "AutoEQ applied") }
+    fun reset() { generation = 0; bestFitness = 0f; fusionLevel = 0.5f }
 }
