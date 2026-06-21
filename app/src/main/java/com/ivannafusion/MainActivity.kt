@@ -9,13 +9,13 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.ivannafusion.navigation.AppNavigation
+import com.ivannafusion.ui.theme.IVANNATheme
 
 class MainActivity : ComponentActivity() {
     companion object { private const val TAG = "MainActivity" }
@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
         audioEngine = AudioEngine()
 
         setContent {
-            MaterialTheme {
+            IVANNATheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     AppNavigation(
                         audioEngine = audioEngine,
@@ -58,19 +58,16 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             perms.add(Manifest.permission.BLUETOOTH_CONNECT)
         }
-        val toRequest = perms.filter {
+        val needRequest = perms.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-        if (toRequest.isNotEmpty()) {
-            requestPermissionLauncher.launch(toRequest.toTypedArray())
+        if (needRequest.isNotEmpty()) {
+            requestPermissionLauncher.launch(needRequest.toTypedArray())
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            audioEngine.release()
-            audioCallbackManager.abandonAudioFocus()
-        } catch (e: Exception) { Log.e(TAG, "Cleanup error", e) }
+        audioEngine.release()
     }
 }
