@@ -95,7 +95,8 @@ fun SpectrumVisualizer(
     }
     
     Canvas(modifier = modifier.fillMaxSize()) {
-        val barCount = magnitudes.size        val totalWidth = size.width
+        val barCount = magnitudes.size
+        val totalWidth = size.width
         val barWidth = (totalWidth / barCount) * 0.7f
         val gap = (totalWidth / barCount) * 0.3f
         

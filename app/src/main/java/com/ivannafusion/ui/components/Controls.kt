@@ -46,7 +46,8 @@ fun IVANNAFader(
         modifier = modifier.width(48.dp)
     ) {
         if (label.isNotEmpty()) {
-            Text(text = label, style = MaterialTheme.typography.labelSmall, color = TextSecondary)            Spacer(Modifier.height(4.dp))
+            Text(text = label, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Spacer(Modifier.height(4.dp))
         }
         
         Box(
