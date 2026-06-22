@@ -12,25 +12,37 @@ option(IVANNA_BUILD_IOS "Build iOS framework" OFF)
 option(IVANNA_BUILD_LINUX "Build Linux library" OFF)
 option(IVANNA_BUILD_TESTS "Build tests" ON)
 
-# Core DSP library
-add_library(ivanna_core STATIC
-    core/dsp/biquad_neon.cpp
-    core/pipeline/audio_pipeline.cpp
+# Core DSP library (HEADER-ONLY INTERFACE)
+# All implementations are inline in headers for zero-overhead and SIMD optimization
+add_library(ivanna_core INTERFACE)
+
+target_include_directories(ivanna_core INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
 )
 
-target_include_directories(ivanna_core PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-)
+target_compile_features(ivanna_core INTERFACE cxx_std_20)
 
-# Enable NEON on ARM
+# Enable NEON on ARM platforms
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
-    target_compile_options(ivanna_core PRIVATE -mfpu=neon -mfloat-abi=softfp)
+    target_compile_options(ivanna_core INTERFACE -mfpu=neon -mfloat-abi=softfp)
 endif()
 
 # API versioning
 set_target_properties(ivanna_core PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR})
+
+# Simple test program to validate compilation
+if(IVANNA_BUILD_TESTS)
+    enable_testing()
+    
+    add_executable(ivanna_test tests/ivanna_test.cpp)
+    target_link_libraries(ivanna_test PRIVATE ivanna_core)
+    
+    add_test(NAME core_compile_test COMMAND ivanna_test)
+    message(STATUS "Tests enabled - ivanna_test will validate core compilation")
+endif()
 
 # Platform-specific integrations
 if(IVANNA_BUILD_ANDROID)
@@ -41,9 +53,4 @@ if(IVANNA_BUILD_ANDROID)
     target_link_libraries(ivanna_android PRIVATE ivanna_core)
 endif()
 
-if(IVANNA_BUILD_TESTS)
-    enable_testing()
-    message(STATUS "Tests enabled")
-endif()
-
-message(STATUS "IVANNA Core v${PROJECT_VERSION} configured successfully")
+message(STATUS "IVANNA Core v${PROJECT_VERSION} configured successfully (header-only)")
