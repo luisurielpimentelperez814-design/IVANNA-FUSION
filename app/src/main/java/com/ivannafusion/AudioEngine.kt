@@ -131,4 +131,13 @@ class AudioEngine {
     fun getAIInferenceCount(): Long = aiEngine.inferenceCount.value
 
     fun aiGetDeviceTemperature(): Float = 35.0f // Placeholder
+
+    // Aplicar preset al motor DSP
+    fun setPreset(presetName: String) {
+        Log.i("AudioEngine", "Aplicando preset: $presetName")
+        // TODO: Mapear presetName a valores específicos de EQ, Compresor, etc.
+        // Por ahora, solo registramos el cambio para que la IA lo considere
+        userMadeAdjustments = false // Resetear flag al cambiar preset
+    }
+
 }
