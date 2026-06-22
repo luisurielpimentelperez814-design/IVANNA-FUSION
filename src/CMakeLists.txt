@@ -42,7 +42,8 @@ set(FFT_SOURCES
 add_library(ivanna_fusion SHARED
     ${IVANNA_SOURCES}
     ${PF_SOURCES}
-    ${FFT_SOURCES}
+)
+    ${PF_SOURCES}
 )
 
 target_include_directories(ivanna_fusion PRIVATE
