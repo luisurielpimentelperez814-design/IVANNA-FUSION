@@ -2,6 +2,49 @@
 
 > © 2025-2026 Luis Uriel Pimentel Pérez — GORE TNS. Todos los derechos reservados.
 
+## ⚠️ BASE ACTIVA DEL PROYECTO (LEER PRIMERO)
+
+Este repositorio acumuló, a lo largo de varias sesiones de trabajo en
+paralelo, **5 implementaciones distintas del mismo motor de audio**:
+`app/src/main/cpp/` + `src/cpp`/`src/include`, `edge_ai/`, `pf_engine/`,
+`omega_engine/`, y `core/`+`include/ivanna/` ("Industrial Platform v2.0").
+
+**La ÚNICA base que Gradle realmente compila hacia el APK, y la única
+verificada end-to-end (incluye YAMNet para clasificación de audio real),
+es:**
+
+```
+app/src/main/cpp/          ← código fuente que Gradle compila (CMakeLists.txt referenciado en app/build.gradle)
+src/cpp/ + src/include/    ← motor DSP real (EQ paramétrico, compresor, exciter), incluido por el CMakeLists de arriba
+magisk_module/             ← módulo Magisk con la interfaz Audio Effect HAL real (audio_effect_library_t)
+```
+
+**Por qué se descartaron las otras 4 (sin borrarlas — siguen en el repo
+como referencia):**
+- `edge_ai/`, `pf_engine/`, `omega_engine/` (Python): no están
+  referenciadas desde ningún `CMakeLists.txt` que Gradle invoque — son
+  código huérfano respecto al build real, sin importar su contenido.
+- `core/` + `include/ivanna/` ("Industrial Platform v2.0"): mismo
+  problema de desconexión del build, y además su biquad NEON no logra
+  paralelismo real (la recursión IIR se calcula escalar, solo se
+  empaqueta en vectores al final — sin ganancia de SIMD), y su
+  `AudioPipeline` central tiene el resampler marcado explícitamente
+  como `// Stage 1: ... (resampling placeholder)` en el código fuente.
+
+Si vas a seguir desarrollando este proyecto en una nueva sesión:
+**edita dentro de `app/src/main/cpp/`, `src/cpp/`, `src/include/`, y
+`magisk_module/`**. Cualquier cambio a los otros directorios no tendrá
+efecto en el APK ni en el módulo instalado hasta que se conecte
+explícitamente al `CMakeLists.txt` real.
+
+**Rescatado de `core/` hacia la base activa:** `complexity_registry.h`
+(control de presupuesto de CPU/memoria por módulo) se portó a
+`src/include/complexity_registry.h` — es la única pieza de
+"Industrial Platform v2.0" sin el problema de SIMD cosmético o
+placeholders, y es independiente del resto de ese directorio.
+
+---
+
 ## 🔊 El mejor procesador de audio DSP del mundo
 
 Motor de audio DSP real para Android, diseñado para Snapdragon 4 Gen 2 / Android 14-15.  
