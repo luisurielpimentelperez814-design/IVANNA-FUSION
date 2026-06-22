@@ -149,20 +149,81 @@ private fun CompressorPanel(audioEngine: AudioEngine) {
 
 @Composable
 private fun ConvolverPanel(audioEngine: AudioEngine) {
-    var enabled by remember { mutableStateOf(false) }
-    var mix by remember { mutableStateOf(0.5f) }
+    var reverbType by remember { mutableStateOf("HALL") }
+    var decay by remember { mutableStateOf(0.4f) }
+    var preDelay by remember { mutableStateOf(0.1f) }
+    var damping by remember { mutableStateOf(0.5f) }
+    var diffusion by remember { mutableStateOf(0.7f) }
+    var earlyMix by remember { mutableStateOf(0.5f) }
+    var mix by remember { mutableStateOf(0.3f) }
     
     IVANNACard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("CONVOLVER", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-            IVANNAToggle(checked = enabled, onCheckedChange = { enabled = it; audioEngine.convolverSetEnabled(it) })
-        }
-        PendingEngineNotice("Sin motor de convolución implementado todavía — los controles guardan el valor pero no procesan audio.")
+        Text("CONVOLVER ELITE", style = MaterialTheme.typography.labelSmall, color = TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
         
-        Spacer(Modifier.height(16.dp))
+        // Selector de tipo de reverb
+        Text("TIPO DE REVERB", style = MaterialTheme.typography.labelSmall, color = TextTertiary, modifier = Modifier.padding(bottom = 4.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf("HALL", "PLATE", "ROOM", "SPRING", "CHAMBER").forEach { type ->
+                IVANNAButton(
+                    text = type,
+                    onClick = { 
+                        reverbType = type
+                        audioEngine.convSetType(type)
+                    },
+                    accent = if (reverbType == type) AccentViolet else TextSecondary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        
+        Spacer(Modifier.height(12.dp))
+        
+        // Presets rápidos
+        Text("PRESETS", style = MaterialTheme.typography.labelSmall, color = TextTertiary, modifier = Modifier.padding(bottom = 4.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            IVANNAButton(text = "SM ROOM", onClick = { audioEngine.convPresetSmallRoom() }, accent = AccentEmerald, modifier = Modifier.weight(1f))
+            IVANNAButton(text = "LG HALL", onClick = { audioEngine.convPresetLargeHall() }, accent = AccentEmerald, modifier = Modifier.weight(1f))
+            IVANNAButton(text = "PLATE", onClick = { audioEngine.convPresetPlate() }, accent = AccentEmerald, modifier = Modifier.weight(1f))
+            IVANNAButton(text = "SPRING", onClick = { audioEngine.convPresetSpring() }, accent = AccentEmerald, modifier = Modifier.weight(1f))
+        }
+        
+        Spacer(Modifier.height(12.dp))
+        
+        // Controles principales
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            IVANNAKnob(value = decay, onValueChange = { 
+                decay = it
+                audioEngine.convSetDecay(it * 4.9f + 0.1f)
+            }, size = 64.dp, label = "DECAY", unit = "s", accentColor = AccentViolet)
+            
+            IVANNAKnob(value = preDelay, onValueChange = { 
+                preDelay = it
+                audioEngine.convSetPreDelay(it * 200f)
+            }, size = 64.dp, label = "PRE-DLY", unit = "ms", accentColor = AccentViolet)
+            
+            IVANNAKnob(value = damping, onValueChange = { 
+                damping = it
+                audioEngine.convSetDamping(it)
+            }, size = 64.dp, label = "DAMP", unit = "", accentColor = AccentViolet)
+            
+            IVANNAKnob(value = diffusion, onValueChange = { 
+                diffusion = it
+                audioEngine.convSetDiffusion(it)
+            }, size = 64.dp, label = "DIFF", unit = "", accentColor = AccentViolet)
+        }
+        
+        Spacer(Modifier.height(12.dp))
         
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            IVANNAKnob(value = mix, onValueChange = { mix = it; audioEngine.convolverSetMix(it) }, label = "MIX", unit = "%", accentColor = AccentViolet, enabled = false)
+            IVANNAKnob(value = earlyMix, onValueChange = { 
+                earlyMix = it
+                audioEngine.convSetEarlyMix(it)
+            }, size = 64.dp, label = "EARLY", unit = "", accentColor = AccentViolet)
+            
+            IVANNAKnob(value = mix, onValueChange = { 
+                mix = it
+                audioEngine.convSetMix(it)
+            }, size = 64.dp, label = "MIX", unit = "%", accentColor = AccentViolet)
         }
     }
 }
@@ -170,18 +231,60 @@ private fun ConvolverPanel(audioEngine: AudioEngine) {
 @Composable
 private fun SpatialPanel(audioEngine: AudioEngine) {
     var width by remember { mutableStateOf(0.5f) }
-    var height by remember { mutableStateOf(0.5f) }
-    var room by remember { mutableStateOf(0.3f) }
+    var depth by remember { mutableStateOf(0.5f) }
+    var diffusion by remember { mutableStateOf(0.3f) }
+    var delay by remember { mutableStateOf(0.15f) }
+    var modRate by remember { mutableStateOf(0.5f) }
+    var mix by remember { mutableStateOf(1.0f) }
     
     IVANNACard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text("PROCESAMIENTO ESPACIAL", style = MaterialTheme.typography.labelSmall, color = TextSecondary, modifier = Modifier.padding(bottom = 4.dp))
-        PendingEngineNotice("Sin decorrelador de fase/surround implementado todavía — los controles guardan el valor pero no procesan audio.")
+        Text("DECORRELADOR ESTÉREO", style = MaterialTheme.typography.labelSmall, color = TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
+        
+        // Presets rápidos
+        Text("PRESETS", style = MaterialTheme.typography.labelSmall, color = TextTertiary, modifier = Modifier.padding(bottom = 4.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            IVANNAButton(text = "NATURAL", onClick = { audioEngine.decorPresetNatural() }, accent = AccentEmerald, modifier = Modifier.weight(1f))
+            IVANNAButton(text = "WIDE", onClick = { audioEngine.decorPresetWide() }, accent = AccentEmerald, modifier = Modifier.weight(1f))
+            IVANNAButton(text = "M→STEREO", onClick = { audioEngine.decorPresetMonoToStereo() }, accent = AccentEmerald, modifier = Modifier.weight(1f))
+        }
+        
         Spacer(Modifier.height(12.dp))
-
+        
+        // Controles principales
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            IVANNAKnob(value = width, onValueChange = { width = it; audioEngine.surroundSetWidth(it) }, label = "WIDTH", accentColor = AccentEmerald, enabled = false)
-            IVANNAKnob(value = height, onValueChange = { height = it; audioEngine.surroundSetHeight(it) }, label = "HEIGHT", accentColor = AccentEmerald, enabled = false)
-            IVANNAKnob(value = room, onValueChange = { room = it; audioEngine.surroundSetRoom(it) }, label = "ROOM", accentColor = AccentEmerald, enabled = false)
+            IVANNAKnob(value = width, onValueChange = { 
+                width = it
+                audioEngine.decorSetWidth(it * 2f)
+            }, size = 64.dp, label = "WIDTH", unit = "", accentColor = AccentEmerald)
+            
+            IVANNAKnob(value = depth, onValueChange = { 
+                depth = it
+                audioEngine.decorSetDepth(it)
+            }, size = 64.dp, label = "DEPTH", unit = "", accentColor = AccentEmerald)
+            
+            IVANNAKnob(value = diffusion, onValueChange = { 
+                diffusion = it
+                audioEngine.decorSetDiffusion(it)
+            }, size = 64.dp, label = "DIFFUSION", unit = "", accentColor = AccentEmerald)
+            
+            IVANNAKnob(value = delay, onValueChange = { 
+                delay = it
+                audioEngine.decorSetDelay(it * 100f)
+            }, size = 64.dp, label = "DELAY", unit = "ms", accentColor = AccentEmerald)
+        }
+        
+        Spacer(Modifier.height(12.dp))
+        
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            IVANNAKnob(value = modRate, onValueChange = { 
+                modRate = it
+                audioEngine.decorSetModRate(it * 5f)
+            }, size = 64.dp, label = "MOD RATE", unit = "Hz", accentColor = AccentEmerald)
+            
+            IVANNAKnob(value = mix, onValueChange = { 
+                mix = it
+                audioEngine.decorSetMix(it)
+            }, size = 64.dp, label = "MIX", unit = "%", accentColor = AccentEmerald)
         }
     }
 }

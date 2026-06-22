@@ -33,6 +33,8 @@ class AudioEngine {
     private var currentCurveDesc: String = "Sin procesar"
 
     private val omegaBridge = OmegaMagiskBridge()
+    private val decorrelationEngine = DecorrelationEngine(audio_fs_hz)
+    private val convolutionEngine = ConvolutionEngine(audio_fs_hz)
     
     private val engineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -609,6 +611,133 @@ class AudioEngine {
                 MagiskBridge.sendCommand("pf:evo:reset")
             }
         }
+    }
+
+
+    // ── Decorrelation Engine ─────────────────────────────────────────────
+    fun decorSetWidth(w: Float) {
+        Log.d(TAG, "Decorrelation Width: $w")
+        decorrelationEngine.width = w.coerceIn(0f, 2f)
+    }
+    
+    fun decorSetDepth(d: Float) {
+        Log.d(TAG, "Decorrelation Depth: $d")
+        decorrelationEngine.depth = d.coerceIn(0f, 1f)
+    }
+    
+    fun decorSetDiffusion(diff: Float) {
+        Log.d(TAG, "Decorrelation Diffusion: $diff")
+        decorrelationEngine.diffusion = diff.coerceIn(0f, 1f)
+    }
+    
+    fun decorSetDelay(ms: Float) {
+        Log.d(TAG, "Decorrelation Delay: $ms ms")
+        decorrelationEngine.delayMs = ms.coerceIn(0f, 100f)
+    }
+    
+    fun decorSetModRate(rate: Float) {
+        Log.d(TAG, "Decorrelation Mod Rate: $rate Hz")
+        decorrelationEngine.modulationRate = rate.coerceIn(0f, 5f)
+    }
+    
+    fun decorSetMix(mix: Float) {
+        Log.d(TAG, "Decorrelation Mix: $mix")
+        decorrelationEngine.mix = mix.coerceIn(0f, 1f)
+    }
+    
+    fun decorPresetNatural() {
+        decorrelationEngine.presetNatural()
+        Log.d(TAG, "Decorrelation preset: Natural Stereo")
+    }
+    
+    fun decorPresetWide() {
+        decorrelationEngine.presetWide()
+        Log.d(TAG, "Decorrelation preset: Wide Ambient")
+    }
+    
+    fun decorPresetMonoToStereo() {
+        decorrelationEngine.presetMonoToStereo()
+        Log.d(TAG, "Decorrelation preset: Mono to Stereo")
+    }
+
+
+    // ── Convolution Engine Elite ─────────────────────────────────────────
+    fun convSetType(type: String) {
+        Log.d(TAG, "Convolution Type: $type")
+        convolutionEngine.reverbType = when (type.uppercase()) {
+            "HALL" -> ConvolutionEngine.ReverbType.HALL
+            "PLATE" -> ConvolutionEngine.ReverbType.PLATE
+            "ROOM" -> ConvolutionEngine.ReverbType.ROOM
+            "SPRING" -> ConvolutionEngine.ReverbType.SPRING
+            "CHAMBER" -> ConvolutionEngine.ReverbType.CHAMBER
+            else -> ConvolutionEngine.ReverbType.HALL
+        }
+        convolutionEngine.regenerateIR()
+    }
+    
+    fun convSetDecay(time: Float) {
+        Log.d(TAG, "Convolution Decay: $time s")
+        convolutionEngine.decayTime = time.coerceIn(0.1f, 5f)
+        convolutionEngine.regenerateIR()
+    }
+    
+    fun convSetPreDelay(ms: Float) {
+        Log.d(TAG, "Convolution Pre-delay: $ms ms")
+        convolutionEngine.preDelayMs = ms.coerceIn(0f, 200f)
+    }
+    
+    fun convSetDamping(damp: Float) {
+        Log.d(TAG, "Convolution Damping: $damp")
+        convolutionEngine.damping = damp.coerceIn(0f, 1f)
+        convolutionEngine.regenerateIR()
+    }
+    
+    fun convSetDiffusion(diff: Float) {
+        Log.d(TAG, "Convolution Diffusion: $diff")
+        convolutionEngine.diffusion = diff.coerceIn(0f, 1f)
+        convolutionEngine.regenerateIR()
+    }
+    
+    fun convSetEarlyMix(mix: Float) {
+        Log.d(TAG, "Convolution Early Mix: $mix")
+        convolutionEngine.earlyMix = mix.coerceIn(0f, 1f)
+    }
+    
+    fun convSetMix(mix: Float) {
+        Log.d(TAG, "Convolution Mix: $mix")
+        convolutionEngine.mix = mix.coerceIn(0f, 1f)
+    }
+    
+    fun convSetLowCut(freq: Float) {
+        Log.d(TAG, "Convolution Low Cut: $freq Hz")
+        convolutionEngine.lowCut = freq.coerceIn(20f, 500f)
+        convolutionEngine.regenerateIR()
+    }
+    
+    fun convSetHighCut(freq: Float) {
+        Log.d(TAG, "Convolution High Cut: $freq Hz")
+        convolutionEngine.highCut = freq.coerceIn(2000f, 20000f)
+        convolutionEngine.regenerateIR()
+    }
+    
+    fun convPresetSmallRoom() {
+        convolutionEngine.presetSmallRoom()
+        Log.d(TAG, "Convolution preset: Small Room")
+    }
+    
+    fun convPresetLargeHall() {
+        convolutionEngine.presetLargeHall()
+        Log.d(TAG, "Convolution preset: Large Hall")
+    }
+    
+    fun convPresetPlate() {
+        convolutionEngine.presetPlate()
+        Log.d(TAG, "Convolution preset: Plate")
+    }
+    
+    fun convPresetSpring() {
+        convolutionEngine.presetSpring()
+        Log.d(TAG, "Convolution preset: Spring")
     }
 
     fun reset() {
