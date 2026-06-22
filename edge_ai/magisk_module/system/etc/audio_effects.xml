@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<audio_effects>
+    <libraries>
+        <library name="omega_effect" path="libomega_effect.so"/>
+    </libraries>
+    <effects>
+        <effect name="omega_in" library="omega_effect" uuid="8f1a2b3c-4d5e-6f7a-8b9c-0d1e2f3a4b5c"/>
+    </effects>
+    <postprocess>
+        <stream type="music">
+            <apply effect="omega_in"/>
+        </stream>
+    </postprocess>
+</audio_effects>
