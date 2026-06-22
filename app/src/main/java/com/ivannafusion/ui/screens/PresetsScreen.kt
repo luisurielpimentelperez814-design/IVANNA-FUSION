@@ -15,12 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.ivannafusion.AudioEngine
 import com.ivannafusion.PresetManager
 import com.ivannafusion.ui.components.*
 import com.ivannafusion.ui.theme.*
 
 @Composable
-fun PresetsScreen(presetManager: PresetManager, onBack: () -> Unit) {
+fun PresetsScreen(audioEngine: AudioEngine, presetManager: PresetManager, onBack: () -> Unit) {
     val presets = listOf(
         "Studio Reference" to "Curva plana profesional",
         "Bass Boost" to "Refuerzo de graves +6dB",
@@ -41,7 +42,14 @@ fun PresetsScreen(presetManager: PresetManager, onBack: () -> Unit) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             presets.forEachIndexed { index, preset ->
                 Row(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (selectedPreset == index) AccentCyan.copy(alpha = 0.1f) else BackgroundTertiary).clickable { selectedPreset = index }.padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (selectedPreset == index) AccentCyan.copy(alpha = 0.1f) else BackgroundTertiary).clickable {
+                        selectedPreset = index
+                        // Antes esto solo cambiaba el resaltado visual: no se
+                        // aplicaba ningún cambio real al motor DSP ni se
+                        // persistía la selección. Ahora sí se conecta.
+                        presetManager.loadPreset(preset.first)
+                        audioEngine.setPreset(preset.first)
+                    }.padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.MusicNote, null, tint = if (selectedPreset == index) AccentCyan else TextSecondary, modifier = Modifier.size(28.dp))

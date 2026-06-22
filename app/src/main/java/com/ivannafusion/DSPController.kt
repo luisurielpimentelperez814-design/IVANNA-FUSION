@@ -16,16 +16,35 @@ object DSPController {
 
     fun init() {
         if (effect != null) return
-        try {
-            val constructor = AudioEffect::class.java.getDeclaredConstructor(
-                UUID::class.java, UUID::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
-            )
-            constructor.isAccessible = true
-            effect = constructor.newInstance(TYPE_IVANNA, UUID_IVANNA, 0, 0) as AudioEffect
-            effect?.enabled = true
-            Log.i(TAG, "DSPController inicializado con AudioEffect exitoso")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error inicializando AudioEffect", e)
+        // CRÍTICO: crear un AudioEffect con audioSession=0 (sesión global del
+        // mix maestro) vía reflexión sobre un constructor no público es una
+        // operación privilegiada que en algunos frameworks de audio de
+        // fabricante puede bloquear el hilo de binder esperando una
+        // respuesta de audioserver que nunca llega (especialmente si
+        // audioserver está en un estado inestable). Se ejecuta con un
+        // timeout duro en un hilo separado para que, si se cuelga, no
+        // arrastre al hilo que llamó a init() ni, por extensión, al
+        // sistema completo — solo falla esta función puntual.
+        val initThread = Thread {
+            try {
+                val constructor = AudioEffect::class.java.getDeclaredConstructor(
+                    UUID::class.java, UUID::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
+                )
+                constructor.isAccessible = true
+                val created = constructor.newInstance(TYPE_IVANNA, UUID_IVANNA, 0, 0) as AudioEffect
+                created.enabled = true
+                effect = created
+                Log.i(TAG, "DSPController inicializado con AudioEffect exitoso")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error inicializando AudioEffect", e)
+            }
+        }
+        initThread.isDaemon = true  // si se cuelga, no impide que la JVM/proceso termine
+        initThread.start()
+        initThread.join(2000)  // máximo 2s de espera; si no termina, seguimos sin AudioEffect
+        if (initThread.isAlive) {
+            Log.e(TAG, "DSPController.init() no respondió en 2s — continuando SIN efecto global " +
+                       "(posible binder colgado hacia audioserver; no se bloquea el resto de la app)")
         }
     }
 

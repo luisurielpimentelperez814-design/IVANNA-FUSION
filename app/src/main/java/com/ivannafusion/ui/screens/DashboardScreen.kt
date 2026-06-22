@@ -104,7 +104,7 @@ fun DashboardScreen(audioEngine: AudioEngine, onNavigate: (String) -> Unit) {
             Text("ACCESO RÁPIDO", style = MaterialTheme.typography.labelSmall, color = TextSecondary, modifier = Modifier.padding(bottom = 12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuickActionRow(icon = Icons.Default.GraphicEq, title = "Ecualizador", subtitle = "10 bandas paramétricas", onClick = { onNavigate("effects") })
-                QuickActionRow(icon = Icons.Default.AutoAwesome, title = "IA Adaptativa", subtitle = "Detección de género activa", onClick = { onNavigate("ai") })
+                QuickActionRow(icon = Icons.Default.AutoAwesome, title = "IA Adaptativa", subtitle = "Sin modelo cargado (en desarrollo)", onClick = { onNavigate("ai") })
                 QuickActionRow(icon = Icons.Default.LibraryMusic, title = "Presets", subtitle = "12 configuraciones", onClick = { onNavigate("presets") })
             }
         }

@@ -34,8 +34,10 @@ fun IVANNAKnob(
     range: ClosedFloatingPointRange<Float> = 0f..1f,
     label: String = "",
     unit: String = "",
-    accentColor: Color = AccentCyan
+    accentColor: Color = AccentCyan,
+    enabled: Boolean = true
 ) {
+    val effectiveColor = if (enabled) accentColor else accentColor.copy(alpha = 0.35f)
     val normalizedValue = (value - range.start) / (range.endInclusive - range.start)
     val animatedValue by animateFloatAsState(
         targetValue = normalizedValue,
@@ -46,7 +48,9 @@ fun IVANNAKnob(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .size(size)            .pointerInput(range) {
+            .size(size)
+            .pointerInput(range, enabled) {
+                if (!enabled) return@pointerInput
                 detectVerticalDragGestures(
                     onDragEnd = {},
                     onVerticalDrag = { change, dragAmount ->
@@ -78,7 +82,7 @@ fun IVANNAKnob(
                 val sweepAngle = animatedValue * 270f
                 drawArc(
                     brush = Brush.sweepGradient(
-                        colors = listOf(accentColor, accentColor.copy(alpha = 0.6f)),
+                        colors = listOf(effectiveColor, effectiveColor.copy(alpha = 0.6f)),
                         center = center
                     ),
                     startAngle = 135f,
@@ -95,8 +99,8 @@ fun IVANNAKnob(
                 val startY = center.y + sin(angle) * (radius * 0.4f)
                 val endX = center.x + cos(angle) * indicatorLength
                 val endY = center.y + sin(angle) * indicatorLength
-                                drawLine(
-                    color = accentColor,
+                drawLine(
+                    color = effectiveColor,
                     start = Offset(startX, startY),
                     end = Offset(endX, endY),
                     strokeWidth = strokeWidth * 0.6f,
@@ -117,7 +121,7 @@ fun IVANNAKnob(
             Text(
                 text = String.format("%.1f%s", value, unit),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFFF1F5F9),
+                color = if (enabled) Color(0xFFF1F5F9) else Color(0xFFF1F5F9).copy(alpha = 0.4f),
                 textAlign = TextAlign.Center
             )
         }
@@ -126,7 +130,7 @@ fun IVANNAKnob(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary,
+                color = if (enabled) TextSecondary else TextSecondary.copy(alpha = 0.4f),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 4.dp)
             )

@@ -24,14 +24,23 @@ fun AIScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
         IVANNAHeader(title = "MOTOR IA", subtitle = "Análisis adaptativo en tiempo real") {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Atrás", tint = AccentCyan) }
         }
-        
+
+        IVANNACard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text(
+                "⚠ Sin modelo de clasificación cargado todavía — los valores de abajo son " +
+                "placeholders fijos, no una lectura en vivo del audio.",
+                style = MaterialTheme.typography.labelSmall,
+                color = AccentAmber
+            )
+        }
+
         IVANNACard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
                     Text("MOTOR IA", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                    Text("Detección: ${audioEngine.aiGetDetectedGenre()}", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-                    Text("Confianza: ${String.format("%.0f%%", audioEngine.aiGetConfidence() * 100)}", style = MaterialTheme.typography.labelMedium, color = AccentCyan)
-                    Text("Tempo: ${String.format("%.1f BPM", audioEngine.aiGetTempo())}", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                    Text("Detección: ${audioEngine.aiGetDetectedGenre()} (sin clasificador activo)", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                    Text("Confianza: ${String.format("%.0f%%", audioEngine.aiGetConfidence() * 100)} (valor fijo)", style = MaterialTheme.typography.labelMedium, color = AccentCyan.copy(alpha = 0.6f))
+                    Text("Tempo: ${String.format("%.1f BPM", audioEngine.aiGetTempo())} (valor fijo)", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
                 }
                 IVANNAToggle(checked = aiEnabled, onCheckedChange = { aiEnabled = it; audioEngine.aiSetEnabled(it) })
             }
@@ -40,7 +49,7 @@ fun AIScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
         IVANNACard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text("AUTO-ADAPTACIÓN", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
             Spacer(Modifier.height(8.dp))
-            IVANNAToggle(checked = autoAdapt, onCheckedChange = { autoAdapt = it })
+            IVANNAToggle(checked = autoAdapt, onCheckedChange = { autoAdapt = it; audioEngine.aiSetAutoAdapt(it) })
             Spacer(Modifier.height(16.dp))
             IVANNAKnob(value = sensitivity, onValueChange = { sensitivity = it; audioEngine.aiSetSensitivity(it) }, label = "SENSIBILIDAD", range = 0f..1f, accentColor = AccentViolet)
         }

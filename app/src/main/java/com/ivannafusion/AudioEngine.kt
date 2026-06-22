@@ -250,6 +250,34 @@ class AudioEngine {
         }
     }
 
+    fun eqSetFreq(band: Int, freq: Float) {
+        Log.d(TAG, "EQ Band $band freq: $freq Hz")
+        engineScope.launch {
+            withContext(Dispatchers.IO) { DSPController.eqSetFreq(band, freq) }
+        }
+    }
+
+    fun eqSetQ(band: Int, q: Float) {
+        Log.d(TAG, "EQ Band $band Q: $q")
+        engineScope.launch {
+            withContext(Dispatchers.IO) { DSPController.eqSetQ(band, q) }
+        }
+    }
+
+    fun eqSetBandEnabled(band: Int, enabled: Boolean) {
+        Log.d(TAG, "EQ Band $band enabled: $enabled")
+        engineScope.launch {
+            withContext(Dispatchers.IO) { DSPController.eqSetEnabled(band, enabled) }
+        }
+    }
+
+    fun eqSetBypass(bypass: Boolean) {
+        Log.d(TAG, "EQ bypass: $bypass")
+        engineScope.launch {
+            withContext(Dispatchers.IO) { DSPController.eqSetBypass(bypass) }
+        }
+    }
+
     fun eqSetThreshold(thr: Float) {
         Log.d(TAG, "EQ Threshold: $thr")
         engineScope.launch {
@@ -304,6 +332,27 @@ class AudioEngine {
                 MagiskBridge.setParameter("comp_release", release)
                 DSPController.compSetRelease(release)
             }
+        }
+    }
+
+    fun compSetKnee(knee: Float) {
+        Log.d(TAG, "Comp Knee: $knee")
+        engineScope.launch {
+            withContext(Dispatchers.IO) { DSPController.compSetKnee(knee) }
+        }
+    }
+
+    fun compSetMakeup(makeup: Float) {
+        Log.d(TAG, "Comp Makeup: $makeup")
+        engineScope.launch {
+            withContext(Dispatchers.IO) { DSPController.compSetMakeup(makeup) }
+        }
+    }
+
+    fun compSetBypass(bypass: Boolean) {
+        Log.d(TAG, "Comp bypass: $bypass")
+        engineScope.launch {
+            withContext(Dispatchers.IO) { DSPController.compSetBypass(bypass) }
         }
     }
 
@@ -429,6 +478,20 @@ class AudioEngine {
             withContext(Dispatchers.IO) {
                 DSPController.excSetHpfFreq(freq)
             }
+        }
+    }
+
+    fun excSetBypass(bypass: Boolean) {
+        Log.d(TAG, "Exciter bypass: $bypass")
+        engineScope.launch {
+            withContext(Dispatchers.IO) { DSPController.excSetBypass(bypass) }
+        }
+    }
+
+    fun setGlobalBypass(bypass: Boolean) {
+        Log.d(TAG, "Global bypass: $bypass")
+        engineScope.launch {
+            withContext(Dispatchers.IO) { DSPController.setGlobalBypass(bypass) }
         }
     }
 
