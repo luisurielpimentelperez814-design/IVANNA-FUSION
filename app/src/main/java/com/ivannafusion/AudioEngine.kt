@@ -752,3 +752,130 @@ class AudioEngine {
         }
     }
 }
+
+// ===== INTEGRACIÓN DE RESAMPLER 32-BIT/192kHz Y PERSISTENCIA =====
+
+import com.ivannafusion.audio.AudioResampler
+import com.ivannafusion.persistence.ParameterStore
+import kotlinx.coroutines.flow.first
+
+class AudioEngine {
+    private val resampler = AudioResampler(targetSampleRate = 192000, targetBitDepth = 32)
+    private var parameterStore: ParameterStore? = null
+    
+    // Estado persistente de parámetros
+    private var savedEQBands: List<Map<String, Float>> = emptyList()
+    private var savedCompressor = mutableMapOf<String, Any>()
+    private var savedExciter = mutableMapOf<String, Any>()
+    private var savedAI = mutableMapOf<String, Any>()
+    
+    fun initialize(context: Context, callback: (Boolean) -> Unit) {
+        parameterStore = ParameterStore(context)
+        
+        // Cargar parámetros guardados
+        lifecycleScope.launch {
+            loadSavedParameters()
+            
+            // Configurar resampler según el sample rate del dispositivo
+            val deviceSampleRate = getDeviceSampleRate(context)
+            resampler.setInputSampleRate(deviceSampleRate)
+            
+            // Inicializar procesamiento a 32-bit float
+            nativeInitHighRes(192000, 32)
+            
+            callback(true)
+        }
+    }
+    
+    private suspend fun loadSavedParameters() {
+        parameterStore?.let { store ->
+            // Cargar EQ
+            savedEQBands = store.getEQBands().first()
+            savedEQBands.forEachIndexed { index, band ->
+                eqSetFreq(index, band["freq"] ?: 1000f)
+                eqSetGain(index, band["gain"] ?: 0f)
+                eqSetQ(index, band["q"] ?: 1.4f)
+                eqSetEnabled(index, (band["enabled"] ?: 1f) > 0.5f)
+            }
+            
+            // Cargar Compressor
+            val comp = store.getCompressor().first()
+            compSetThreshold((comp["threshold"] as? Float) ?: -20f)
+            compSetRatio((comp["ratio"] as? Float) ?: 4f)
+            compSetAttack((comp["attack"] as? Float) ?: 10f)
+            compSetRelease((comp["release"] as? Float) ?: 100f)
+            compSetEnabled(comp["enabled"] as? Boolean ?: true)
+            
+            // Cargar Exciter
+            val exc = store.getExciter().first()
+            excSetDrive((exc["drive"] as? Float) ?: 0.5f)
+            excSetMix((exc["mix"] as? Float) ?: 0.3f)
+            excSetEnabled(exc["enabled"] as? Boolean ?: true)
+            
+            // Cargar AI
+            val ai = store.getAI().first()
+            setAIIntensity((ai["intensity"] as? Float) ?: 0.7f)
+            setAIMode(ai["mode"] as? String ?: "adaptive")
+            setAIEnabled(ai["enabled"] as? Boolean ?: true)
+        }
+    }
+    
+    // Procesamiento con resampling automático
+    fun processAudio(inputBuffer: FloatArray, sampleRate: Int): FloatArray {
+        // Upsample a 192kHz si es necesario
+        val upsampledBuffer = if (sampleRate < 192000) {
+            resampler.setInputSampleRate(sampleRate)
+            resampler.upsample(inputBuffer)
+        } else {
+            inputBuffer
+        }
+        
+        // Procesar a 32-bit float
+        val processedBuffer = nativeProcessHighRes(upsampledBuffer)
+        
+        // Downsample al sample rate original
+        return if (sampleRate < 192000) {
+            resampler.downsample(processedBuffer, sampleRate)
+        } else {
+            processedBuffer
+        }
+    }
+    
+    // Guardar parámetros automáticamente cuando cambian
+    suspend fun saveEQBands(bands: List<Map<String, Float>>) {
+        savedEQBands = bands
+        parameterStore?.saveEQBands(bands)
+    }
+    
+    suspend fun saveCompressor(threshold: Float, ratio: Float, attack: Float, release: Float, enabled: Boolean) {
+        savedCompressor["threshold"] = threshold
+        savedCompressor["ratio"] = ratio
+        savedCompressor["attack"] = attack
+        savedCompressor["release"] = release
+        savedCompressor["enabled"] = enabled
+        parameterStore?.saveCompressor(threshold, ratio, attack, release, enabled)
+    }
+    
+    suspend fun saveExciter(drive: Float, mix: Float, enabled: Boolean) {
+        savedExciter["drive"] = drive
+        savedExciter["mix"] = mix
+        savedExciter["enabled"] = enabled
+        parameterStore?.saveExciter(drive, mix, enabled)
+    }
+    
+    suspend fun saveAI(intensity: Float, mode: String, enabled: Boolean) {
+        savedAI["intensity"] = intensity
+        savedAI["mode"] = mode
+        savedAI["enabled"] = enabled
+        parameterStore?.saveAI(intensity, mode, enabled)
+    }
+    
+    // Métodos nativos para procesamiento de alta resolución
+    private external fun nativeInitHighRes(sampleRate: Int, bitDepth: Int)
+    private external fun nativeProcessHighRes(buffer: FloatArray): FloatArray
+    
+    private fun getDeviceSampleRate(context: Context): Int {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        return audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toInt() ?: 48000
+    }
+}
