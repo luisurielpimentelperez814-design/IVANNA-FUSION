@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import com.ivannafusion.navigation.AppNavigation
 import com.ivannafusion.ui.theme.IVANNAFusionTheme
 import kotlinx.coroutines.delay
+import com.ivannafusion.ai.TrainingWorker
 
 class MainActivity : ComponentActivity() {
     companion object { private const val TAG = "MainActivity" }
@@ -132,6 +133,10 @@ class MainActivity : ComponentActivity() {
             
             // Marcar como listo
             appState = AppState.READY
+            
+            // Programar entrenamiento periódico de IA
+            TrainingWorker.schedule(this@MainActivity)
+            Log.i(TAG, "Training Worker programado para ejecutarse cada 6 horas")
             Log.d(TAG, "Componentes inicializados correctamente")
         } catch (e: Exception) {
             Log.e(TAG, "Error inicializando componentes", e)
