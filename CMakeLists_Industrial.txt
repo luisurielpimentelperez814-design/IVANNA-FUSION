@@ -1,2 +1,49 @@
 cmake_minimum_required(VERSION 3.22)
 project(ivanna_core VERSION 2.0.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Options for different targets
+option(IVANNA_BUILD_ANDROID "Build Android .so" OFF)
+option(IVANNA_BUILD_VST3 "Build VST3 plugin" OFF)
+option(IVANNA_BUILD_IOS "Build iOS framework" OFF)
+option(IVANNA_BUILD_LINUX "Build Linux library" OFF)
+option(IVANNA_BUILD_TESTS "Build tests" ON)
+
+# Core DSP library
+add_library(ivanna_core STATIC
+    core/dsp/biquad_neon.cpp
+    core/pipeline/audio_pipeline.cpp
+)
+
+target_include_directories(ivanna_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Enable NEON on ARM
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
+    target_compile_options(ivanna_core PRIVATE -mfpu=neon -mfloat-abi=softfp)
+endif()
+
+# API versioning
+set_target_properties(ivanna_core PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR})
+
+# Platform-specific integrations
+if(IVANNA_BUILD_ANDROID)
+    message(STATUS "Building Android integration")
+    add_library(ivanna_android SHARED
+        integration/android/audio_hal_module.cpp
+    )
+    target_link_libraries(ivanna_android PRIVATE ivanna_core)
+endif()
+
+if(IVANNA_BUILD_TESTS)
+    enable_testing()
+    message(STATUS "Tests enabled")
+endif()
+
+message(STATUS "IVANNA Core v${PROJECT_VERSION} configured successfully")
