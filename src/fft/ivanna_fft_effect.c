@@ -100,11 +100,7 @@ typedef struct {
     int ringPos;
 } ivanna_ctx_t;
 
-<<<<<<< HEAD
-/* ivanna_itfe definido más abajo — la definición es suficiente como forward decl en C */
-=======
 static const struct effect_interface_s ivanna_itfe; /* fwd decl */
->>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
 
 /* ---------------------------------------------------------------------
  * process(): llamada en el hilo de audio, debe ser rapida y no bloqueante.

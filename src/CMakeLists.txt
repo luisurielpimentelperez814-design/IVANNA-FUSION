@@ -1,9 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-<<<<<<< HEAD
-project(ivanna_fusion VERSION 1.0 LANGUAGES CXX C)
-=======
 project(ivanna_fusion VERSION 2.0 LANGUAGES C CXX)
->>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
 
 # ─── Estándar C++17 ──────────────────────────────────────────────────────────
 set(CMAKE_CXX_STANDARD 17)
@@ -52,12 +48,9 @@ add_library(ivanna_fusion SHARED
 target_include_directories(ivanna_fusion PRIVATE
     include
     fft
-<<<<<<< HEAD
     # NDK audio headers (disponibles en android.toolchain.cmake)
-=======
     ../pf_engine/core
     ../pf_engine/learning
->>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
     ${CMAKE_SYSROOT}/usr/include
 )
 
@@ -87,10 +80,11 @@ set(ANDROID_STL "c++_static")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
 target_compile_definitions(ivanna_fusion PRIVATE -DHAVE_VISIBILITY=1)
 
-<<<<<<< HEAD
-message(STATUS "IVANNA FUSION DSP — build para ABI: ${ANDROID_ABI}")
-message(STATUS "  Samplerate target: 48000 Hz stereo")
-message(STATUS "  NEON SIMD: habilitado para arm64-v8a")
+message(STATUS "IVANNA FUSION DSP v2.0 — ABI: ${ANDROID_ABI}")
+message(STATUS "  Core: 8-band PEQ + Soft-Knee Compressor + Harmonic Exciter")
+message(STATUS "  PF-ENGINE: Amp Models (Marshall/Fender/Vox/70sRock) + Evolution + FFT Learning")
+message(STATUS "  FFT Effect: Spectral bass/treble enhancement")
+message(STATUS "  NEON SIMD: arm64-v8a")
 
 # ─── IVANNA FFT EFFECT ────────────────────────────────────────────────────────
 # Compilar como efecto AudioFlinger independiente (libivanna_fft_effect.so)
@@ -119,10 +113,3 @@ set_target_properties(ivanna_fft_effect PROPERTIES
 )
 
 message(STATUS "IVANNA FFT Effect — ABI: ${ANDROID_ABI}")
-=======
-message(STATUS "IVANNA FUSION DSP v2.0 — ABI: ${ANDROID_ABI}")
-message(STATUS "  Core: 8-band PEQ + Soft-Knee Compressor + Harmonic Exciter")
-message(STATUS "  PF-ENGINE: Amp Models (Marshall/Fender/Vox/70sRock) + Evolution + FFT Learning")
-message(STATUS "  FFT Effect: Spectral bass/treble enhancement")
-message(STATUS "  NEON SIMD: arm64-v8a")
->>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)

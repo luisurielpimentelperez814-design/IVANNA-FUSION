@@ -147,7 +147,7 @@ object ShmManager {
 
     init {
         try {
-            System.loadLibrary("ivanna_trascendental")
+            System.loadLibrary("pf_engine")
             nativeLibLoaded = true
             _shmStatus.value = "Librería nativa cargada"
         } catch (e: UnsatisfiedLinkError) {
