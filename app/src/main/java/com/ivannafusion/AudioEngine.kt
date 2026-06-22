@@ -2,759 +2,7 @@ package com.ivannafusion
 
 import android.content.Context
 import android.util.Log
-import kotlinx.coroutines.*
-import kotlin.random.Random
-
-class AudioEngine {
-    companion object {
-        private const val TAG = "AudioEngine"
-        var audio_fs_hz: Int = 48000
-            private set
-        var audio_bit_depth: Int = 16
-            private set
-        var audio_latencia_us: Int = 5000
-            private set
-    }
-
-    var initialized: Boolean = false
-        private set
-
-    private var mutationRate: Float = 0.01f
-    private var generation: Int = 0
-    private var bestFitness: Float = 0.0f
-    private var phaseErrorRms: Float = 0.0f
-    private var fusionLevel: Float = 0.5f
-    private var latencyMicros: Long = 5000L
-    private var isEnabled: Boolean = false
-    private var detectedGenre: String = "Unknown"
-    private var confidence: Float = 0.5f
-    private var tempo: Float = 120.0f
-    private var currentCurveName: String = "Flat"
-    private var currentCurveDesc: String = "Sin procesar"
-
-    private val omegaBridge = OmegaMagiskBridge()
-    private val decorrelationEngine = DecorrelationEngine(audio_fs_hz)
-    private val convolutionEngine = ConvolutionEngine(audio_fs_hz)
-    
-    private val engineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
-    fun initialize(context: Context, onResult: (Boolean) -> Unit = {}) {
-        engineScope.launch {
-            try {
-                Log.d(TAG, "Inicializando AudioEngine en background...")
-                
-                val moduleInstalled = withContext(Dispatchers.IO) {
-                    MagiskBridge.isModuleInstalled()
-                }
-                
-                initialized = moduleInstalled
-                isEnabled = initialized
-                Log.d(TAG, "Módulo Magisk instalado: $initialized")                
-                withContext(Dispatchers.IO) {
-                    omegaBridge.connect()
-                }
-                
-                withContext(Dispatchers.IO) {
-                    DSPController.init()
-                }
-
-                // YAMNet (clasificador de audio real, ver YamnetClassifier.kt).
-                // Si app/src/main/assets/yamnet.tflite no existe todavía
-                // (no descargado por el usuario, ver README_MODEL.txt),
-                // initialize() devuelve false y isLoaded queda false — sin
-                // crashear y sin simular una clasificación falsa.
-                val yamnetLoaded = withContext(Dispatchers.IO) {
-                    YamnetClassifier.initialize(context)
-                }
-                Log.d(TAG, "YAMNet cargado: $yamnetLoaded")
-                
-                Log.d(TAG, "AudioEngine inicializado correctamente")
-                
-                withContext(Dispatchers.Main) {
-                    onResult(initialized)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error inicializando", e)
-                withContext(Dispatchers.Main) {
-                    onResult(false)
-                }
-            }
-        }
-    }
-
-    /**
-     * Clasifica un bloque de audio real con YAMNet y actualiza
-     * detectedGenre/confidence con el resultado verdadero. Debe llamarse
-     * desde Dispatchers.IO con exactamente YamnetClassifier.INPUT_SAMPLES
-     * muestras mono float32 a 16kHz — no se hace resample aquí.
-     * Si el modelo no está cargado, no hace nada y deja los valores
-     * previos (que ya están marcados como "sin clasificador" en la UI).
-     */
-    fun classifyAudioBlock(samples: FloatArray) {
-        val result = YamnetClassifier.classify(samples) ?: return
-        detectedGenre = result.topLabel
-        confidence = result.topScore.coerceIn(0f, 1f)
-        Log.d(TAG, "YAMNet: ${result.topLabel} (${result.topScore}) en ${result.inferenceTimeMs}ms " +
-                   "[music=${result.musicScore} speech=${result.speechScore} silence=${result.silenceScore}]")
-    }
-
-    fun isAiClassifierLoaded(): Boolean = YamnetClassifier.isLoaded
-
-    fun startAudioCapture() {
-        engineScope.launch {
-            try {
-                Log.d(TAG, "Iniciando captura")
-                isEnabled = true
-                withContext(Dispatchers.IO) {
-                    MagiskBridge.sendCommand("start")
-                    omegaBridge.setProcessingState(true)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error", e)
-            }
-        }
-    }
-
-    fun stopAudioCapture() {
-        engineScope.launch {
-            try {
-                Log.d(TAG, "Deteniendo captura")
-                isEnabled = false
-                withContext(Dispatchers.IO) {
-                    MagiskBridge.sendCommand("stop")
-                    omegaBridge.setProcessingState(false)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error", e)
-            }        }
-    }
-
-    fun release() {
-        engineScope.launch {
-            try {
-                initialized = false
-                isEnabled = false
-                withContext(Dispatchers.IO) {
-                    omegaBridge.disconnect()
-                    DSPController.release()
-                    YamnetClassifier.release()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error", e)
-            }
-        }
-        // NO cancelar el scope - puede ser necesario para reiniciar
-        // engineScope.cancel()
-    }
-
-    fun restart() {
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                release()
-                MagiskBridge.sendCommand("restart")
-                omegaBridge.connect()
-                DSPController.init()
-                initialized = MagiskBridge.isModuleInstalled()
-                isEnabled = initialized
-            }
-        }
-    }
-
-    fun getEvolutionState(): String = "Gen: $generation | Fit: ${String.format("%.3f", bestFitness)}"
-    fun getLatencyMicros(): Long {
-        val telemetry = omegaBridge.telemetry.value
-        return if (telemetry.isConnected) (telemetry.latencyMs * 1000f).toLong() else latencyMicros
-    }
-    fun getPhaseErrorRms(): Float = phaseErrorRms
-    fun getGeneration(): Int = generation
-    fun getBestFitness(): Float = bestFitness
-    fun getMutationRate(): Float = mutationRate
-    fun isOmegaModuleConnected(): Boolean = omegaBridge.isConnected.value
-    fun getDeviceTemperature(): Float = omegaBridge.telemetry.value.temperature
-
-    fun setMutationRate(rate: Float) {
-        mutationRate = rate.coerceIn(0f, 1f)
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("mutation", mutationRate)
-            }        }
-    }
-
-    fun setFusionLevel(level: Float) {
-        fusionLevel = level.coerceIn(0f, 1f)
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setWet(fusionLevel)
-                omegaBridge.setVocoderMix(fusionLevel)
-            }
-        }
-    }
-
-    fun setEnabled(enabled: Boolean) {
-        isEnabled = enabled
-        if (enabled) startAudioCapture() else stopAudioCapture()
-    }
-
-    fun initializeEvolution() {
-        generation = 0
-        bestFitness = 0.0f
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("evo:init")
-            }
-        }
-        Log.d(TAG, "Evolución inicializada")
-    }
-
-    fun evolveStep() {
-        generation++
-        bestFitness = (bestFitness + Random.nextFloat() * 0.05f).coerceAtMost(1.0f)
-        phaseErrorRms = Random.nextFloat() * 0.1f
-        latencyMicros = 3000L + Random.nextLong(4000L)
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("evo:step")
-            }
-        }
-    }
-
-    fun setPreferredAudioConfig(sampleRate: Int, bitDepth: Int) {
-        audio_fs_hz = sampleRate
-        audio_bit_depth = bitDepth
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("config:sample_rate=$sampleRate;bit_depth=$bitDepth")
-            }
-        }
-    }
-    fun predictSamples(): FloatArray = FloatArray(128) { Random.nextFloat() * 2f - 1f }
-
-    fun aiGetDetectedGenre(): String = detectedGenre
-    fun aiGetConfidence(): Float = confidence
-    fun aiGetTempo(): Float = tempo
-    fun aiGetCurrentCurveName(): String = currentCurveName
-    fun aiGetCurrentCurveDescription(): String = currentCurveDesc
-
-    fun aiSetEnabled(enabled: Boolean) {
-        isEnabled = enabled
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("ai:${if (enabled) "enable" else "disable"}")
-            }
-        }
-    }
-
-    fun aiSetAutoAdapt(auto: Boolean) {
-        Log.d(TAG, "Auto adapt: $auto")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("ai:auto:${if (auto) "on" else "off"}")
-            }
-        }
-    }
-
-    fun aiSetSensitivity(sens: Float) {
-        confidence = sens
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("ai_sensitivity", sens)
-            }
-        }
-    }
-
-    fun aiApplyCurrentCurve() {
-        currentCurveName = "Applied"
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("ai:apply")
-            }
-        }
-    }
-
-    fun eqSetGain(band: Int, gain: Float) {
-        Log.d(TAG, "EQ Band $band: $gain dB")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setEQBand(band, gain)
-                DSPController.eqSetGain(band, gain)
-            }
-        }
-    }
-
-    fun eqSetFreq(band: Int, freq: Float) {
-        Log.d(TAG, "EQ Band $band freq: $freq Hz")
-        engineScope.launch {
-            withContext(Dispatchers.IO) { DSPController.eqSetFreq(band, freq) }
-        }
-    }
-
-    fun eqSetQ(band: Int, q: Float) {
-        Log.d(TAG, "EQ Band $band Q: $q")
-        engineScope.launch {
-            withContext(Dispatchers.IO) { DSPController.eqSetQ(band, q) }
-        }
-    }
-
-    fun eqSetBandEnabled(band: Int, enabled: Boolean) {
-        Log.d(TAG, "EQ Band $band enabled: $enabled")
-        engineScope.launch {
-            withContext(Dispatchers.IO) { DSPController.eqSetEnabled(band, enabled) }
-        }
-    }
-
-    fun eqSetBypass(bypass: Boolean) {
-        Log.d(TAG, "EQ bypass: $bypass")
-        engineScope.launch {
-            withContext(Dispatchers.IO) { DSPController.eqSetBypass(bypass) }
-        }
-    }
-
-    fun eqSetThreshold(thr: Float) {
-        Log.d(TAG, "EQ Threshold: $thr")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("eq_threshold", thr)
-            }
-        }
-    }
-
-    fun eqSetRatio(ratio: Float) {
-        Log.d(TAG, "EQ Ratio: $ratio")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("eq_ratio", ratio)
-            }
-        }
-    }
-
-    fun compSetThreshold(thr: Float) {
-        Log.d(TAG, "Comp Threshold: $thr")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("comp_threshold", thr)
-                DSPController.compSetThreshold(thr)
-            }
-        }
-    }
-
-    fun compSetRatio(ratio: Float) {
-        Log.d(TAG, "Comp Ratio: $ratio")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("comp_ratio", ratio)
-                DSPController.compSetRatio(ratio)
-            }
-        }
-    }
-
-    fun compSetAttack(attack: Float) {
-        Log.d(TAG, "Comp Attack: $attack")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("comp_attack", attack)
-                DSPController.compSetAttack(attack)
-            }        }
-    }
-
-    fun compSetRelease(release: Float) {
-        Log.d(TAG, "Comp Release: $release")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("comp_release", release)
-                DSPController.compSetRelease(release)
-            }
-        }
-    }
-
-    fun compSetKnee(knee: Float) {
-        Log.d(TAG, "Comp Knee: $knee")
-        engineScope.launch {
-            withContext(Dispatchers.IO) { DSPController.compSetKnee(knee) }
-        }
-    }
-
-    fun compSetMakeup(makeup: Float) {
-        Log.d(TAG, "Comp Makeup: $makeup")
-        engineScope.launch {
-            withContext(Dispatchers.IO) { DSPController.compSetMakeup(makeup) }
-        }
-    }
-
-    fun compSetBypass(bypass: Boolean) {
-        Log.d(TAG, "Comp bypass: $bypass")
-        engineScope.launch {
-            withContext(Dispatchers.IO) { DSPController.compSetBypass(bypass) }
-        }
-    }
-
-    fun convolverSetEnabled(enabled: Boolean) {
-        Log.d(TAG, "Convolver: $enabled")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("convolver:${if (enabled) "enable" else "disable"}")
-            }
-        }
-    }
-
-    fun convolverLoadPreset(name: String) {
-        Log.d(TAG, "Convolver preset: $name")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.loadPreset(name)
-            }
-        }
-    }
-
-    fun convolverSetMix(mix: Float) {
-        Log.d(TAG, "Convolver mix: $mix")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setWet(mix)
-                DSPController.excSetMix(mix)
-            }
-        }
-    }
-
-    fun surroundSetWidth(w: Float) {
-        Log.d(TAG, "Surround Width: $w")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("surround_width", w)
-            }
-        }
-    }
-    fun surroundSetLevel(l: Float) {
-        Log.d(TAG, "Surround Level: $l")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("surround_level", l)
-            }
-        }
-    }
-
-    fun surroundSetHeight(h: Float) {
-        Log.d(TAG, "Surround Height: $h")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("surround_height", h)
-            }
-        }
-    }
-
-    fun surroundSetRoom(r: Float) {
-        Log.d(TAG, "Surround Room: $r")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("surround_room", r)
-            }
-        }
-    }
-
-    fun widenerSetWidth(w: Float) {
-        Log.d(TAG, "Widener: $w")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("widener_width", w)
-            }
-        }
-    }
-
-    fun bassSetAmount(a: Float) {
-        Log.d(TAG, "Bass Amount: $a")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("bass_amount", a)
-            }
-        }
-    }
-
-    fun bassSetFrequency(f: Float) {
-        Log.d(TAG, "Bass Freq: $f")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("bass_freq", f)            }
-        }
-    }
-
-    fun upscalerSetAmount(a: Float) {
-        Log.d(TAG, "Upscaler Amount: $a")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("upscaler_amount", a)
-            }
-        }
-    }
-
-    fun excSetDrive(drive: Float) {
-        Log.d(TAG, "Exciter Drive: $drive")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                DSPController.excSetDrive(drive)
-            }
-        }
-    }
-
-    fun excSetMix(mix: Float) {
-        Log.d(TAG, "Exciter Mix: $mix")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                DSPController.excSetMix(mix)
-            }
-        }
-    }
-
-    fun excSetHpfFreq(freq: Float) {
-        Log.d(TAG, "Exciter HPF Freq: $freq")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                DSPController.excSetHpfFreq(freq)
-            }
-        }
-    }
-
-    fun excSetBypass(bypass: Boolean) {
-        Log.d(TAG, "Exciter bypass: $bypass")
-        engineScope.launch {
-            withContext(Dispatchers.IO) { DSPController.excSetBypass(bypass) }
-        }
-    }
-
-    fun setGlobalBypass(bypass: Boolean) {
-        Log.d(TAG, "Global bypass: $bypass")
-        engineScope.launch {
-            withContext(Dispatchers.IO) { DSPController.setGlobalBypass(bypass) }
-        }
-    }
-
-    fun upscalerSetCeiling(c: Float) {
-        Log.d(TAG, "Upscaler Ceiling: $c")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("upscaler_ceiling", c)
-            }
-        }
-    }
-
-    fun getMomentaryLoudness(): Float = -20f + Random.nextFloat() * 10f
-    fun getShortTermLoudness(): Float = -25f + Random.nextFloat() * 10f
-    fun getIntegratedLoudness(): Float = -23f + Random.nextFloat() * 5f
-    fun getPeakLevel(): Float = -1f - Random.nextFloat() * 5f
-    fun getCorrelation(): Float = 0.8f + Random.nextFloat() * 0.2f
-    fun getLoudnessRange(): Float = 10f + Random.nextFloat() * 5f
-
-    fun setPreset(name: String) {
-        Log.d(TAG, "Preset: $name")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.loadPreset(name)
-                omegaBridge.setPreset(name)
-                DSPController.loadPreset(if (name.contains("ock", true)) 1 else 0)
-            }
-        }
-    }
-
-    fun autoeqApply() {
-        Log.d(TAG, "AutoEQ applied")
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("autoeq:apply")
-            }
-        }
-    }
-
-
-    // ── PF-ENGINE v3 — Amp Modeling + Evolution (vía MagiskBridge) ────────────
-    fun pfSetAmp(model: Int) {
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("pf:amp=$model")
-            }
-        }
-    }
-
-    fun pfSetParam(key: String, value: Float) {
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.setParameter("pf_$key", value)
-            }
-        }
-    }
-
-    fun applyPFPreset(preset: PFPreset) {
-        pfSetAmp(preset.ampModel)
-        pfSetParam("alpha",   preset.alpha)
-        pfSetParam("beta",    preset.beta)
-        pfSetParam("gamma",   preset.gamma)
-        pfSetParam("delta",   preset.delta)
-        pfSetParam("sigma",   preset.sigma)
-        pfSetParam("drive",   preset.drive)
-        pfSetParam("wet",     preset.wet)
-        pfSetParam("low",     preset.lowGain)
-        pfSetParam("mid",     preset.midGain)
-        pfSetParam("high",    preset.highGain)
-        pfSetParam("presence",preset.presence)
-        pfSetParam("sag",     preset.sag)
-        setPreset(preset.name)
-    }
-
-    fun pfEvoTick(bar: Int) {
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("pf:evo:tick=$bar")
-            }
-        }
-    }
-
-    fun pfEvoReset() {
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("pf:evo:reset")
-            }
-        }
-    }
-
-
-    // ── Decorrelation Engine ─────────────────────────────────────────────
-    fun decorSetWidth(w: Float) {
-        Log.d(TAG, "Decorrelation Width: $w")
-        decorrelationEngine.width = w.coerceIn(0f, 2f)
-    }
-    
-    fun decorSetDepth(d: Float) {
-        Log.d(TAG, "Decorrelation Depth: $d")
-        decorrelationEngine.depth = d.coerceIn(0f, 1f)
-    }
-    
-    fun decorSetDiffusion(diff: Float) {
-        Log.d(TAG, "Decorrelation Diffusion: $diff")
-        decorrelationEngine.diffusion = diff.coerceIn(0f, 1f)
-    }
-    
-    fun decorSetDelay(ms: Float) {
-        Log.d(TAG, "Decorrelation Delay: $ms ms")
-        decorrelationEngine.delayMs = ms.coerceIn(0f, 100f)
-    }
-    
-    fun decorSetModRate(rate: Float) {
-        Log.d(TAG, "Decorrelation Mod Rate: $rate Hz")
-        decorrelationEngine.modulationRate = rate.coerceIn(0f, 5f)
-    }
-    
-    fun decorSetMix(mix: Float) {
-        Log.d(TAG, "Decorrelation Mix: $mix")
-        decorrelationEngine.mix = mix.coerceIn(0f, 1f)
-    }
-    
-    fun decorPresetNatural() {
-        decorrelationEngine.presetNatural()
-        Log.d(TAG, "Decorrelation preset: Natural Stereo")
-    }
-    
-    fun decorPresetWide() {
-        decorrelationEngine.presetWide()
-        Log.d(TAG, "Decorrelation preset: Wide Ambient")
-    }
-    
-    fun decorPresetMonoToStereo() {
-        decorrelationEngine.presetMonoToStereo()
-        Log.d(TAG, "Decorrelation preset: Mono to Stereo")
-    }
-
-
-    // ── Convolution Engine Elite ─────────────────────────────────────────
-    fun convSetType(type: String) {
-        Log.d(TAG, "Convolution Type: $type")
-        convolutionEngine.reverbType = when (type.uppercase()) {
-            "HALL" -> ConvolutionEngine.ReverbType.HALL
-            "PLATE" -> ConvolutionEngine.ReverbType.PLATE
-            "ROOM" -> ConvolutionEngine.ReverbType.ROOM
-            "SPRING" -> ConvolutionEngine.ReverbType.SPRING
-            "CHAMBER" -> ConvolutionEngine.ReverbType.CHAMBER
-            else -> ConvolutionEngine.ReverbType.HALL
-        }
-        convolutionEngine.regenerateIR()
-    }
-    
-    fun convSetDecay(time: Float) {
-        Log.d(TAG, "Convolution Decay: $time s")
-        convolutionEngine.decayTime = time.coerceIn(0.1f, 5f)
-        convolutionEngine.regenerateIR()
-    }
-    
-    fun convSetPreDelay(ms: Float) {
-        Log.d(TAG, "Convolution Pre-delay: $ms ms")
-        convolutionEngine.preDelayMs = ms.coerceIn(0f, 200f)
-    }
-    
-    fun convSetDamping(damp: Float) {
-        Log.d(TAG, "Convolution Damping: $damp")
-        convolutionEngine.damping = damp.coerceIn(0f, 1f)
-        convolutionEngine.regenerateIR()
-    }
-    
-    fun convSetDiffusion(diff: Float) {
-        Log.d(TAG, "Convolution Diffusion: $diff")
-        convolutionEngine.diffusion = diff.coerceIn(0f, 1f)
-        convolutionEngine.regenerateIR()
-    }
-    
-    fun convSetEarlyMix(mix: Float) {
-        Log.d(TAG, "Convolution Early Mix: $mix")
-        convolutionEngine.earlyMix = mix.coerceIn(0f, 1f)
-    }
-    
-    fun convSetMix(mix: Float) {
-        Log.d(TAG, "Convolution Mix: $mix")
-        convolutionEngine.mix = mix.coerceIn(0f, 1f)
-    }
-    
-    fun convSetLowCut(freq: Float) {
-        Log.d(TAG, "Convolution Low Cut: $freq Hz")
-        convolutionEngine.lowCut = freq.coerceIn(20f, 500f)
-        convolutionEngine.regenerateIR()
-    }
-    
-    fun convSetHighCut(freq: Float) {
-        Log.d(TAG, "Convolution High Cut: $freq Hz")
-        convolutionEngine.highCut = freq.coerceIn(2000f, 20000f)
-        convolutionEngine.regenerateIR()
-    }
-    
-    fun convPresetSmallRoom() {
-        convolutionEngine.presetSmallRoom()
-        Log.d(TAG, "Convolution preset: Small Room")
-    }
-    
-    fun convPresetLargeHall() {
-        convolutionEngine.presetLargeHall()
-        Log.d(TAG, "Convolution preset: Large Hall")
-    }
-    
-    fun convPresetPlate() {
-        convolutionEngine.presetPlate()
-        Log.d(TAG, "Convolution preset: Plate")
-    }
-    
-    fun convPresetSpring() {
-        convolutionEngine.presetSpring()
-        Log.d(TAG, "Convolution preset: Spring")
-    }
-
-    fun reset() {
-        generation = 0
-        bestFitness = 0f
-        fusionLevel = 0.5f
-        engineScope.launch {
-            withContext(Dispatchers.IO) {
-                MagiskBridge.sendCommand("reset")
-                omegaBridge.resetToDefaults()
-            }
-        }
-    }
-}
-
-// ===== INTEGRACIÓN DE RESAMPLER 32-BIT/192kHz Y PERSISTENCIA =====
-
+import com.ivannafusion.ai.*
 import com.ivannafusion.audio.AudioResampler
 import com.ivannafusion.persistence.ParameterStore
 import kotlinx.coroutines.flow.first
@@ -763,119 +11,124 @@ class AudioEngine {
     private val resampler = AudioResampler(targetSampleRate = 192000, targetBitDepth = 32)
     private var parameterStore: ParameterStore? = null
     
+    // Sistema de IA Adaptativa
+    private lateinit var modelManager: ModelManager
+    private lateinit var adaptiveLearning: AdaptiveLearning
+    private lateinit var aiEngine: AIInferenceEngine
+    private var userMadeAdjustments = false
+    
     // Estado persistente de parámetros
-    private var savedEQBands: List<Map<String, Float>> = emptyList()
+    private var savedEQBands: MutableList<Map<String, Float>> = emptyList()
     private var savedCompressor = mutableMapOf<String, Any>()
     private var savedExciter = mutableMapOf<String, Any>()
     private var savedAI = mutableMapOf<String, Any>()
-    
+
     fun initialize(context: Context, callback: (Boolean) -> Unit) {
         parameterStore = ParameterStore(context)
         
-        // Cargar parámetros guardados
-        lifecycleScope.launch {
+        // Inicializar sistema de IA adaptativa
+        modelManager = ModelManager(context)
+        adaptiveLearning = AdaptiveLearning(context)
+        aiEngine = AIInferenceEngine(modelManager, adaptiveLearning)
+        
+        Log.i("AudioEngine", "Sistema de IA adaptativa inicializado")
+        Log.i("AudioEngine", "Modelo actual: v${modelManager.currentModelVersion.value}")
+        
+        lifeCycleScope.launch {
             loadSavedParameters()
             
-            // Configurar resampler según el sample rate del dispositivo
             val deviceSampleRate = getDeviceSampleRate(context)
             resampler.setInputSampleRate(deviceSampleRate)
             
-            // Inicializar procesamiento a 32-bit float
             nativeInitHighRes(192000, 32)
             
             callback(true)
         }
     }
-    
+
     private suspend fun loadSavedParameters() {
         parameterStore?.let { store ->
             // Cargar EQ
-            savedEQBands = store.getEQBands().first()
+            savedEQBands = store.getEQBands()?.firstOrNull() ?: emptyList()
             savedEQBands.forEachIndexed { index, band ->
-                eqSetFreq(index, band["freq"] ?: 1000f)
-                eqSetGain(index, band["gain"] ?: 0f)
-                eqSetQ(index, band["q"] ?: 1.4f)
-                eqSetEnabled(index, (band["enabled"] ?: 1f) > 0.5f)
+                eQSetFreq(index, band["freq"] ?: 1000f)
+                eQSetGain(index, band["gain"] ?: 0f)
+                eQSetQ(index, band["q"] ?: 1.4f)
+                eQSetEnabled(index, band["enabled"] ?: 1f > 0.5f)
             }
             
-            // Cargar Compressor
-            val comp = store.getCompressor().first()
+            // Cargar Compresor
+            val comp = store.getCompressor()?.firstOrNull()
             compSetThreshold((comp["threshold"] as? Float) ?: -20f)
             compSetRatio((comp["ratio"] as? Float) ?: 4f)
             compSetAttack((comp["attack"] as? Float) ?: 10f)
             compSetRelease((comp["release"] as? Float) ?: 100f)
             compSetEnabled(comp["enabled"] as? Boolean ?: true)
             
-            // Cargar Exciter
-            val exc = store.getExciter().first()
+            // Cargar Excitador
+            val exc = store.getExciter()?.firstOrNull()
             excSetDrive((exc["drive"] as? Float) ?: 0.5f)
             excSetMix((exc["mix"] as? Float) ?: 0.3f)
             excSetEnabled(exc["enabled"] as? Boolean ?: true)
             
             // Cargar AI
-            val ai = store.getAI().first()
+            val ai = store.getAI()?.firstOrNull()
             setAIIntensity((ai["intensity"] as? Float) ?: 0.7f)
             setAIMode(ai["mode"] as? String ?: "adaptive")
             setAIEnabled(ai["enabled"] as? Boolean ?: true)
         }
     }
-    
-    // Procesamiento con resampling automático
+
     fun processAudio(inputBuffer: FloatArray, sampleRate: Int): FloatArray {
-        // Upsample a 192kHz si es necesario
-        val upsampledBuffer = if (sampleRate < 192000) {
-            resampler.setInputSampleRate(sampleRate)
-            resampler.upsample(inputBuffer)
-        } else {
-            inputBuffer
-        }
+        // 1. Resampling a 192kHz
+        val resampledInput = resampler.upsample(inputBuffer)
         
-        // Procesar a 32-bit float
-        val processedBuffer = nativeProcessHighRes(upsampledBuffer)
+        // 2. Iniciar sesión de IA
+        val currentParams = getCurrentParameters()
+        aiEngine.startSession()
         
-        // Downsample al sample rate original
-        return if (sampleRate < 192000) {
-            resampler.downsample(processedBuffer, sampleRate)
-        } else {
-            processedBuffer
-        }
+        // 3. Procesar con IA adaptativa
+        val aiOutput = aiEngine.processAudioBlock(resampledInput)
+        
+        // 4. Aplicar DSP adicional (EQ, Compresor, Exciter)
+        val dspOutput = applyDSP(aiOutput)
+        
+        // 5. Finalizar sesión y capturar experiencia
+        aiEngine.endSession(resampledInput, dspOutput, userMadeAdjustments, currentParams)
+        
+        // 6. Reset flag de ajustes
+        userMadeAdjustments = false
+        
+        // 7. Downsample al formato original
+        return resampler.downsample(dspOutput)
     }
-    
-    // Guardar parámetros automáticamente cuando cambian
-    suspend fun saveEQBands(bands: List<Map<String, Float>>) {
-        savedEQBands = bands
-        parameterStore?.saveEQBands(bands)
+
+    private fun getCurrentParameters(): Map<String, Float> {
+        return mapOf(
+            "eq_bands" to savedEQBands.size.toFloat(),
+            "comp_threshold" to (savedCompressor["threshold"] as? Float ?: -20f),
+            "comp_ratio" to (savedCompressor["ratio"] as? Float ?: 4f),
+            "exc_drive" to (savedExciter["drive"] as? Float ?: 0.5f),
+            "ai_intensity" to (savedAI["intensity"] as? Float ?: 0.7f)
+        )
     }
-    
-    suspend fun saveCompressor(threshold: Float, ratio: Float, attack: Float, release: Float, enabled: Boolean) {
-        savedCompressor["threshold"] = threshold
-        savedCompressor["ratio"] = ratio
-        savedCompressor["attack"] = attack
-        savedCompressor["release"] = release
-        savedCompressor["enabled"] = enabled
-        parameterStore?.saveCompressor(threshold, ratio, attack, release, enabled)
+
+    private fun applyDSP(buffer: FloatArray): FloatArray {
+        // Aquí iría el procesamiento DSP tradicional (EQ, Compresor, etc.)
+        // Por ahora, devolver el buffer sin cambios
+        return buffer
     }
-    
-    suspend fun saveExciter(drive: Float, mix: Float, enabled: Boolean) {
-        savedExciter["drive"] = drive
-        savedExciter["mix"] = mix
-        savedExciter["enabled"] = enabled
-        parameterStore?.saveExciter(drive, mix, enabled)
+
+    // Métodos para registrar ajustes manuales del usuario
+    fun recordUserAdjustment() {
+        userMadeAdjustments = true
+        Log.d("AudioEngine", "Usuario ajustó parámetros manualmente")
     }
-    
-    suspend fun saveAI(intensity: Float, mode: String, enabled: Boolean) {
-        savedAI["intensity"] = intensity
-        savedAI["mode"] = mode
-        savedAI["enabled"] = enabled
-        parameterStore?.saveAI(intensity, mode, enabled)
-    }
-    
-    // Métodos nativos para procesamiento de alta resolución
-    private external fun nativeInitHighRes(sampleRate: Int, bitDepth: Int)
-    private external fun nativeProcessHighRes(buffer: FloatArray): FloatArray
-    
-    private fun getDeviceSampleRate(context: Context): Int {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        return audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toInt() ?: 48000
-    }
+
+    // Getters para estadísticas de IA
+    fun getAIModelVersion(): Int = modelManager.currentModelVersion.value
+    fun getAITotalExperiences(): Int = adaptiveLearning.totalExperiences.value
+    fun getAIInferenceCount(): Long = aiEngine.inferenceCount.value
+
+    fun aiGetDeviceTemperature(): Float = 35.0f // Placeholder
 }
