@@ -127,6 +127,7 @@ class AudioEngine {
             }        }
     }
 
+<<<<<<< HEAD
     fun release() {
         engineScope.launch {
             try {
@@ -143,6 +144,70 @@ class AudioEngine {
         }
         // NO cancelar el scope - puede ser necesario para reiniciar
         // engineScope.cancel()
+=======
+    fun getPhaseErrorRms(): Float =
+        if (nativeHandle != 0L) nativeGetPhaseError(nativeHandle) else 0f
+
+    fun initializeEvolution() {
+        if (nativeHandle != 0L) nativeInitializeEvolution()
+    }
+
+    fun getBestFitness(): Float =
+        if (nativeHandle != 0L) nativeGetBestFitness() else 0f
+
+    fun getGeneration(): Int =
+        if (nativeHandle != 0L) nativeGetGeneration() else 0
+
+    fun evolveStep() {
+        if (nativeHandle != 0L) nativeEvolveStep()
+    }
+
+    fun predictSamples(input: FloatArray, output: FloatArray) {
+        if (nativeHandle != 0L && input.size == output.size)
+            nativePredictSamples(nativeHandle, input, output, input.size)
+    }
+
+    // ── PF-ENGINE-PRO-MAX-NEXT: Amp modeling + Spectral params ─────────────
+    fun pfSetAmp(model: Int) {
+        if (nativeHandle != 0L) nativePFSetAmp(model)
+    }
+
+    fun pfSetParam(key: String, value: Float) {
+        if (nativeHandle != 0L) nativePFSetParam(key, value)
+    }
+
+    fun applyPFPreset(preset: PFPreset) {
+        if (nativeHandle == 0L) return
+        nativePFSetAmp(preset.ampModel)
+        nativePFSetParam("alpha",    preset.alpha)
+        nativePFSetParam("beta",     preset.beta)
+        nativePFSetParam("gamma",    preset.gamma)
+        nativePFSetParam("delta",    preset.delta)
+        nativePFSetParam("sigma",    preset.sigma)
+        nativePFSetParam("drive",    preset.drive)
+        nativePFSetParam("wet",      preset.wet)
+        nativePFSetParam("low",      preset.lowGain)
+        nativePFSetParam("mid",      preset.midGain)
+        nativePFSetParam("high",     preset.highGain)
+        nativePFSetParam("presence", preset.presence)
+        nativePFSetParam("sag",      preset.sag)
+        Log.i(TAG, "PF Preset applied: ${preset.name} (amp=${preset.ampModel})")
+    }
+
+    fun pfEvoTick(bar: Int) {
+        if (nativeHandle != 0L) nativePFEvoTick(bar)
+    }
+
+    fun pfEvoReset() {
+        if (nativeHandle != 0L) nativePFEvoReset()
+    }
+
+    fun shutdown() {
+        stopAudioRecord()
+        if (nativeHandle != 0L) nativeDestroyEngine(nativeHandle)
+        nativeHandle = 0L
+        initialized = false
+>>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
     }
 
     fun restart() {
@@ -178,6 +243,7 @@ class AudioEngine {
             }        }
     }
 
+<<<<<<< HEAD
     fun setFusionLevel(level: Float) {
         fusionLevel = level.coerceIn(0f, 1f)
         engineScope.launch {
@@ -569,6 +635,20 @@ class AudioEngine {
                 MagiskBridge.sendCommand("reset")
                 omegaBridge.resetToDefaults()
             }
+=======
+    // PF-ENGINE JNI
+    private external fun nativePFSetAmp(model: Int)
+    private external fun nativePFSetParam(key: String, value: Float)
+    private external fun nativePFEvoTick(bar: Int)
+    private external fun nativePFEvoReset()
+
+    init {
+        try {
+            System.loadLibrary("ivanna_trascendental")
+            Log.i(TAG, "Librería nativa cargada")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "ERROR cargando librería nativa: ${e.message}")
+>>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
         }
     }
 }

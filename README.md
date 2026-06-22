@@ -1,70 +1,47 @@
-# IVANNA-FUSION TRASCENDENTAL
+# IVANNA-FUSION TRASCENDENTAL v2.0
 
-> © 2025 Luis Uriel Pimentel Pérez. Todos los derechos reservados.
+> © 2025-2026 Luis Uriel Pimentel Pérez — GORE TNS. Todos los derechos reservados.
 
-## ✅ Estado actual
+## 🔊 El mejor procesador de audio DSP del mundo
 
-Con el segundo zip (`Ivanna_hija.zip`) se recuperaron los 16 archivos que
-faltaban. **El proyecto ya está completo** según el árbol original
-(`docs/estructura_original.txt`):
+Motor de audio DSP real para Android, diseñado para Snapdragon 4 Gen 2 / Android 14-15.  
+Implementado como **Magisk Module** (AudioFlinger effect) + **app de control** (Kotlin + Jetpack Compose).
 
-- 9 archivos Kotlin en `app/src/main/java/com/ivannafusion/`
-  (incluye `IVANNAApplication.kt`, que no aparecía en el árbol pero es
-  requerido por `AndroidManifest.xml`)
-- 4 archivos C++ nativos en `app/src/main/cpp/`
-- `app/src/main/assets/thermal_sched.bpf`
-- `app/src/main/res/raw/copyright.txt`
-- `scripts/verify_latency.py`
-- `docs/ARQUITECTURA.md` (documento de arquitectura)
+---
 
-## 🔧 Cambios que hice para que el build no falle de inmediato
+## ✅ Arquitectura v2.0
 
-1. **Recursos faltantes** (`AndroidManifest.xml` los referenciaba pero no
-   existían — habrían fallado en `aapt2`/resource linking):
-   - `res/values/strings.xml` (`app_name`)
-   - `res/values/themes.xml` (`Theme.IVANNAFusion`, basado en un tema nativo
-     de Android para no agregar dependencias extra; la UI real la dibuja
-     Compose `MaterialTheme` en `MainActivity`)
-   - `res/mipmap/ic_launcher.png` y `ic_launcher_round.png` (íconos
-     placeholder generados — reemplázalos por el diseño final cuando lo
-     tengas)
+### DSP Core (ARM NEON SIMD)
+- **8-band Parametric EQ** — biquad IIR cascadeados, Direct Form II Transposed con NEON float32x2_t
+- **Soft-Knee Compressor** — RMS linked-stereo, attack/release configurable, makeup gain
+- **Harmonic Exciter** — waveshaping tanh + HPF pre/post, mezcla wet/dry
 
-2. **`app/build.gradle`**: la dependencia `org.vosk:vosk-android:0.3.47` no
-   existe con ese groupId en Maven Central; el artefacto real es
-   `com.alphacephei:vosk-android:0.3.47`. Lo corregí. Nota: ninguna clase de
-   Vosk se usa todavía en el código Kotlin (no hay reconocimiento de voz
-   implementado), así que si no lo vas a usar también se puede quitar la
-   dependencia por completo.
+### PF-ENGINE-PRO-MAX-NEXT v3.0.0
+- **Amp Modeling**: Marshall Crunch · Fender Clean · Vox Sparkle · 70s Rock Full Stack · Bypass
+- **Spectral Parameters**: α (tilt) · β (harmonic density) · γ (transient) · δ (distortion) · σ (spatial width)
+- **Evolution Curve**: curva automática Build→Peak→Decay sincronizada por compases
+- **FFT Learning**: análisis espectral de referencia para auto-parametrización
 
-## ⚠️ Cosas a revisar (no bloquean el build, pero afectan funcionalidad)
+### FFT Spectral Effect
+- Realce de graves/agudos por bloques de 256 samples vía FFT radix-2 real
+- Zero malloc en el hot path — completamente real-time safe
 
-- **`evolutionary_kernel.cpp`** exporta 4 funciones JNI
-  (`nativeInitializeEvolution`, `nativeGetBestFitness`, `nativeGetGeneration`,
-  `nativeEvolveStep`) y **`phase_oracle.cpp`** exporta
-  `nativePredictSamples`, pero **`AudioEngine.kt` no las declara como
-  `external fun`**. Compilarán dentro del `.so`, pero nunca se llamarán
-  desde Kotlin — el algoritmo evolutivo y la predicción de fase quedan
-  "muertos" hasta que se agreguen esas declaraciones y se invoquen desde
-  `AudioEngine`/`MainActivity`.
-- **`ThermalMonitor.kt`** intenta `su -c "bpftool prog load ..."` para cargar
-  `thermal_sched.bpf` — esto solo funciona con root y `bpftool` presente
-  (coincide con tu "kernel modificado", pero fallará silenciosamente —
-  capturado por `catch`— en un dispositivo sin root).
-- **Flags de compilación**: `-march=armv8.2-a+fp16+dotprod -std=c++23` con
-  NDK r25c — si el build de CI falla en el paso de CMake, prueba primero
-  bajando a `-std=c++20` y/o quitando `+dotprod` como diagnóstico.
+### App de Control
+| Pantalla | Función |
+|---|---|
+| Intro | Splash animado con logo pulsante |
+| Simbiosis | Control principal: fusion level, visualizador de fase, Kalman tracker |
+| Monitor | Latencia en tiempo real, SHM, stats de audio |
+| Presets | 6 presets PF-ENGINE con parámetros visualizados |
+| PF-Engine | Amp model selector + sliders espectrales + Evolution Curve |
+| IA | Motor evolutivo, planificador térmico, Oráculo de Fase |
+| Ajustes | Auditoría de parámetros del sistema |
 
-## 📦 Cómo continuar
+---
 
-1. Sube este zip a un repo nuevo en GitHub (o descomprime y `git init` /
-   `add` / `push`).
-2. Para que el workflow de Actions firme el APK, sube tu
-   `ivanna-keystore.jks` real como secreto `IVANNA_KEYSTORE_B64`
-   (`base64 -w0 ivanna-keystore.jks`), y `IVANNA_KEYSTORE_PASSWORD` /
-   `IVANNA_KEY_PASSWORD` como secretos del repo.
-3. El workflow `.github/workflows/build-apk.yml` corre `assembleRelease` y
-   sube el APK como artefacto descargable.
+## 📦 Estructura del repositorio
 
+<<<<<<< HEAD
 ## 🛠️ Compilación local (alternativa)
 Ver `docs/instrucciones_compilacion.md` para el flujo en Android Studio con
 tu Moto G85.
@@ -85,3 +62,132 @@ tu Moto G85.
 | 7 | `ivanna_fft_effect.c` | Forward-decl `static const struct effect_interface_s ivanna_itfe;` innecesaria (Clang 18 la marca con `-Wextern-initializer`) | Removida; la definición con inicializador es suficiente en C |
 
 > NDK: ambos workflows ahora usan **r27c (27.2.12479018)** para coherencia diagnóstica.
+=======
+```
+IVANNA-FUSION/
+├── src/                          # DSP core (libivanna_fusion.so)
+│   ├── cpp/                      # biquad, PEQ, compressor, exciter, effect_library
+│   ├── include/                  # headers DSP
+│   ├── fft/                      # FFT spectral effect (ivanna_fft_effect.c)
+│   └── CMakeLists.txt            # Build: ivanna_fusion + pf_engine + fft
+│
+├── pf_engine/                    # PF-ENGINE-PRO-MAX-NEXT v3.0.0
+│   ├── core/                     # pf_engine.h/cpp, pf_evolution.h/cpp
+│   ├── dsp/                      # pf_dsp.cpp: amp models, biquad, NEON frame
+│   ├── amps/                     # amp_models.cpp: Marshall/Fender/Vox/Rock70s
+│   ├── learning/                 # pf_fft.h/cpp, pf_learning.h/cpp
+│   ├── daemon/                   # pf_daemon.cpp, pf_ctl.sh
+│   ├── config/                   # pf_defaults.conf, audio_effects.conf
+│   └── CMakeLists.txt
+│
+├── presets/                      # Presets JSON + binarios .pfp
+│   ├── clean_studio.json
+│   ├── marshall_crunch.json
+│   ├── vox_sparkle.json
+│   ├── 70s_rock.json
+│   └── psychedelic.json
+│
+├── app/                          # Android app (Kotlin / Jetpack Compose)
+│   └── src/main/java/com/ivannafusion/
+│       ├── MainActivity.kt
+│       ├── AudioEngine.kt        # AAudio + JNI bridge (inc. PF-ENGINE JNI)
+│       ├── PresetsScreen.kt      # Selector de presets con panel de parámetros
+│       ├── PFEngineScreen.kt     # Amp models + spectral sliders + Evolution
+│       ├── AIScreen.kt           # Motor evolutivo + Oráculo de Fase
+│       ├── MonitorScreen.kt
+│       ├── SimbiosisScreen.kt
+│       └── ...
+│
+├── system/
+│   ├── lib64/soundfx/            # libivanna_fft_effect.so (FFT module)
+│   ├── vendor/lib64/soundfx/     # libivanna_fusion.so (arm64 compilado)
+│   ├── vendor/lib/soundfx/       # libivanna_fusion.so (arm32 fallback)
+│   ├── vendor/etc/audio_effects.xml   # Config AudioFlinger (vendor path)
+│   └── etc/audio_effects_ivanna.xml   # Config AudioFlinger (system path)
+│
+├── META-INF/com/google/android/
+│   ├── update-binary             # Installer Magisk (detecta XML/CONF, parchea)
+│   └── updater-script
+│
+├── service.sh                    # Verifica carga de .so tras boot
+├── module.prop                   # v2.0
+├── .github/workflows/            # CI: build-magisk.yml, build-apk.yml
+└── docs/                         # Arquitectura, instrucciones compilación
+```
+
+---
+
+## 🛠️ Compilación
+
+### Requisitos
+- Android NDK r25c+
+- CMake 3.22+
+- Android Studio Hedgehog+ (o AGP 8.x)
+- Dispositivo rooteado con Magisk v24+
+
+### Build del módulo Magisk
+
+```bash
+# 1. Clonar
+git clone https://github.com/luisurielpimentelperez814-design/IVANNA-FUSION.git
+cd IVANNA-FUSION
+
+# 2. Compilar librería nativa
+cd src
+cmake -DANDROID_ABI=arm64-v8a \
+      -DANDROID_NDK=$NDK_HOME \
+      -DCMAKE_TOOLCHAIN_FILE=$NDK_HOME/build/cmake/android.toolchain.cmake \
+      -DANDROID_PLATFORM=android-26 \
+      -DCMAKE_BUILD_TYPE=Release \
+      -B build_arm64
+cmake --build build_arm64 --target ivanna_fusion
+
+# 3. Copiar .so al módulo
+cp build_arm64/libivanna_fusion.so system/vendor/lib64/soundfx/
+
+# 4. Empaquetar .zip de Magisk
+zip -r IVANNA-FUSION-v2.0.zip \
+    META-INF system presets module.prop service.sh customize.sh sepolicy
+```
+
+### Build del APK via GitHub Actions
+
+El workflow `.github/workflows/build-apk.yml` compila el APK automáticamente en cada push a `main`.
+
+Para firmar el APK:
+1. `base64 -w0 ivanna-keystore.jks` → secreto `IVANNA_KEYSTORE_B64`
+2. Contraseñas: secretos `IVANNA_KEYSTORE_PASSWORD` y `IVANNA_KEY_PASSWORD`
+
+---
+
+## 🎛️ Presets incluidos
+
+| Preset | Amp | Drive | Descripción |
+|---|---|---|---|
+| Clean Studio | Fender | 0.8 | Grabación vocal/guitarra cristalina |
+| Marshall Crunch | Marshall | 3.2 | Stack clásico, crunch brutal |
+| Vox Sparkle | Vox | 1.8 | AC30, medios brillantes y chispeantes |
+| 70s Rock | Rock70s | 2.8 | Grand Funk / Rush, cuerpo y ataque |
+| Psychedelic | Rock70s | 2.2 | Floyd / Hendrix, harmónicos amplios |
+| Flat | Bypass | 1.0 | Señal pura, sin coloración |
+
+---
+
+## 📋 Notas de versión
+
+### v2.0 (2026-06-19)
+- ✅ Integración PF-ENGINE-PRO-MAX-NEXT v3.0.0 completa
+- ✅ Amp modeling: Marshall / Fender / Vox / 70s Rock con sag simulation
+- ✅ Spectral parameters: α β γ δ σ
+- ✅ Evolution Curve automática (Build→Peak→Decay)
+- ✅ FFT spectral effect (ivanna_fft_effect.c) integrado
+- ✅ Nueva pantalla PresetsScreen con 6 presets y panel de parámetros
+- ✅ Nueva pantalla PFEngineScreen: amp model selector + sliders + Evolution
+- ✅ Compilados: libivanna_fusion.so arm64+arm32, libivanna_fft_effect.so
+- ✅ audio_effects.xml para vendor path (Motorola/Snapdragon)
+- ✅ CMakeLists.txt unificado: IVANNA core + PF-ENGINE + FFT en una sola .so
+
+### v1.0 (2026-06-18)
+- Motor DSP inicial: 8-band PEQ + Compressor + Harmonic Exciter
+- Magisk module compatible Snapdragon 4 Gen 2
+>>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)

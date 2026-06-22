@@ -52,7 +52,10 @@ struct audio_buffer_s {
         int32_t *s32;
         int16_t *s16;
         uint8_t *u8;
+<<<<<<< HEAD
         float   *f32;   // alias para PCM float — no cambia tamaño ni offset de la unión
+=======
+>>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
     };
 };
 
@@ -137,9 +140,13 @@ typedef struct audio_effect_library_s {
     int32_t (*get_descriptor)(const effect_uuid_t *uuid, effect_descriptor_t *pDescriptor);
 } audio_effect_library_t;
 
+<<<<<<< HEAD
 /* El símbolo se exporta literalmente como AUDIO_EFFECT_LIBRARY_INFO_SYM
  * para que audioserver lo encuentre al hacer dlopen() y las herramientas
  * de verificación (nm, readelf) lo detecten con su nombre estándar AOSP.
  * No se usa un alias/macro que cambie el nombre del símbolo en el ELF. */
+=======
+#define AUDIO_EFFECT_LIBRARY_INFO_SYM AELI
+>>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
 
 #endif /* ANDROID_EFFECT_ABI_H */

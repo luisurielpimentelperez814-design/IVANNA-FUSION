@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         setContent {
+<<<<<<< HEAD
             IVANNAFusionTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     when (appState) {
@@ -75,6 +76,20 @@ class MainActivity : ComponentActivity() {
                                 AppNavigation(audioEngine = engine, presetManager = presets)
                             }
                         }
+=======
+            MaterialTheme {
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    val navController = rememberNavController()
+                    NavHost(navController = navController, startDestination = "intro") {
+                        composable("intro")     { IntroScreen(navController) }
+                        composable("simbiosis") { SimbiosisScreen(navController) }
+                        composable("monitor")   { MonitorScreen(navController, AudioEngine, ShmManager) }
+                        composable("settings")  { SettingsAuditScreen(navController) }
+                        composable("ai")        { AIScreen(navController, AudioEngine) }
+                        // ── v2.0: PF-ENGINE routes ────────────────────────
+                        composable("presets")   { PresetsScreen(navController, AudioEngine) }
+                        composable("pfengine")  { PFEngineScreen(navController) }
+>>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
                     }
                 }
             }

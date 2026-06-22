@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
+<<<<<<< HEAD
 project(ivanna_fusion VERSION 1.0 LANGUAGES CXX C)
+=======
+project(ivanna_fusion VERSION 2.0 LANGUAGES C CXX)
+>>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
 
 # ─── Estándar C++17 ──────────────────────────────────────────────────────────
 set(CMAKE_CXX_STANDARD 17)
@@ -7,17 +11,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ─── Flags de compilación ─────────────────────────────────────────────────────
-# -O3 + -ffast-math: optimizaciones agresivas (seguro para DSP donde NaN/Inf no importan)
-# -march=armv8-a+simd: habilita instrucciones NEON en ARM64
-# -ftree-vectorize: auto-vectorización del compilador
-# -fno-exceptions / -fno-rtti: reduce tamaño del .so
 set(CMAKE_CXX_FLAGS_RELEASE
     "-O3 -ffast-math -march=armv8-a+simd -ftree-vectorize \
      -fno-exceptions -fno-rtti \
      -ffunction-sections -fdata-sections \
      -Wno-unused-result")
 
-# ─── Fuentes ──────────────────────────────────────────────────────────────────
+# ─── Fuentes IVANNA FUSION (core DSP) ────────────────────────────────────────
 set(IVANNA_SOURCES
     cpp/biquad_neon.cpp
     cpp/parametric_eq.cpp
@@ -27,13 +27,37 @@ set(IVANNA_SOURCES
     cpp/effect_library.cpp
 )
 
+# ─── Fuentes PF-ENGINE (integradas en la librería principal) ─────────────────
+set(PF_SOURCES
+    ../pf_engine/core/pf_engine.cpp
+    ../pf_engine/core/pf_evolution.cpp
+    ../pf_engine/dsp/pf_dsp.cpp
+    ../pf_engine/amps/amp_models.cpp
+    ../pf_engine/learning/pf_fft.cpp
+    ../pf_engine/learning/pf_learning.cpp
+)
+
+# ─── Fuentes FFT Effect (capa espectral) ──────────────────────────────────────
+set(FFT_SOURCES
+    fft/ivanna_fft_effect.c
+)
+
 # ─── Biblioteca compartida ────────────────────────────────────────────────────
-add_library(ivanna_fusion SHARED ${IVANNA_SOURCES})
+add_library(ivanna_fusion SHARED
+    ${IVANNA_SOURCES}
+    ${PF_SOURCES}
+    ${FFT_SOURCES}
+)
 
 target_include_directories(ivanna_fusion PRIVATE
     include
     fft
+<<<<<<< HEAD
     # NDK audio headers (disponibles en android.toolchain.cmake)
+=======
+    ../pf_engine/core
+    ../pf_engine/learning
+>>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
     ${CMAKE_SYSROOT}/usr/include
 )
 
@@ -41,6 +65,7 @@ target_include_directories(ivanna_fusion PRIVATE
 target_compile_definitions(ivanna_fusion PRIVATE
     ANDROID
     __ANDROID__
+    IVANNA_FUSION_V2
 )
 
 # ─── Bibliotecas del sistema Android ─────────────────────────────────────────
@@ -52,18 +77,17 @@ target_link_libraries(ivanna_fusion PRIVATE
     ${android-lib}
 )
 
-# ─── Linker flags: eliminar símbolos no usados, minimizar tamaño ──────────────
+# ─── Linker flags ────────────────────────────────────────────────────────────
 set_target_properties(ivanna_fusion PROPERTIES
     LINK_FLAGS "-static-libstdc++ -Wl,--gc-sections -Wl,--strip-all -Wl,-soname,libivanna_fusion.so"
 )
 set(ANDROID_STL "c++_static")
 
-# ─── Visibilidad: solo AUDIO_EFFECT_LIBRARY_INFO_SYM debe ser visible ─────────
+# ─── Visibilidad ──────────────────────────────────────────────────────────────
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
-target_compile_definitions(ivanna_fusion PRIVATE
-    -DHAVE_VISIBILITY=1
-)
+target_compile_definitions(ivanna_fusion PRIVATE -DHAVE_VISIBILITY=1)
 
+<<<<<<< HEAD
 message(STATUS "IVANNA FUSION DSP — build para ABI: ${ANDROID_ABI}")
 message(STATUS "  Samplerate target: 48000 Hz stereo")
 message(STATUS "  NEON SIMD: habilitado para arm64-v8a")
@@ -95,3 +119,10 @@ set_target_properties(ivanna_fft_effect PROPERTIES
 )
 
 message(STATUS "IVANNA FFT Effect — ABI: ${ANDROID_ABI}")
+=======
+message(STATUS "IVANNA FUSION DSP v2.0 — ABI: ${ANDROID_ABI}")
+message(STATUS "  Core: 8-band PEQ + Soft-Knee Compressor + Harmonic Exciter")
+message(STATUS "  PF-ENGINE: Amp Models (Marshall/Fender/Vox/70sRock) + Evolution + FFT Learning")
+message(STATUS "  FFT Effect: Spectral bass/treble enhancement")
+message(STATUS "  NEON SIMD: arm64-v8a")
+>>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
