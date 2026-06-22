@@ -26,12 +26,21 @@ fun AIScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
         }
 
         IVANNACard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(
-                "⚠ Sin modelo de clasificación cargado todavía — los valores de abajo son " +
-                "placeholders fijos, no una lectura en vivo del audio.",
-                style = MaterialTheme.typography.labelSmall,
-                color = AccentAmber
-            )
+            if (audioEngine.isAiClassifierLoaded()) {
+                Text(
+                    "✓ YAMNet cargado — clasificación real de Música/Habla/Silencio activa. " +
+                    "No distingue subgéneros musicales todavía.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AccentEmerald
+                )
+            } else {
+                Text(
+                    "⚠ Sin modelo de clasificación cargado — falta app/src/main/assets/yamnet.tflite " +
+                    "(ver assets/README_MODEL.txt). Los valores de abajo son placeholders fijos.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AccentAmber
+                )
+            }
         }
 
         IVANNACard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {

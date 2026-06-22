@@ -55,6 +55,16 @@ class AudioEngine {
                 withContext(Dispatchers.IO) {
                     DSPController.init()
                 }
+
+                // YAMNet (clasificador de audio real, ver YamnetClassifier.kt).
+                // Si app/src/main/assets/yamnet.tflite no existe todavía
+                // (no descargado por el usuario, ver README_MODEL.txt),
+                // initialize() devuelve false y isLoaded queda false — sin
+                // crashear y sin simular una clasificación falsa.
+                val yamnetLoaded = withContext(Dispatchers.IO) {
+                    YamnetClassifier.initialize(context)
+                }
+                Log.d(TAG, "YAMNet cargado: $yamnetLoaded")
                 
                 Log.d(TAG, "AudioEngine inicializado correctamente")
                 
@@ -69,6 +79,24 @@ class AudioEngine {
             }
         }
     }
+
+    /**
+     * Clasifica un bloque de audio real con YAMNet y actualiza
+     * detectedGenre/confidence con el resultado verdadero. Debe llamarse
+     * desde Dispatchers.IO con exactamente YamnetClassifier.INPUT_SAMPLES
+     * muestras mono float32 a 16kHz — no se hace resample aquí.
+     * Si el modelo no está cargado, no hace nada y deja los valores
+     * previos (que ya están marcados como "sin clasificador" en la UI).
+     */
+    fun classifyAudioBlock(samples: FloatArray) {
+        val result = YamnetClassifier.classify(samples) ?: return
+        detectedGenre = result.topLabel
+        confidence = result.topScore.coerceIn(0f, 1f)
+        Log.d(TAG, "YAMNet: ${result.topLabel} (${result.topScore}) en ${result.inferenceTimeMs}ms " +
+                   "[music=${result.musicScore} speech=${result.speechScore} silence=${result.silenceScore}]")
+    }
+
+    fun isAiClassifierLoaded(): Boolean = YamnetClassifier.isLoaded
 
     fun startAudioCapture() {
         engineScope.launch {
@@ -107,6 +135,7 @@ class AudioEngine {
                 withContext(Dispatchers.IO) {
                     omegaBridge.disconnect()
                     DSPController.release()
+                    YamnetClassifier.release()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error", e)
