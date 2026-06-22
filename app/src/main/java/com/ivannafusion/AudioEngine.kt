@@ -39,15 +39,15 @@ class AudioEngine {
         Log.i("AudioEngine", "Sistema de IA adaptativa inicializado")
         Log.i("AudioEngine", "Modelo actual: v${modelManager.currentModelVersion.value}")
 
-        // Usar CoroutineScope correcto
-        CoroutineScope(Dispatchers.Main).launch {
+        // Usar CoroutineScope correcto        CoroutineScope(Dispatchers.Main).launch {
             try {
                 loadSavedParameters()
 
                 val deviceSampleRate = getDeviceSampleRate(context)
                 resampler.setInputSampleRate(deviceSampleRate)
 
-                // Inicializar motor nativo                nativeLib.nativeSetEnabled(true)
+                // Inicializar motor nativo
+                nativeLib.nativeSetEnabled(true)
                 nativeLib.nativeReset()
 
                 callback(true)
@@ -70,8 +70,6 @@ class AudioEngine {
                     val enabled = (band["enabled"] as? Boolean) ?: true
 
                     nativeLib.nativeEqSetGain(index, gain)
-                    // Nota: Las funciones de freq y Q no están en el JNI actual
-                    // Se pueden agregar si es necesario
                 }
 
                 // Cargar Compresor
@@ -86,17 +84,16 @@ class AudioEngine {
                 nativeLib.nativeCompSetAttack(0, attack)
                 nativeLib.nativeCompSetRelease(0, release)
 
-                // Cargar Excitador (si existe en ParameterStore)
+                // Cargar Excitador
                 savedExciter = store.getExciter()?.firstOrNull() ?: emptyMap()
-                // Nota: Las funciones del excitador no están en el JNI actual
 
                 // Cargar AI
-                savedAI = store.getAI()?.firstOrNull() ?: emptyMap()
-                val aiEnabled = (savedAI["enabled"] as? Boolean) ?: true
+                savedAI = store.getAI()?.firstOrNull() ?: emptyMap()                val aiEnabled = (savedAI["enabled"] as? Boolean) ?: true
                 val aiSensitivity = (savedAI["intensity"] as? Number)?.toFloat() ?: 0.7f
 
                 nativeLib.nativeAiSetEnabled(aiEnabled)
                 nativeLib.nativeAiSetSensitivity(aiSensitivity)
+
                 Log.i("AudioEngine", "Parámetros cargados correctamente")
             } catch (e: Exception) {
                 Log.e("AudioEngine", "Error cargando parámetros", e)
@@ -105,26 +102,13 @@ class AudioEngine {
     }
 
     fun processAudio(inputBuffer: FloatArray, sampleRate: Int): FloatArray {
-        // 1. Resampling a 192kHz
         val resampledInput = resampler.upsample(inputBuffer)
-
-        // 2. Iniciar sesión de IA
         val currentParams = getCurrentParameters()
         aiEngine.startSession()
-
-        // 3. Procesar con IA adaptativa
         val aiOutput = aiEngine.processAudioBlock(resampledInput)
-
-        // 4. Aplicar DSP adicional (EQ, Compresor, Exciter)
         val dspOutput = applyDSP(aiOutput)
-
-        // 5. Finalizar sesión y capturar experiencia
         aiEngine.endSession(resampledInput, dspOutput, userMadeAdjustments, currentParams)
-
-        // 6. Reset flag de ajustes
         userMadeAdjustments = false
-
-        // 7. Downsample al formato original
         return resampler.downsample(dspOutput)
     }
 
@@ -139,27 +123,21 @@ class AudioEngine {
     }
 
     private fun applyDSP(buffer: FloatArray): FloatArray {
-        // Aquí iría el procesamiento DSP tradicional (EQ, Compresor, etc.)
-        // Por ahora, devolver el buffer sin cambios
         return buffer
     }
 
-    // Métodos para registrar ajustes manuales del usuario
-    fun recordUserAdjustment() {        userMadeAdjustments = true
+    fun recordUserAdjustment() {
+        userMadeAdjustments = true
         Log.d("AudioEngine", "Usuario ajustó parámetros manualmente")
     }
 
-    // Getters para estadísticas de IA
     fun getAIModelVersion(): Int = modelManager.currentModelVersion.value
     fun getAITotalExperiences(): Int = adaptiveLearning.totalExperiences.value
     fun getAIInferenceCount(): Long = aiEngine.inferenceCount.value
+    fun aiGetDeviceTemperature(): Float = 35.0f
 
-    fun aiGetDeviceTemperature(): Float = 35.0f // Placeholder
-
-    // Aplicar preset al motor DSP
     fun setPreset(presetName: String) {
-        Log.i("AudioEngine", "Aplicando preset: $presetName")
-        val presetId = when (presetName.lowercase()) {
+        Log.i("AudioEngine", "Aplicando preset: $presetName")        val presetId = when (presetName.lowercase()) {
             "rock", "classic rock" -> 1
             else -> 0
         }
@@ -167,7 +145,6 @@ class AudioEngine {
         userMadeAdjustments = false
     }
 
-    // Función auxiliar para obtener sample rate del dispositivo
     private fun getDeviceSampleRate(context: Context): Int {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val sampleRateStr = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
