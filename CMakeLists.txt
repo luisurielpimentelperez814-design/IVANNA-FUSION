@@ -49,6 +49,10 @@ file(GLOB_RECURSE IVANNA_SOURCES
     "include/*.h"
 )
 
+# Garantizar al menos un .cpp aunque el core sea header-only
+list(APPEND IVANNA_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/core/ivanna_core_stub.cpp")
+list(REMOVE_DUPLICATES IVANNA_SOURCES)
+
 # ==============================================================================
 # LIBRARY TARGET
 # ==============================================================================
