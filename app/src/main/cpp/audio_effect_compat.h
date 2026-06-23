@@ -175,7 +175,7 @@ static const effect_uuid_t EFFECT_UUID_NULL_VAL = {0, 0, 0, 0, {0,0,0,0,0,0}};
 #endif
 
 typedef uint32_t audio_channel_mask_t;
-typedef uint8_t  audio_format_t;
+typedef uint32_t audio_format_t;
 
 static inline int audio_channel_count_from_out_mask(uint32_t mask) {
     int n = 0;

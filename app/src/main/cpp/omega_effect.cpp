@@ -63,16 +63,17 @@
 #ifndef AUDIO_FORMAT_PCM_FLOAT
 #define AUDIO_FORMAT_PCM_FLOAT   0x5u
 #endif
-typedef uint32_t audio_format_t;
+// typedef uint32_t audio_format_t;
 
-static inline int audio_channel_count_from_out_mask(uint32_t mask) {
+/* static inline int audio_channel_count_from_out_mask(uint32_t mask) {
     int n = 0;
     while (mask) { n += (mask & 1u); mask >>= 1u; }
     return n;
 }
+*/
 
 static const effect_uuid_t kEffectUuidNull = {0, 0, 0, 0, {0,0,0,0,0,0}};
-#define EFFECT_UUID_NULL (&kEffectUuidNull)
+// #define EFFECT_UUID_NULL (&kEffectUuidNull)
 
 #define LOG_TAG "OmegaEffect"
 #define ALOG(...)  __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
