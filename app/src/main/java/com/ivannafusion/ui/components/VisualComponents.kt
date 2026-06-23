@@ -30,7 +30,7 @@ import kotlin.math.*
 fun MasterSpectrumVisualizer(
     modifier: Modifier = Modifier,
     amplitudes: List<Float> = List(64) { (sin(it * 0.3f) + 1f) / 2f },
-    gradientColors: List<Color> = MasterGradient,
+    gradientColors: List<Color> = listOf(MasterGradient, PrecisionCyan),
     backgroundColor: Color = Carbon
 ) {
     val infiniteTransition = rememberInfiniteTransition()

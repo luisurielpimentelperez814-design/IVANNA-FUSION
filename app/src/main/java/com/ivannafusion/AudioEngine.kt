@@ -44,7 +44,8 @@ class AudioEngine {
         val success = try {
             nativeInit(sampleRate, 2)
         } catch (e: Exception) {
-            Log.e("AudioEngine", "Error en nativeInit: ${e.message}")            false
+            Log.e("AudioEngine", "Error en nativeInit: ${e.message}")
+            false
         }
         initialized = success
         Log.i("AudioEngine", "Inicializado: $sampleRate Hz, éxito: $success")
