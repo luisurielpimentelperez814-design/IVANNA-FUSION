@@ -41,7 +41,7 @@
  * efecto — eso ahora pasa exclusivamente por la vtable de abajo.
  */
 
-#include <hardware/audio_effect.h>
+#include "android_effect_abi.h"
 #include <cstdlib>
 #include <cstring>
 #include <cerrno>
