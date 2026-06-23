@@ -45,7 +45,8 @@ class AudioEngine {
     fun eqSetQ(band: Int, q: Float) { Log.d("AudioEngine", "eqSetQ: $band=$q") }
     fun eqSetEnabled(enabled: Boolean) { Log.d("AudioEngine", "eqSetEnabled: $enabled") }
 
-    // Compressor    fun compSetBypass(bypass: Boolean) { Log.d("AudioEngine", "compSetBypass: $bypass") }
+    // Compressor
+    fun compSetBypass(bypass: Boolean) { Log.d("AudioEngine", "compSetBypass: $bypass") }
     fun compSetThreshold(threshold: Float) { Log.d("AudioEngine", "compSetThreshold: $threshold") }
     fun compSetRatio(ratio: Float) { Log.d("AudioEngine", "compSetRatio: $ratio") }
     fun compSetAttack(attack: Float) { Log.d("AudioEngine", "compSetAttack: $attack") }
