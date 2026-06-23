@@ -40,42 +40,79 @@ class AudioEngine {
     external fun nativeReset()
 
     fun initialize(context: Context, callback: (Boolean) -> Unit) {
-        CoroutineScope(Dispatchers.Main).launch {
-            try {
-                val sampleRate = getDeviceSampleRate(context)
-                val success = nativeInit(sampleRate, 2)
-                initialized = success                callback(success)
-            } catch (e: Exception) {
-                callback(false)
-            }
+        val sampleRate = getDeviceSampleRate(context)
+        val success = try {
+            nativeInit(sampleRate, 2)
+        } catch (e: Exception) {
+            Log.e("AudioEngine", "Error en nativeInit: ${e.message}")            false
         }
+        initialized = success
+        Log.i("AudioEngine", "Inicializado: $sampleRate Hz, éxito: $success")
+        callback(success)
     }
 
-    fun release() { initialized = false; nativeReset() }
+    fun release() { 
+        initialized = false
+        try { nativeReset() } catch (e: Exception) {}
+    }
 
     fun processAudio(inputBuffer: FloatArray, sampleRate: Int): FloatArray {
         if (!initialized) return inputBuffer
         val outputBuffer = FloatArray(inputBuffer.size)
-        nativeProcessAudio(inputBuffer, outputBuffer, inputBuffer.size / 2)
+        try {
+            nativeProcessAudio(inputBuffer, outputBuffer, inputBuffer.size / 2)
+        } catch (e: Exception) {
+            Log.e("AudioEngine", "Error en processAudio: ${e.message}")
+            return inputBuffer
+        }
         return outputBuffer
     }
 
     // EQ
-    fun eqSetBypass(bypass: Boolean) { for(i in 0..7) nativeSetEQBypass(i, bypass) }
-    fun eqSetGain(band: Int, gain: Float) { nativeSetEQGain(band, gain) }
-    fun eqSetFreq(band: Int, freq: Float) { nativeSetEQFreq(band, freq) }
-    fun eqSetQ(band: Int, q: Float) { nativeSetEQQ(band, q) }
-    fun eqSetEnabled(enabled: Boolean) { for(i in 0..7) nativeSetEQBypass(i, !enabled) }
+    fun eqSetBypass(bypass: Boolean) { 
+        for(i in 0..7) {
+            try { nativeSetEQBypass(i, bypass) } catch (e: Exception) {}
+        }
+    }
+    fun eqSetGain(band: Int, gain: Float) { 
+        try { nativeSetEQGain(band, gain) } catch (e: Exception) {}
+    }
+    fun eqSetFreq(band: Int, freq: Float) { 
+        try { nativeSetEQFreq(band, freq) } catch (e: Exception) {}
+    }
+    fun eqSetQ(band: Int, q: Float) { 
+        try { nativeSetEQQ(band, q) } catch (e: Exception) {}
+    }
+    fun eqSetEnabled(enabled: Boolean) { 
+        for(i in 0..7) {
+            try { nativeSetEQBypass(i, !enabled) } catch (e: Exception) {}
+        }
+    }
 
     // Compressor
-    fun compSetBypass(bypass: Boolean) { nativeSetCompressorBypass(bypass) }
-    fun compSetThreshold(threshold: Float) { nativeSetCompressorThreshold(threshold) }
-    fun compSetRatio(ratio: Float) { nativeSetCompressorRatio(ratio) }
-    fun compSetAttack(attack: Float) { nativeSetCompressorAttack(attack) }
-    fun compSetRelease(release: Float) { nativeSetCompressorRelease(release) }
-    fun compSetKnee(knee: Float) { nativeSetCompressorKnee(knee) }
-    fun compSetMakeup(makeup: Float) { nativeSetCompressorMakeup(makeup) }
-    fun compSetEnabled(enabled: Boolean) { nativeSetCompressorBypass(!enabled) }
+    fun compSetBypass(bypass: Boolean) { 
+        try { nativeSetCompressorBypass(bypass) } catch (e: Exception) {}
+    }
+    fun compSetThreshold(threshold: Float) {         try { nativeSetCompressorThreshold(threshold) } catch (e: Exception) {}
+    }
+    fun compSetRatio(ratio: Float) { 
+        try { nativeSetCompressorRatio(ratio) } catch (e: Exception) {}
+    }
+    fun compSetAttack(attack: Float) { 
+        try { nativeSetCompressorAttack(attack) } catch (e: Exception) {}
+    }
+    fun compSetRelease(release: Float) { 
+        try { nativeSetCompressorRelease(release) } catch (e: Exception) {}
+    }
+    fun compSetKnee(knee: Float) { 
+        try { nativeSetCompressorKnee(knee) } catch (e: Exception) {}
+    }
+    fun compSetMakeup(makeup: Float) { 
+        try { nativeSetCompressorMakeup(makeup) } catch (e: Exception) {}
+    }
+    fun compSetEnabled(enabled: Boolean) { 
+        try { nativeSetCompressorBypass(!enabled) } catch (e: Exception) {}
+    }
 
     // Placeholders para UI
     fun convSetType(type: String) {}
@@ -93,7 +130,8 @@ class AudioEngine {
     fun decorPresetWide() {}
     fun decorPresetMonoToStereo() {}
     fun decorSetWidth(width: Float) {}
-    fun decorSetDepth(depth: Float) {}    fun decorSetDiffusion(diffusion: Float) {}
+    fun decorSetDepth(depth: Float) {}
+    fun decorSetDiffusion(diffusion: Float) {}
     fun decorSetDelay(delay: Float) {}
     fun decorSetModRate(modRate: Float) {}
     fun decorSetMix(mix: Float) {}
@@ -104,8 +142,7 @@ class AudioEngine {
     fun aiSetEnabled(enabled: Boolean) {}
     fun aiSetAutoAdapt(autoAdapt: Boolean) {}
     fun aiSetSensitivity(sensitivity: Float) {}
-    fun aiGetCurrentCurveName(): String = "Default"
-    fun aiGetCurrentCurveDescription(): String = "Default curve"
+    fun aiGetCurrentCurveName(): String = "Default"    fun aiGetCurrentCurveDescription(): String = "Default curve"
     fun aiApplyCurrentCurve() {}
     fun getMomentaryLoudness(): Float = -20.0f
     fun getCorrelation(): Float = 0.8f
