@@ -54,8 +54,8 @@ class AudioEngine {
     fun compSetMakeup(makeup: Float) { Log.d("AudioEngine", "compSetMakeup: $makeup") }
     fun compSetEnabled(enabled: Boolean) { Log.d("AudioEngine", "compSetEnabled: $enabled") }
 
-    // Convolver
-    fun convSetType(type: Int) { Log.d("AudioEngine", "convSetType: $type") }
+    // Convolver - type es String (no Int)
+    fun convSetType(type: String) { Log.d("AudioEngine", "convSetType: $type") }
     fun convPresetSmallRoom() { Log.d("AudioEngine", "convPresetSmallRoom") }
     fun convPresetLargeHall() { Log.d("AudioEngine", "convPresetLargeHall") }
     fun convPresetPlate() { Log.d("AudioEngine", "convPresetPlate") }
@@ -78,8 +78,8 @@ class AudioEngine {
     fun decorSetModRate(modRate: Float) { Log.d("AudioEngine", "decorSetModRate: $modRate") }
     fun decorSetMix(mix: Float) { Log.d("AudioEngine", "decorSetMix: $mix") }
 
-    // AI
-    val isAiClassifierLoaded: Boolean = false
+    // AI - isAiClassifierLoaded es FUNCIÓN (no propiedad)
+    fun isAiClassifierLoaded(): Boolean = false
     fun aiGetDetectedGenre(): String = "Unknown"
     fun aiGetConfidence(): Float = 0.0f
     fun aiGetTempo(): Float = 120.0f
@@ -96,9 +96,9 @@ class AudioEngine {
     fun getLatencyMicros(): Long = 5000L
     fun getGeneration(): Int = 1    fun getBestFitness(): Float = 0.95f
 
-    // PF Engine
-    fun pfEvoTick() { Log.d("AudioEngine", "pfEvoTick") }
-    fun applyPFPreset(preset: String) { Log.d("AudioEngine", "applyPFPreset: $preset") }
+    // PF Engine - pfEvoTick recibe Int, applyPFPreset recibe Any (PFPreset)
+    fun pfEvoTick(barCount: Int) { Log.d("AudioEngine", "pfEvoTick: $barCount") }
+    fun applyPFPreset(preset: Any) { Log.d("AudioEngine", "applyPFPreset: $preset") }
     fun pfSetAmp(amp: Int) { Log.d("AudioEngine", "pfSetAmp: $amp") }
     fun pfSetParam(param: String, value: Float) { Log.d("AudioEngine", "pfSetParam: $param=$value") }
     fun pfEvoReset() { Log.d("AudioEngine", "pfEvoReset") }
