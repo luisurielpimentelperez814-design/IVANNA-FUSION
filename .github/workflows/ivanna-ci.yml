@@ -98,6 +98,14 @@ jobs:
       - name: Build APK
         run: ./gradlew assembleDebug --stacktrace
 
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ivanna-fusion-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
   zero-failure-gate:
     runs-on: ubuntu-latest
     needs: [build-android-apk]
