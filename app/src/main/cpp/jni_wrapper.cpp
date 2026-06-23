@@ -43,7 +43,7 @@ static bool initialized=false;
 static float lastInputLevel=0, lastOutputLevel=0;
 
 // INICIALIZACIÓN
-extern "C" JNIEXPORT jboolean JNICALLJava_com_ivannafusion_AudioEngine_nativeInit(JNIEnv*, jobject, jint sr, jint) {
+extern "C" JNIEXPORT jboolean JNICALL Java_com_ivannafusion_AudioEngine_nativeInit(JNIEnv*, jobject, jint sr, jint) {
     for(int i=0; i<8; i++) eq[i].setPeaking(1000, 48000, 0, 1.41);
     initialized=true;
     LOGI("✅ DSP initialized at %d Hz", sr);
