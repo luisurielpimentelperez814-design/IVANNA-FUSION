@@ -2,6 +2,7 @@
 #include <cmath>
 #include <vector>
 #include <android/log.h>
+#include <string.h>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "IVANNA_DSP", __VA_ARGS__)
 
@@ -42,6 +43,15 @@ static bool excBypass=false, fftEnabled=false;
 static bool initialized=false;
 static float lastInputLevel=0, lastOutputLevel=0;
 
+// Variables para IA y métricas (stubs)
+static float currentRmsDb = -60.0f;
+static float spectrum[32] = {0};
+static float correlation = 1.0f;
+static int latencyMicros = 5000;static int generation = 0;
+static float bestFitness = 0.0f;
+static float tempo = 0.0f;
+static char detectedGenre[32] = "Unknown";
+
 // INICIALIZACIÓN
 extern "C" JNIEXPORT jboolean JNICALL Java_com_ivannafusion_AudioEngine_nativeInit(JNIEnv*, jobject, jint sr, jint) {
     for(int i=0; i<8; i++) eq[i].setPeaking(1000, 48000, 0, 1.41);
@@ -54,12 +64,6 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_ivannafusion_AudioEngine_nativeIn
 extern "C" JNIEXPORT void JNICALL
 Java_com_ivannafusion_AudioEngine_nativeProcessAudio(JNIEnv* env, jobject, jfloatArray in, jfloatArray out, jint frames) {
     if(!initialized) {
-        // CORREGIDO: la versión anterior llamaba a
-        // GetFloatArrayRegion(in, 0, frames*2, GetFloatArrayElements(out,0))
-        // — esto filtraba la referencia JNI obtenida de 'out' (nunca se
-        // liberaba con ReleaseFloatArrayElements) y tenía semántica
-        // confusa (mezclaba dos APIs JNI distintas para copiar arrays).
-        // Forma correcta de copiar 'in' -> 'out' sin tocar el DSP:
         jfloat* inBuf = env->GetFloatArrayElements(in, nullptr);
         env->SetFloatArrayRegion(out, 0, frames * 2, inBuf);
         env->ReleaseFloatArrayElements(in, inBuf, JNI_ABORT);
@@ -75,16 +79,13 @@ Java_com_ivannafusion_AudioEngine_nativeProcessAudio(JNIEnv* env, jobject, jfloa
         float L = inBuf[f*2];
         float R = inBuf[f*2+1];
         
-        // Calcular nivel de entrada
         inputSum += fabsf(L) + fabsf(R);
         
-        // Aplicar EQ (8 bandas)
         for(int b=0; b<8; b++) {
             L = eq[b].process(L);
             R = eq[b].process(R);
         }
         
-        // Aplicar Compresor
         if(!compBypass) {
             float lvl = fabsf(L);
             float coeff = (lvl > compEnv) ? 
@@ -95,16 +96,13 @@ Java_com_ivannafusion_AudioEngine_nativeProcessAudio(JNIEnv* env, jobject, jfloa
             float gr = (compEnv > compThresh) ? (compThresh-compEnv)*(1.0f-1.0f/compRatio) : 0;
             float gain = powf(10.0f, (gr+compMakeup)/20.0f);
             L *= gain;
-            R *= gain;
-        }
+            R *= gain;        }
         
-        // Aplicar Exciter
         if(!excBypass) {
             L = L + (tanhf(L*excDrive) - L) * excMix;
             R = R + (tanhf(R*excDrive) - R) * excMix;
         }
         
-        // FFT Effect (simple boost)
         if(fftEnabled) {
             L *= 1.1f;
             R *= 1.1f;
@@ -113,19 +111,76 @@ Java_com_ivannafusion_AudioEngine_nativeProcessAudio(JNIEnv* env, jobject, jfloa
         outBuf[f*2] = L;
         outBuf[f*2+1] = R;
         
-        // Calcular nivel de salida
         outputSum += fabsf(L) + fabsf(R);
     }
     
-    // Guardar métricas
     lastInputLevel = inputSum / (frames*2);
     lastOutputLevel = outputSum / (frames*2);
+    
+    // Actualizar RMS basado en el nivel de entrada
+    if (lastInputLevel > 0.001f) {
+        currentRmsDb = 20.0f * log10f(lastInputLevel);
+    } else {
+        currentRmsDb = -60.0f;
+    }
     
     env->ReleaseFloatArrayElements(in, inBuf, 0);
     env->ReleaseFloatArrayElements(out, outBuf, 0);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// FUNCIONES DE IA Y MÉTRICAS (STUBS - Implementaciones básicas)
+// ═══════════════════════════════════════════════════════════════
+
+extern "C" JNIEXPORT jfloat JNICALL Java_com_ivannafusion_AudioEngine_nativeAiGetRmsDb(JNIEnv*, jobject) {
+    return currentRmsDb;
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL Java_com_ivannafusion_AudioEngine_nativeAiGetSpectrum(JNIEnv* env, jobject) {
+    jfloatArray result = env->NewFloatArray(32);
+    if (result != nullptr) {
+        // Generar espectro simulado basado en el nivel actual
+        float normalizedLevel = (currentRmsDb + 60.0f) / 60.0f; // Normalizar -60 a 0 dB en rango 0 a 1
+        if (normalizedLevel < 0) normalizedLevel = 0;
+        if (normalizedLevel > 1) normalizedLevel = 1;
+        
+        for (int i = 0; i < 32; i++) {
+            // Crear un espectro con más energía en frecuencias medias            float freqFactor = 1.0f - fabsf((i - 16.0f) / 16.0f);
+            spectrum[i] = normalizedLevel * freqFactor * 0.8f;
+        }
+        env->SetFloatArrayRegion(result, 0, 32, spectrum);
+    }
+    return result;
+}
+
+extern "C" JNIEXPORT jfloat JNICALL Java_com_ivannafusion_AudioEngine_nativeGetCorrelation(JNIEnv*, jobject) {
+    return correlation;
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_ivannafusion_AudioEngine_nativeGetLatencyMicros(JNIEnv*, jobject) {
+    return latencyMicros;
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_ivannafusion_AudioEngine_nativeGetGeneration(JNIEnv*, jobject) {
+    return generation;
+}
+
+extern "C" JNIEXPORT jfloat JNICALL Java_com_ivannafusion_AudioEngine_nativeGetBestFitness(JNIEnv*, jobject) {
+    return bestFitness;
+}
+
+extern "C" JNIEXPORT jstring JNICALL Java_com_ivannafusion_AudioEngine_nativeAiGetDetectedGenre(JNIEnv* env, jobject) {
+    return env->NewStringUTF(detectedGenre);
+}
+
+extern "C" JNIEXPORT jfloat JNICALL Java_com_ivannafusion_AudioEngine_nativeAiGetTempo(JNIEnv*, jobject) {
+    return tempo;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // FUNCIONES EQ
+// ═══════════════════════════════════════════════════════════════
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_ivannafusion_AudioEngine_nativeSetEQGain(JNIEnv*, jobject, jint band, jfloat gain) {
     if(band>=0 && band<8) {
@@ -138,7 +193,9 @@ extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQF
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQQ(JNIEnv*, jobject, jint, jfloat) {}
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQBypass(JNIEnv*, jobject, jint, jboolean) {}
 
-// FUNCIONES COMPRESOR
+// ═══════════════════════════════════════════════════════════════
+// FUNCIONES COMPRESOR// ═══════════════════════════════════════════════════════════════
+
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetCompressorThreshold(JNIEnv*, jobject, jfloat f) { compThresh=f; LOGI("Comp Threshold: %.1f dB", f); }
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetCompressorRatio(JNIEnv*, jobject, jfloat f) { compRatio=f; }
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetCompressorAttack(JNIEnv*, jobject, jfloat f) { compAttack=f; }
@@ -147,14 +204,24 @@ extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetCom
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetCompressorMakeup(JNIEnv*, jobject, jfloat f) { compMakeup=f; }
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetCompressorBypass(JNIEnv*, jobject, jboolean b) { compBypass=b; }
 
+// ═══════════════════════════════════════════════════════════════
 // FUNCIONES EXCITER
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetExciterDrive(JNIEnv*, jobject, jfloat f) { excDrive=f; LOGI("Exciter Drive: %.2f", f); }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetExciterMix(JNIEnv*, jobject, jfloat f) { excMix=f; }extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetExciterBypass(JNIEnv*, jobject, jboolean b) { excBypass=b; }
+// ═══════════════════════════════════════════════════════════════
 
+extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetExciterDrive(JNIEnv*, jobject, jfloat f) { excDrive=f; LOGI("Exciter Drive: %.2f", f); }
+extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetExciterMix(JNIEnv*, jobject, jfloat f) { excMix=f; }
+extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetExciterBypass(JNIEnv*, jobject, jboolean b) { excBypass=b; }
+
+// ═══════════════════════════════════════════════════════════════
 // FUNCIONES FFT
+// ═══════════════════════════════════════════════════════════════
+
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetFFTEffect(JNIEnv*, jobject, jboolean b) { fftEnabled=b; }
 
+// ═══════════════════════════════════════════════════════════════
 // RESET
+// ═══════════════════════════════════════════════════════════════
+
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeReset(JNIEnv*, jobject) {
     for(int i=0; i<8; i++) eq[i] = Biquad();
     compThresh=-20; compRatio=4; compAttack=10; compRelease=100;
@@ -163,7 +230,10 @@ extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeReset(
     LOGI("DSP Reset");
 }
 
+// ═══════════════════════════════════════════════════════════════
 // MÉTRICAS REALES
+// ═══════════════════════════════════════════════════════════════
+
 extern "C" JNIEXPORT jfloat JNICALL Java_com_ivannafusion_AudioEngine_nativeGetInputLevel(JNIEnv*, jobject) {
     return lastInputLevel;
 }
