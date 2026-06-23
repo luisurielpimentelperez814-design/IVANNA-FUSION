@@ -18,14 +18,18 @@ jobs:
       - name: Grant permission
         run: chmod +x gradlew
 
-      - name: Create debug keystore
+      - name: Create debug keystore (si no existe ya)
         run: |
-          keytool -genkey -v \
-            -keystore "${{ github.workspace }}/debug.keystore" \
-            -alias androiddebugkey \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Debug, OU=Debug, O=Debug, L=Debug, ST=Debug, C=US"
+          if [ -f "${{ github.workspace }}/debug.keystore" ]; then
+            echo "debug.keystore ya existe en el repo (versionado), no se regenera."
+          else
+            keytool -genkey -v \
+              -keystore "${{ github.workspace }}/debug.keystore" \
+              -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=Debug, OU=Debug, O=Debug, L=Debug, ST=Debug, C=US"
+          fi
 
       - name: Build APK
         run: ./gradlew assembleDebug --stacktrace
