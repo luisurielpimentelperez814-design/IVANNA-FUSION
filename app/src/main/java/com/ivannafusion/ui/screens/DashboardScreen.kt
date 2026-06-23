@@ -50,7 +50,7 @@ fun DashboardScreen(audioEngine: AudioEngine, onNavigate: (String) -> Unit) {
             levelDb     = audioEngine.aiGetRmsDb()
             spectrum    = audioEngine.aiGetSpectrum()
             correlation = audioEngine.getCorrelation()
-            latency     = audioEngine.getLatencyMicros()
+            latency     = audioEngine.getLatencyMicros().toInt()
             generation  = audioEngine.getGeneration()
             fitness     = audioEngine.getBestFitness()
             genre       = audioEngine.aiGetDetectedGenre()
