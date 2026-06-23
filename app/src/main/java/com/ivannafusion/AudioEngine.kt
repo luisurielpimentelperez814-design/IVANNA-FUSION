@@ -6,16 +6,49 @@ import android.util.Log
 import kotlinx.coroutines.*
 
 class AudioEngine {
+    
+    companion object {
+        init {
+            try {
+                System.loadLibrary("ivanna_fusion")
+                System.loadLibrary("ivanna_fft_effect")
+                Log.i("IVANNA_DSP", "✅ Librerías nativas cargadas exitosamente")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.e("IVANNA_DSP", "❌ Error cargando librerías: ${e.message}")
+            }
+        }
+    }
+
     private var initialized = false
     private var userMadeAdjustments = false
 
+    // Funciones nativas reales (JNI)
+    external fun nativeInit(sampleRate: Int, channels: Int): Boolean
+    external fun nativeProcessAudio(inputBuffer: FloatArray, outputBuffer: FloatArray, numFrames: Int)
+    external fun nativeSetEQGain(band: Int, gainDB: Float)
+    external fun nativeSetEQFreq(band: Int, freqHz: Float)
+    external fun nativeSetEQQ(band: Int, q: Float)
+    external fun nativeSetEQBypass(band: Int, bypass: Boolean)
+    external fun nativeSetCompressorThreshold(thresholdDB: Float)
+    external fun nativeSetCompressorRatio(ratio: Float)
+    external fun nativeSetCompressorAttack(attackMs: Float)
+    external fun nativeSetCompressorRelease(releaseMs: Float)
+    external fun nativeSetCompressorKnee(kneeDB: Float)
+    external fun nativeSetCompressorMakeup(makeupDB: Float)
+    external fun nativeSetCompressorBypass(bypass: Boolean)
+    external fun nativeSetExciterDrive(drive: Float)
+    external fun nativeSetExciterMix(mix: Float)
+    external fun nativeSetExciterBypass(bypass: Boolean)
+    external fun nativeSetFFTEffect(enabled: Boolean)
+    external fun nativeReset()
     fun initialize(context: Context, callback: (Boolean) -> Unit) {
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 val sampleRate = getDeviceSampleRate(context)
-                Log.i("AudioEngine", "Inicializando con sample rate: $sampleRate")
-                initialized = true
-                callback(true)
+                val success = nativeInit(sampleRate, 2) // Stereo
+                initialized = success
+                Log.i("AudioEngine", "Inicializado con sample rate: $sampleRate, éxito: $success")
+                callback(success)
             } catch (e: Exception) {
                 Log.e("AudioEngine", "Error en inicialización", e)
                 callback(false)
@@ -30,7 +63,9 @@ class AudioEngine {
 
     fun processAudio(inputBuffer: FloatArray, sampleRate: Int): FloatArray {
         if (!initialized) return inputBuffer
-        return inputBuffer
+        val outputBuffer = FloatArray(inputBuffer.size)
+        nativeProcessAudio(inputBuffer, outputBuffer, inputBuffer.size / 2)
+        return outputBuffer
     }
 
     // Presets
@@ -38,24 +73,27 @@ class AudioEngine {
         Log.i("AudioEngine", "Preset: $presetName")
     }
 
-    // EQ
-    fun eqSetBypass(bypass: Boolean) { Log.d("AudioEngine", "eqSetBypass: $bypass") }
-    fun eqSetGain(band: Int, gain: Float) { Log.d("AudioEngine", "eqSetGain: $band=$gain") }
-    fun eqSetFreq(band: Int, freq: Float) { Log.d("AudioEngine", "eqSetFreq: $band=$freq") }
-    fun eqSetQ(band: Int, q: Float) { Log.d("AudioEngine", "eqSetQ: $band=$q") }
-    fun eqSetEnabled(enabled: Boolean) { Log.d("AudioEngine", "eqSetEnabled: $enabled") }
+    // EQ - Ahora llaman a funciones nativas reales
+    fun eqSetBypass(bypass: Boolean) { 
+        for (i in 0..7) nativeSetEQBypass(i, bypass)
+    }
+    fun eqSetGain(band: Int, gain: Float) { nativeSetEQGain(band, gain) }
+    fun eqSetFreq(band: Int, freq: Float) { nativeSetEQFreq(band, freq) }
+    fun eqSetQ(band: Int, q: Float) { nativeSetEQQ(band, q) }
+    fun eqSetEnabled(enabled: Boolean) { 
+        for (i in 0..7) nativeSetEQBypass(i, !enabled)
+    }
 
-    // Compressor
-    fun compSetBypass(bypass: Boolean) { Log.d("AudioEngine", "compSetBypass: $bypass") }
-    fun compSetThreshold(threshold: Float) { Log.d("AudioEngine", "compSetThreshold: $threshold") }
-    fun compSetRatio(ratio: Float) { Log.d("AudioEngine", "compSetRatio: $ratio") }
-    fun compSetAttack(attack: Float) { Log.d("AudioEngine", "compSetAttack: $attack") }
-    fun compSetRelease(release: Float) { Log.d("AudioEngine", "compSetRelease: $release") }
-    fun compSetKnee(knee: Float) { Log.d("AudioEngine", "compSetKnee: $knee") }
-    fun compSetMakeup(makeup: Float) { Log.d("AudioEngine", "compSetMakeup: $makeup") }
-    fun compSetEnabled(enabled: Boolean) { Log.d("AudioEngine", "compSetEnabled: $enabled") }
+    // Compressor - Funciones nativas reales
+    fun compSetBypass(bypass: Boolean) { nativeSetCompressorBypass(bypass) }
+    fun compSetThreshold(threshold: Float) { nativeSetCompressorThreshold(threshold) }
+    fun compSetRatio(ratio: Float) { nativeSetCompressorRatio(ratio) }
+    fun compSetAttack(attack: Float) { nativeSetCompressorAttack(attack) }
+    fun compSetRelease(release: Float) { nativeSetCompressorRelease(release) }    fun compSetKnee(knee: Float) { nativeSetCompressorKnee(knee) }
+    fun compSetMakeup(makeup: Float) { nativeSetCompressorMakeup(makeup) }
+    fun compSetEnabled(enabled: Boolean) { nativeSetCompressorBypass(!enabled) }
 
-    // Convolver - type es String (no Int)
+    // Convolver
     fun convSetType(type: String) { Log.d("AudioEngine", "convSetType: $type") }
     fun convPresetSmallRoom() { Log.d("AudioEngine", "convPresetSmallRoom") }
     fun convPresetLargeHall() { Log.d("AudioEngine", "convPresetLargeHall") }
@@ -79,7 +117,7 @@ class AudioEngine {
     fun decorSetModRate(modRate: Float) { Log.d("AudioEngine", "decorSetModRate: $modRate") }
     fun decorSetMix(mix: Float) { Log.d("AudioEngine", "decorSetMix: $mix") }
 
-    // AI - isAiClassifierLoaded es FUNCIÓN (no propiedad)
+    // AI
     fun isAiClassifierLoaded(): Boolean = false
     fun aiGetDetectedGenre(): String = "Unknown"
     fun aiGetConfidence(): Float = 0.0f
@@ -95,12 +133,12 @@ class AudioEngine {
     fun getMomentaryLoudness(): Float = -20.0f
     fun getCorrelation(): Float = 0.8f
     fun getLatencyMicros(): Long = 5000L
-    fun getGeneration(): Int = 1    fun getBestFitness(): Float = 0.95f
+    fun getGeneration(): Int = 1
+    fun getBestFitness(): Float = 0.95f
 
-    // PF Engine - pfEvoTick recibe Int, applyPFPreset recibe Any (PFPreset)
+    // PF Engine
     fun pfEvoTick(barCount: Int) { Log.d("AudioEngine", "pfEvoTick: $barCount") }
-    fun applyPFPreset(preset: Any) { Log.d("AudioEngine", "applyPFPreset: $preset") }
-    fun pfSetAmp(amp: Int) { Log.d("AudioEngine", "pfSetAmp: $amp") }
+    fun applyPFPreset(preset: Any) { Log.d("AudioEngine", "applyPFPreset: $preset") }    fun pfSetAmp(amp: Int) { Log.d("AudioEngine", "pfSetAmp: $amp") }
     fun pfSetParam(param: String, value: Float) { Log.d("AudioEngine", "pfSetParam: $param=$value") }
     fun pfEvoReset() { Log.d("AudioEngine", "pfEvoReset") }
 
