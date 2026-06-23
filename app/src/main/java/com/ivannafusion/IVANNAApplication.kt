@@ -26,7 +26,16 @@ class IVANNAApplication : Application() {
         // que ya usan EffectsScreen/AIScreen/PFEngineScreen. Se mantiene
         // esta línea para no perder su estado por si algo la referencia
         // en el futuro, pero no es la fuente de verdad activa.
-        ShmManager.initialize(this)
+        
+        // FIX: Envolver en try-catch para prevenir crash si la librería nativa falla
+        try {
+            ShmManager.initialize(this)
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "Error cargando librería nativa en ShmManager", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error inicializando ShmManager", e)
+        }
+        
         ThermalMonitor.initialize(this)
         Log.i(TAG, "✅ ShmManager + ThermalMonitor + DSPState iniciados")
     }
