@@ -20,3 +20,21 @@ val TextTertiary = Color(0xFF64748B)
 val KnobBackground = Color(0xFF1E293B)
 val KnobForeground = Color(0xFF00D9FF)
 val KnobTrack = Color(0xFF334155)
+
+// Colores adicionales para UI Premium
+val BorderSubtle = Color(0xFF2D3748)
+val TextAccent = Color(0xFF00D9FF)
+val SignalHot = Color(0xFFFF3B30)
+val SignalWarm = Color(0xFFFF9500)
+val SignalCool = Color(0xFF34C759)
+val SignalMute = Color(0xFF8E8E93)
+val AccentMagenta = Color(0xFFFF00FF)
+
+// Gradientes y materiales
+val MasterGradient = Color(0xFF1A1A2E)
+val Carbon = Color(0xFF0F0F14)
+val PrecisionCyan = Color(0xFF00FFFF)
+val Graphite = Color(0xFF2C2C34)
+val Titanium = Color(0xFF4A4A56)
+val Platinum = Color(0xFFE5E5EA)
+val Silver = Color(0xFFC7C7CC)
