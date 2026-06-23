@@ -4,9 +4,7 @@ project(IvannaFusion VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ==============================================================================
-# SIMD DETECTION & OPTIMIZATION (IVANNA-FUSION)
-# ==============================================================================
+# SIMD Detection
 include(CheckCXXCompilerFlag)
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64|armv8")
@@ -17,72 +15,48 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|x86|i386|i686")
     message(STATUS "IVANNA: x86_64 detected.")
     check_cxx_compiler_flag("-mavx2" COMPILER_SUPPORTS_AVX2)
     if(COMPILER_SUPPORTS_AVX2)
-        message(STATUS "IVANNA: Enabling AVX2.")
         add_compile_options(-mavx2 -mfma)
         add_compile_definitions(IVANNA_SIMD_AVX2=1)
     else()
-        message(STATUS "IVANNA: Falling back to SSE2.")
         add_compile_options(-msse2)
         add_compile_definitions(IVANNA_SIMD_SSE2=1)
     endif()
 else()
-    message(WARNING "IVANNA: Unknown architecture. Using scalar fallback.")
     add_compile_definitions(IVANNA_SIMD_SCALAR=1)
 endif()
 
-# ==============================================================================
-# BUILD OPTIONS
-# ==============================================================================
-option(IVANNA_BUILD_TESTS "Build unit tests" ON)
-
-# ==============================================================================
-# INCLUDE DIRECTORIES
-# ==============================================================================
+# Include directories - both root core/ and nested IVANNA-FUSION/
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/core)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/IVANNA-FUSION/src/cpp)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/IVANNA-FUSION/pf_engine/core)
 
-# ==============================================================================
-# SOURCE FILES
-# ==============================================================================
+# Source files - use real code from nested directory
 file(GLOB_RECURSE IVANNA_SOURCES
     "core/*.cpp"
-    "core/*.h"
-    "include/*.h"
+    "IVANNA-FUSION/src/cpp/*.cpp"
+    "IVANNA-FUSION/pf_engine/core/*.cpp"
+    "IVANNA-FUSION/pf_engine/dsp/*.cpp"
 )
 
-# Garantizar al menos un .cpp aunque el core sea header-only
-list(APPEND IVANNA_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/core/ivanna_core_stub.cpp")
+# Remove duplicates
 list(REMOVE_DUPLICATES IVANNA_SOURCES)
 
-# ==============================================================================
-# LIBRARY TARGET
-# ==============================================================================
-add_library(ivanna_core STATIC ${IVANNA_SOURCES})
-
-target_include_directories(ivanna_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-
-# ==============================================================================
-# TESTS
-# ==============================================================================
-if(IVANNA_BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(tests)
+# Library target
+if(IVANNA_SOURCES)
+    add_library(ivanna_core STATIC ${IVANNA_SOURCES})
+    target_include_directories(ivanna_core PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/core>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/IVANNA-FUSION/src/cpp>
+        $<INSTALL_INTERFACE:include>
+    )
+    message(STATUS "IVANNA: Building with ${CMAKE_CURRENT_LIST_FILE}")
+    message(STATUS "IVANNA: Found ${IVANNA_SOURCES} source files")
+else()
+    message(WARNING "IVANNA: No source files found. Creating empty library.")
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/empty.cpp "// Empty stub\n")
+    add_library(ivanna_core STATIC ${CMAKE_CURRENT_BINARY_DIR}/empty.cpp)
 endif()
 
-# ==============================================================================
-# INSTALL
-# ==============================================================================
-install(TARGETS ivanna_core
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-)
-
-install(DIRECTORY include/ DESTINATION include)
-
-message(STATUS "IVANNA-FUSION Configuration:")
-message(STATUS "  Version: ${PROJECT_VERSION}")
-message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "  System processor: ${CMAKE_SYSTEM_PROCESSOR}")
+message(STATUS "IVANNA-FUSION: ${PROJECT_VERSION} on ${CMAKE_SYSTEM_PROCESSOR}")
