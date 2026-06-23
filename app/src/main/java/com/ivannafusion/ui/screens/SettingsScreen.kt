@@ -10,22 +10,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.ivannafusion.dsp.DSPState
+import com.ivannafusion.DSPState
 import com.ivannafusion.ui.components.*
 import com.ivannafusion.ui.theme.*
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     // Valores REALES leídos del hardware (AudioManager.PROPERTY_OUTPUT_
-    // SAMPLE_RATE/FRAMES_PER_BUFFER vía DSPState.detectRealHardwareCapabilities),
-    // no texto fijo. La mayoría de dispositivos Android reportan 48000Hz
-    // en su path de salida estándar — 192kHz/24-bit reales solo ocurren
-    // con un DAC USB-C externo y su propio driver, no con el codec
-    // interno del teléfono. Se muestra lo que el dispositivo realmente
-    // soporta, sin forzar un número aspiracional.
-    val sampleRateHz by DSPState.deviceSampleRateHz.collectAsState()
-    val framesPerBuffer by DSPState.deviceFramesPerBuffer.collectAsState()
-    val supportsHighRes by DSPState.deviceSupportsHighRes.collectAsState()
+    // SAMPLE_RATE/FRAMES_PER_BUFFER vía DSPState.detectRealHardwareCapabilities,
+    // llamado desde IVANNAApplication.onCreate), no texto fijo. La
+    // mayoría de dispositivos Android reportan 48000Hz en su path de
+    // salida estándar — 192kHz/24-bit reales solo ocurren con un DAC
+    // USB-C externo y su propio driver, no con el codec interno del
+    // teléfono. Se muestra lo que el dispositivo realmente soporta.
+    val sampleRateHz = DSPState.deviceSampleRateHz
+    val framesPerBuffer = DSPState.deviceFramesPerBuffer
+    val supportsHighRes = DSPState.deviceSupportsHighRes
     val bufferLatencyMicros = if (sampleRateHz > 0 && framesPerBuffer > 0)
         (framesPerBuffer.toLong() * 1_000_000L / sampleRateHz) else 0L
 

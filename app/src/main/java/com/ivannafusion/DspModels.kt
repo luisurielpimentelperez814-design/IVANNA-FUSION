@@ -1,6 +1,5 @@
 package com.ivannafusion
 
-import androidx.compose.ui.graphics.Color
 
 data class PFPreset(
     val name: String,

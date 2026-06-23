@@ -1,5 +1,4 @@
 package com.ivannafusion
-import com.ivannafusion.dsp.DSPState
 
 import android.content.Context
 import android.media.AudioManager
@@ -20,7 +19,8 @@ class AudioEngine {
     private var initialized = false
 
     external fun nativeInit(sampleRate: Int, channels: Int): Boolean
-    external fun nativeProcessAudio(input: FloatArray, output: FloatArray, frames: Int)    external fun nativeSetEQGain(band: Int, gain: Float)
+    external fun nativeProcessAudio(input: FloatArray, output: FloatArray, frames: Int)
+    external fun nativeSetEQGain(band: Int, gain: Float)
     external fun nativeSetEQFreq(band: Int, freq: Float)
     external fun nativeSetEQQ(band: Int, q: Float)
     external fun nativeSetEQBypass(band: Int, bypass: Boolean)
@@ -61,6 +61,9 @@ class AudioEngine {
     }
 
     @Volatile private var lastYamnetResult: YamnetClassifier.Result? = null
+    @Volatile var lastSpectralResult: SpectralClassifier.Classification? = null
+    private val spectralAccum = FloatArray(SpectralClassifier.BLOCK_SIZE)
+    private var spectralAccumPos = 0
     private val yamnetAccumulator = FloatArray(YamnetClassifier.INPUT_SAMPLES)
     private var yamnetAccumPos = 0
     private var yamnetSourceSampleRate = 48000
@@ -103,6 +106,7 @@ class AudioEngine {
             yamnetSourceSampleRate = sr
             feedYamnetAccumulator(input)
         }
+        feedSpectralAccumulator(input)
 
         return output
     }
@@ -139,6 +143,20 @@ class AudioEngine {
                     yamnetClassifying = false
                 }
             }.apply { isDaemon = true; start() }
+        }
+    }
+
+    private fun feedSpectralAccumulator(stereoInterleaved: FloatArray) {
+        val frames = stereoInterleaved.size / 2
+        for (i in 0 until frames) {
+            if (spectralAccumPos < spectralAccum.size) {
+                spectralAccum[spectralAccumPos++] =
+                    (stereoInterleaved[i * 2] + stereoInterleaved[i * 2 + 1]) * 0.5f
+            }
+        }
+        if (spectralAccumPos >= spectralAccum.size) {
+            val block = spectralAccum.copyOf(); spectralAccumPos = 0
+            Thread { lastSpectralResult = SpectralClassifier.analyze(block) }.apply { isDaemon = true; start() }
         }
     }
 
@@ -186,25 +204,55 @@ class AudioEngine {
     fun decorSetDelay(d: Float) {}
     fun decorSetModRate(r: Float) {}
     fun decorSetMix(m: Float) {}
-    fun isAiClassifierLoaded(): Boolean = YamnetClassifier.isLoaded
-    fun aiGetDetectedGenre(): String = lastYamnetResult?.topLabel ?: "Unknown"
-    fun aiGetConfidence(): Float = lastYamnetResult?.topScore?.coerceIn(0f, 1f) ?: 0.0f
-    fun aiGetTempo(): Float = 120.0f
+    fun isAiClassifierLoaded(): Boolean = YamnetClassifier.isLoaded || lastSpectralResult != null
+    fun aiGetDetectedGenre(): String = lastYamnetResult?.topLabel ?: lastSpectralResult?.label ?: "Analizando..."
+    fun aiGetConfidence(): Float = lastYamnetResult?.topScore?.coerceIn(0f,1f) ?: lastSpectralResult?.confidence ?: 0f
+    fun aiGetTempo(): Float = lastSpectralResult?.bpm ?: 120f
+    fun aiGetCentroidHz(): Float = lastSpectralResult?.centroidHz ?: 0f
+    fun aiGetBassEnergy(): Float = lastSpectralResult?.bassEnergy ?: 0f
+    fun aiGetMidEnergy(): Float = lastSpectralResult?.midEnergy ?: 0f
+    fun aiGetHighEnergy(): Float = lastSpectralResult?.highEnergy ?: 0f
+    fun aiGetRmsDb(): Float = lastSpectralResult?.rmsDb ?: -60f
+    fun aiGetZcr(): Float = lastSpectralResult?.zcr ?: 0f
+    fun aiGetSpectrum(): FloatArray = lastSpectralResult?.spectrum ?: FloatArray(32)
     fun aiSetEnabled(e: Boolean) {}
     fun aiSetAutoAdapt(a: Boolean) {}
     fun aiSetSensitivity(s: Float) {}
     fun aiGetCurrentCurveName(): String = "Default"
     fun aiGetCurrentCurveDescription(): String = "Default"
     fun aiApplyCurrentCurve() {}
-    fun getMomentaryLoudness(): Float = -20.0f
+    fun getMomentaryLoudness(): Float = lastSpectralResult?.rmsDb ?: -60f
     fun getCorrelation(): Float = 0.8f
     fun getLatencyMicros(): Long = 5000L
     fun getGeneration(): Int = 1
     fun getBestFitness(): Float = 0.95f
-    fun pfEvoTick(b: Int) {}    fun applyPFPreset(p: Any) {}
-    fun pfSetAmp(a: Int) {}
-    fun pfSetParam(p: String, v: Float) {}
-    fun pfEvoReset() {}
+    fun pfEvoTick(bar: Int) { MagiskBridge.sendCommand("pf:evo:tick=$bar") }
+    fun pfEvoReset() { MagiskBridge.sendCommand("pf:evo:reset") }
+    fun pfSetAmp(a: Int) {
+        MagiskBridge.setAmp(a)
+        DSPState.pfAmpModel = a
+    }
+    fun pfSetParam(p: String, v: Float) { MagiskBridge.setParameter(p, v) }
+    fun applyPFPreset(preset: PFPreset) {
+        MagiskBridge.setAmp(preset.ampModel)
+        MagiskBridge.setParameter("alpha", preset.alpha)
+        MagiskBridge.setParameter("beta",  preset.beta)
+        MagiskBridge.setParameter("gamma", preset.gamma)
+        MagiskBridge.setParameter("delta", preset.delta)
+        MagiskBridge.setParameter("sigma", preset.sigma)
+        MagiskBridge.setDrive(preset.drive); MagiskBridge.setWet(preset.wet)
+        MagiskBridge.setSag(preset.sag)
+        MagiskBridge.setEQBand(0, preset.lowGain); MagiskBridge.setEQBand(3, preset.midGain)
+        MagiskBridge.setEQBand(6, preset.highGain)
+        MagiskBridge.setParameter("presence", preset.presence)
+        setPreset(preset.name)
+        DSPState.pfAmpModel = preset.ampModel; DSPState.pfDrive = preset.drive
+        DSPState.pfWet = preset.wet;           DSPState.pfAlpha = preset.alpha
+        DSPState.pfDelta = preset.delta;       DSPState.pfSigma = preset.sigma
+        DSPState.pfLowGain = preset.lowGain;   DSPState.pfMidGain = preset.midGain
+        DSPState.pfHighGain = preset.highGain; DSPState.pfPresence = preset.presence
+        DSPState.pfSag = preset.sag
+    }
     fun recordUserAdjustment() {}
     fun getAIModelVersion(): Int = 1
     fun getAITotalExperiences(): Int = 0
@@ -216,13 +264,13 @@ class AudioEngine {
         val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         return am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 48000
     }
-    fun setMasterVolumePersisted(v: Float) { DSPState.setMasterVolume(v) }
-    fun setBassBoostPersisted(v: Float) { DSPState.setBassBoost(v) }
-    fun setMidRangePersisted(v: Float) { DSPState.setMidRange(v) }
-    fun setTreblePersisted(v: Float) { DSPState.setTreble(v) }
-    fun setReverbLevelPersisted(v: Float) { DSPState.setReverbLevel(v) }
-    fun setDelayTimePersisted(v: Float) { DSPState.setDelayTime(v) }
-    fun setDelayFeedbackPersisted(v: Float) { DSPState.setDelayFeedback(v) }
-    fun setCompressorThresholdPersisted(v: Float) { DSPState.setCompressorThreshold(v) }
-    fun setCompressorRatioPersisted(v: Float) { DSPState.setCompressorRatio(v) }
+    fun setMasterVolumePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setMasterVolume(v) }
+    fun setBassBoostPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setBassBoost(v) }
+    fun setMidRangePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setMidRange(v) }
+    fun setTreblePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setTreble(v) }
+    fun setReverbLevelPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setReverbLevel(v) }
+    fun setDelayTimePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setDelayTime(v) }
+    fun setDelayFeedbackPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setDelayFeedback(v) }
+    fun setCompressorThresholdPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setCompressorThreshold(v) }
+    fun setCompressorRatioPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setCompressorRatio(v) }
 }
