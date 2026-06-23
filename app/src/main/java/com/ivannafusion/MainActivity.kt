@@ -1,8 +1,10 @@
 package com.ivannafusion
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -34,6 +36,68 @@ class MainActivity : ComponentActivity() {
     
     // Estado de inicialización
     private var appState by mutableStateOf(AppState.LOADING)
+
+    // Estado real de la captura de audio interno (Spotify/YouTube/etc),
+    // expuesto para que AIScreen pueda mostrarlo y ofrecer el botón de
+    // activar/desactivar sin que la pantalla conozca MediaProjection.
+    var isPlaybackCaptureActive by mutableStateOf(false)
+        private set
+
+    private val mediaProjectionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            val serviceIntent = Intent(this, PlaybackCaptureService::class.java).apply {
+                action = PlaybackCaptureService.ACTION_START
+                putExtra(PlaybackCaptureService.EXTRA_RESULT_CODE, result.resultCode)
+                putExtra(PlaybackCaptureService.EXTRA_RESULT_DATA, result.data)
+            }
+            startForegroundService(serviceIntent)
+            isPlaybackCaptureActive = true
+            Log.i(TAG, "Captura de audio interno autorizada e iniciada")
+        } else {
+            Log.w(TAG, "Usuario denegó el permiso de captura de audio interno")
+            isPlaybackCaptureActive = false
+        }
+    }
+
+    /**
+     * Inicia el flujo real de AudioPlaybackCapture: muestra el diálogo
+     * del sistema ("Comenzar a grabar/transmitir"), y si el usuario lo
+     * acepta, arranca PlaybackCaptureService. Este diálogo lo controla
+     * Android, no se puede omitir ni mostrar de forma distinta.
+     */
+    fun requestPlaybackCapture() {
+        bindPlaybackCaptureCallback()
+        val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        mediaProjectionLauncher.launch(projectionManager.createScreenCaptureIntent())
+    }
+
+    /**
+     * NOTA: PlaybackCaptureService corre en un proceso/Service distinto
+     * del ciclo de vida directo de la Activity, así que su callback
+     * onAudioCaptured se conecta aquí, justo después de que el usuario
+     * aprueba el permiso e inicia el servicio — audioEngine ya debe
+     * existir en ese punto (initializeComponents() corrió antes,
+     * porque la captura solo se ofrece desde AIScreen, que requiere
+     * AppState.READY).
+     */
+    private fun bindPlaybackCaptureCallback() {
+        // El binding real (instancia de PlaybackCaptureService) requeriría
+        // bindService(); para mantenerlo simple, AudioEngine se conecta
+        // como companion-level callback estático en el propio servicio.
+        PlaybackCaptureService.globalAudioCallback = { mono ->
+            audioEngine?.feedExternalMonoAudio(mono, PlaybackCaptureService.CAPTURE_SAMPLE_RATE)
+        }
+    }
+
+    fun stopPlaybackCapture() {
+        val serviceIntent = Intent(this, PlaybackCaptureService::class.java).apply {
+            action = PlaybackCaptureService.ACTION_STOP
+        }
+        startService(serviceIntent)
+        isPlaybackCaptureActive = false
+    }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()

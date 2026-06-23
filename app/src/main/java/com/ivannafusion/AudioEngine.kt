@@ -68,6 +68,32 @@ class AudioEngine {
 
     fun release() { initialized = false; try { nativeReset() } catch (e: Exception) {}; YamnetClassifier.release() }
     
+    /**
+     * Punto de entrada para audio MONO ya capturado externamente (ver
+     * PlaybackCaptureService — captura de audio interno del sistema vía
+     * AudioPlaybackCapture). A diferencia de processAudio(), esto NO
+     * pasa por el motor DSP nativo (nativeProcessAudio) — solo alimenta
+     * al clasificador YAMNet. Tiene sentido mantenerlos separados:
+     * processAudio() es audio que la propia app está reproduciendo/
+     * procesando localmente (estéreo), mientras que esto es una copia
+     * de solo-análisis de lo que otras apps están reproduciendo (mono,
+     * ya a 16kHz porque PlaybackCaptureService captura directo a esa
+     * tasa).
+     */
+    fun feedExternalMonoAudio(monoSamples: FloatArray, sourceSampleRate: Int) {
+        if (!YamnetClassifier.isLoaded) return
+        yamnetSourceSampleRate = sourceSampleRate
+        // feedYamnetAccumulator espera un buffer intercalado L/R; para
+        // audio ya mono, L=R=mono duplica la muestra sin alterar el
+        // promedio que la función calcula internamente.
+        val pseudoStereo = FloatArray(monoSamples.size * 2)
+        for (i in monoSamples.indices) {
+            pseudoStereo[i * 2] = monoSamples[i]
+            pseudoStereo[i * 2 + 1] = monoSamples[i]
+        }
+        feedYamnetAccumulator(pseudoStereo)
+    }
+
     fun processAudio(input: FloatArray, sr: Int): FloatArray {
         if (!initialized) return input
         val output = FloatArray(input.size)

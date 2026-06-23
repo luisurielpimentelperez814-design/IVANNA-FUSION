@@ -53,41 +53,61 @@ object DSPState {
         _compressorRatio.value = prefs.getFloat("compressorRatio", 4f)
     }
 
+    /**
+     * Persiste un valor solo si DSPState.initialize() ya corrió.
+     * CORRECCIÓN DE CRASH: antes, cada setter llamaba a prefs.edit()
+     * directamente — 'prefs' es 'lateinit var', y si initialize()
+     * nunca se llamó (que era el caso: ningún archivo del proyecto lo
+     * invocaba), el primer setter ejecutado lanzaba
+     * UninitializedPropertyAccessException sin try/catch, crasheando
+     * la app en cuanto el usuario tocaba cualquier slider conectado a
+     * DSPState. Si no está inicializado, el StateFlow en memoria sí se
+     * actualiza (la UI sigue funcionando), pero no se persiste a disco
+     * hasta que initialize() corra.
+     */
+    private fun persistSafely(key: String, value: Float) {
+        if (!isInitialized) {
+            android.util.Log.w("DSPState", "persistSafely('$key'): DSPState.initialize() no se ha llamado todavía, valor no persistido (solo en memoria)")
+            return
+        }
+        prefs.edit().putFloat(key, value).apply()
+    }
+
     fun setMasterVolume(v: Float) {
         _masterVolume.update { v }
-        prefs.edit().putFloat("masterVolume", v).apply()
+        persistSafely("masterVolume", v)
     }
     fun setBassBoost(v: Float) {
         _bassBoost.update { v }
-        prefs.edit().putFloat("bassBoost", v).apply()
+        persistSafely("bassBoost", v)
     }
     fun setMidRange(v: Float) {
         _midRange.update { v }
-        prefs.edit().putFloat("midRange", v).apply()
+        persistSafely("midRange", v)
     }
     fun setTreble(v: Float) {
         _treble.update { v }
-        prefs.edit().putFloat("treble", v).apply()
+        persistSafely("treble", v)
     }
     fun setReverbLevel(v: Float) {
         _reverbLevel.update { v }
-        prefs.edit().putFloat("reverbLevel", v).apply()
+        persistSafely("reverbLevel", v)
     }
     fun setDelayTime(v: Float) {
         _delayTime.update { v }
-        prefs.edit().putFloat("delayTime", v).apply()
+        persistSafely("delayTime", v)
     }
     fun setDelayFeedback(v: Float) {
         _delayFeedback.update { v }
-        prefs.edit().putFloat("delayFeedback", v).apply()
+        persistSafely("delayFeedback", v)
     }
     fun setCompressorThreshold(v: Float) {
         _compressorThreshold.update { v }
-        prefs.edit().putFloat("compressorThreshold", v).apply()
+        persistSafely("compressorThreshold", v)
     }
     fun setCompressorRatio(v: Float) {
         _compressorRatio.update { v }
-        prefs.edit().putFloat("compressorRatio", v).apply()
+        persistSafely("compressorRatio", v)
     }
     fun updateMetrics(rms: Float, flatness: Float) {
         _rmsLevel.update { rms }
