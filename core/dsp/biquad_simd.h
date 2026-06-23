@@ -33,7 +33,8 @@ public:
 
             float x1 = data[i+1];
             float y1 = b0 * x1 + s1;
-            s1 = b1 * x1 - a1 * y1 + s2;            s2 = b2 * x1 - a2 * y1;
+            s1 = b1 * x1 - a1 * y1 + s2;
+            s2 = b2 * x1 - a2 * y1;
             data[i+1] = y1;
 
             float x2 = data[i+2];
@@ -82,7 +83,8 @@ private:
 #if defined(IVANNA_SIMD_NEON)
     void processBlockMultiChannelNeon(float** channels, size_t numChannels, size_t n) noexcept {
         const float32x4_t v_b0 = vdupq_n_f32(coeffs_.b0);
-        const float32x4_t v_b1 = vdupq_n_f32(coeffs_.b1);        const float32x4_t v_b2 = vdupq_n_f32(coeffs_.b2);
+        const float32x4_t v_b1 = vdupq_n_f32(coeffs_.b1);
+        const float32x4_t v_b2 = vdupq_n_f32(coeffs_.b2);
         const float32x4_t v_a1 = vdupq_n_f32(coeffs_.a1);
         const float32x4_t v_a2 = vdupq_n_f32(coeffs_.a2);
 
