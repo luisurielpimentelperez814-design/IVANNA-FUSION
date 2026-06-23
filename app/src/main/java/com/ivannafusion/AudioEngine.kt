@@ -1,4 +1,5 @@
 package com.ivannafusion
+import com.ivannafusion.dsp.DSPState
 
 import android.content.Context
 import android.media.AudioManager
@@ -132,9 +133,6 @@ class AudioEngine {
         val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         return am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 48000
     }
-    fun getLatencyMicros(): Long = 0L
-    fun getGeneration(): Int = 0
-    fun getBestFitness(): Float = 0f
     fun setMasterVolumePersisted(v: Float) { DSPState.setMasterVolume(v) }
     fun setBassBoostPersisted(v: Float) { DSPState.setBassBoost(v) }
     fun setMidRangePersisted(v: Float) { DSPState.setMidRange(v) }
