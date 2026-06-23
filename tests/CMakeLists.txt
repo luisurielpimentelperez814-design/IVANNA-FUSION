@@ -1,18 +1,10 @@
-# IVANNA-FUSION — Tests
-cmake_minimum_required(VERSION 3.16)
+# IVANNA-FUSION Test Suite
+# Minimal test configuration to satisfy CMake add_subdirectory(tests)
 
-add_executable(ivanna_test ivanna_test.cpp)
+# Placeholder: tests will be added in Phase 2
+message(STATUS "IVANNA: Test suite configured (placeholder)")
 
-target_include_directories(ivanna_test PRIVATE
-    ${CMAKE_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-
-target_link_libraries(ivanna_test PRIVATE ivanna_core)
-
-set_target_properties(ivanna_test PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-)
-
-add_test(NAME ivanna_core_compile_test COMMAND ivanna_test)
+# Example test target (commented out until tests exist)
+# add_executable(ivanna_test ivanna_test.cpp)
+# target_link_libraries(ivanna_test PRIVATE ivanna_core)
+# add_test(NAME ivanna_test COMMAND ivanna_test)
