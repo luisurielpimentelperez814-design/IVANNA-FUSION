@@ -1,4 +1,3 @@
-import com.ivannafusion.dsp.DSPState
 package com.ivannafusion
 
 import android.content.Context
@@ -133,8 +132,6 @@ class AudioEngine {
         val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         return am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 48000
     }
-    fun getMomentaryLoudness(): Float = DSPState.rmsLevel.value
-    fun getCorrelation(): Float = DSPState.spectralFlatness.value
     fun getLatencyMicros(): Long = 0L
     fun getGeneration(): Int = 0
     fun getBestFitness(): Float = 0f
