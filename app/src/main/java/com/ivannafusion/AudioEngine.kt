@@ -47,16 +47,72 @@ class AudioEngine {
             false
         }
         initialized = ok
+
+        // YAMNet (clasificador real, ver YamnetClassifier.kt). Si
+        // app/src/main/assets/yamnet.tflite no existe todavía (ver
+        // assets/README_MODEL.txt), initialize() devuelve false e
+        // isAiClassifierLoaded() queda false — sin crashear y sin
+        // simular una clasificación falsa.
+        val yamnetLoaded = YamnetClassifier.initialize(context)
+        Log.i("AudioEngine", "YAMNet cargado: $yamnetLoaded")
+
         callback(ok)
     }
 
-    fun release() { initialized = false; try { nativeReset() } catch (e: Exception) {} }
+    @Volatile private var lastYamnetResult: YamnetClassifier.Result? = null
+    private val yamnetAccumulator = FloatArray(YamnetClassifier.INPUT_SAMPLES)
+    private var yamnetAccumPos = 0
+    private var yamnetSourceSampleRate = 48000
+    private var yamnetClassifying = false  // evita solapar inferencias si una tarda más que el bloque siguiente
+
+    fun release() { initialized = false; try { nativeReset() } catch (e: Exception) {}; YamnetClassifier.release() }
     
     fun processAudio(input: FloatArray, sr: Int): FloatArray {
         if (!initialized) return input
         val output = FloatArray(input.size)
         try { nativeProcessAudio(input, output, input.size / 2) } catch (e: Exception) { return input }
+
+        if (YamnetClassifier.isLoaded) {
+            yamnetSourceSampleRate = sr
+            feedYamnetAccumulator(input)
+        }
+
         return output
+    }
+
+    /**
+     * Convierte el bloque estéreo intercalado a mono (promedio L/R),
+     * lo decima a 16kHz (decimación simple por relación de enteros —
+     * suficiente para clasificación de eventos de audio, no para
+     * reproducción), y lo acumula hasta tener exactamente
+     * YamnetClassifier.INPUT_SAMPLES muestras, momento en el que
+     * dispara una inferencia en un hilo separado para no bloquear el
+     * camino de audio que llamó a processAudio().
+     */
+    private fun feedYamnetAccumulator(stereoInterleaved: FloatArray) {
+        val ratio = (yamnetSourceSampleRate.toFloat() / YamnetClassifier.SAMPLE_RATE_HZ).coerceAtLeast(1f)
+        var srcIdx = 0f
+        val frames = stereoInterleaved.size / 2
+        while (srcIdx.toInt() < frames && yamnetAccumPos < yamnetAccumulator.size) {
+            val f = srcIdx.toInt()
+            val mono = (stereoInterleaved[f * 2] + stereoInterleaved[f * 2 + 1]) * 0.5f
+            yamnetAccumulator[yamnetAccumPos++] = mono
+            srcIdx += ratio
+        }
+
+        if (yamnetAccumPos >= yamnetAccumulator.size && !yamnetClassifying) {
+            yamnetClassifying = true
+            val block = yamnetAccumulator.copyOf()
+            yamnetAccumPos = 0
+            Thread {
+                try {
+                    val result = YamnetClassifier.classify(block)
+                    if (result != null) lastYamnetResult = result
+                } finally {
+                    yamnetClassifying = false
+                }
+            }.apply { isDaemon = true; start() }
+        }
     }
 
     fun getInputLevel(): Float = try { nativeGetInputLevel() } catch (e: Exception) { 0f }
@@ -102,9 +158,9 @@ class AudioEngine {
     fun decorSetDelay(d: Float) {}
     fun decorSetModRate(r: Float) {}
     fun decorSetMix(m: Float) {}
-    fun isAiClassifierLoaded(): Boolean = false
-    fun aiGetDetectedGenre(): String = "Unknown"
-    fun aiGetConfidence(): Float = 0.0f
+    fun isAiClassifierLoaded(): Boolean = YamnetClassifier.isLoaded
+    fun aiGetDetectedGenre(): String = lastYamnetResult?.topLabel ?: "Unknown"
+    fun aiGetConfidence(): Float = lastYamnetResult?.topScore?.coerceIn(0f, 1f) ?: 0.0f
     fun aiGetTempo(): Float = 120.0f
     fun aiSetEnabled(e: Boolean) {}
     fun aiSetAutoAdapt(a: Boolean) {}

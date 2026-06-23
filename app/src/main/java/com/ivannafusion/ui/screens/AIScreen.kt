@@ -47,9 +47,11 @@ fun AIScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
                     Text("MOTOR IA", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                    Text("Detección: ${audioEngine.aiGetDetectedGenre()} (sin clasificador activo)", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-                    Text("Confianza: ${String.format("%.0f%%", audioEngine.aiGetConfidence() * 100)} (valor fijo)", style = MaterialTheme.typography.labelMedium, color = AccentCyan.copy(alpha = 0.6f))
-                    Text("Tempo: ${String.format("%.1f BPM", audioEngine.aiGetTempo())} (valor fijo)", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                    val loaded = audioEngine.isAiClassifierLoaded()
+                    val suffix = if (loaded) "" else " (sin clasificador activo)"
+                    Text("Detección: ${audioEngine.aiGetDetectedGenre()}$suffix", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                    Text("Confianza: ${String.format("%.0f%%", audioEngine.aiGetConfidence() * 100)}${if (loaded) "" else " (valor fijo)"}", style = MaterialTheme.typography.labelMedium, color = if (loaded) AccentEmerald else AccentCyan.copy(alpha = 0.6f))
+                    Text("Tempo: ${String.format("%.1f BPM", audioEngine.aiGetTempo())} (Tempo no estimado por YAMNet — pendiente)", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
                 }
                 IVANNAToggle(checked = aiEnabled, onCheckedChange = { aiEnabled = it; audioEngine.aiSetEnabled(it) })
             }
