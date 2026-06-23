@@ -54,8 +54,15 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_ivannafusion_AudioEngine_nativeIn
 extern "C" JNIEXPORT void JNICALL
 Java_com_ivannafusion_AudioEngine_nativeProcessAudio(JNIEnv* env, jobject, jfloatArray in, jfloatArray out, jint frames) {
     if(!initialized) {
-        // Si no está inicializado, copiar input a output
-        env->GetFloatArrayRegion(in, 0, frames*2, env->GetFloatArrayElements(out, 0));
+        // CORREGIDO: la versión anterior llamaba a
+        // GetFloatArrayRegion(in, 0, frames*2, GetFloatArrayElements(out,0))
+        // — esto filtraba la referencia JNI obtenida de 'out' (nunca se
+        // liberaba con ReleaseFloatArrayElements) y tenía semántica
+        // confusa (mezclaba dos APIs JNI distintas para copiar arrays).
+        // Forma correcta de copiar 'in' -> 'out' sin tocar el DSP:
+        jfloat* inBuf = env->GetFloatArrayElements(in, nullptr);
+        env->SetFloatArrayRegion(out, 0, frames * 2, inBuf);
+        env->ReleaseFloatArrayElements(in, inBuf, JNI_ABORT);
         return;
     }
     
@@ -92,7 +99,8 @@ Java_com_ivannafusion_AudioEngine_nativeProcessAudio(JNIEnv* env, jobject, jfloa
         }
         
         // Aplicar Exciter
-        if(!excBypass) {            L = L + (tanhf(L*excDrive) - L) * excMix;
+        if(!excBypass) {
+            L = L + (tanhf(L*excDrive) - L) * excMix;
             R = R + (tanhf(R*excDrive) - R) * excMix;
         }
         
