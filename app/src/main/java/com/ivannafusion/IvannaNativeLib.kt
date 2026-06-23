@@ -8,7 +8,7 @@ object IvannaNativeLib {
     init {
         try {
             System.loadLibrary("ivanna_native")
-            System.loadLibrary("pf_engine")
+            System.loadLibrary("ivanna_jni")
         } catch (e: UnsatisfiedLinkError) {
             android.util.Log.e("IvannaNativeLib", "Failed to load native libraries", e)
         }
