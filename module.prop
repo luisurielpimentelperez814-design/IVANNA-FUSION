@@ -1,15 +1,7 @@
 id=ivanna_fusion_dsp
-<<<<<<< HEAD
-name=IVANNA FUSION DSP + PF ENGINE + FFT
-version=v2.1
-versionCode=210
-author=GORE TNS (Luis Uriel Pimentel Perez)
-description=IVANNA FUSION: 8-band PEQ + Compresor RMS soft-knee + Excitador Armónico. PF ENGINE v3: amp modeling + presets. IVANNA FFT band-gain. ARM64 NEON SIMD. NDK r27c / Android 15 / Snapdragon 4 Gen 2.
-=======
 name=IVANNA FUSION DSP
 version=v2.0
 versionCode=200
 author=GORE TNS (Luis Uriel Pimentel Perez)
 description=Real DSP engine v2: 8-band PEQ + Soft-Knee Compressor + Harmonic Exciter + PF-ENGINE (Amp Models: Marshall/Fender/Vox/70sRock) + FFT Spectral Enhancement. ARM NEON SIMD. Snapdragon 4 Gen 2 / Android 15.
->>>>>>> 82b483f (feat(v2.0): fusión PF-ENGINE v3.0.0 + FFT Effect + Presets + nuevas pantallas UI)
 minMagisk=24000
