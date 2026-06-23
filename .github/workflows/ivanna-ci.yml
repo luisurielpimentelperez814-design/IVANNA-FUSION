@@ -95,14 +95,75 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       
-      - name: Build APK
-        run: ./gradlew assembleDebug --stacktrace
+      # Variante 'enterprise': solo arm64-v8a (única ABI realista en
+      # dispositivos con Magisk/root modernos), con MAGISK_INTEGRATION=true
+      # (ver app/build.gradle productFlavors) — esta es la variante que
+      # se distribuye junto al módulo Magisk de abajo.
+      - name: Build APK (enterprise, arm64-v8a + integración Magisk)
+        run: ./gradlew assembleEnterpriseDebug --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ivanna-fusion-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: ivanna-fusion-enterprise-apk
+          path: app/build/outputs/apk/enterprise/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Set up Android NDK (para compilar el módulo Magisk)
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r25b
+
+      # libomega_effect.so (Audio Effect HAL real, target ya definido en
+      # app/src/main/cpp/CMakeLists.txt) se compila aquí para empaquetar
+      # junto al módulo, ya que audio_effects.xml lo referencia y antes
+      # nunca se generaba ni se copiaba (ver fix(crítico) previo en el
+      # historial de este repo).
+      - name: Build libomega_effect.so (Audio Effect HAL)
+        env:
+          ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          mkdir -p app/src/main/cpp/build_effect_only
+          cd app/src/main/cpp/build_effect_only
+          cmake ../.. \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-29 \
+            -DANDROID_STL=c++_shared
+          cmake --build . --target omega_effect --config Release
+
+      - name: Build omega_daemon (binario root del módulo)
+        env:
+          ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          mkdir -p magisk_module/daemon_src/build
+          cd magisk_module/daemon_src/build
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DANDROID_STL=c++_shared
+          cmake --build . --config Release
+          cp omega_daemon ../../system/bin/omega_daemon
+          chmod 755 ../../system/bin/omega_daemon
+
+      - name: Empaquetar módulo Magisk
+        run: |
+          mkdir -p magisk_module/system/vendor/lib64/soundfx
+          cp app/src/main/cpp/build_effect_only/libomega_effect.so \
+             magisk_module/system/vendor/lib64/soundfx/libomega_effect.so
+          chmod 644 magisk_module/system/vendor/lib64/soundfx/libomega_effect.so
+          cd magisk_module
+          zip -r ../ivanna-fusion-magisk-module.zip . \
+            -x "daemon_src/build/*" "test_client*" "test_cmd*" "test_set*"
+
+      - name: Upload Magisk module artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ivanna-fusion-magisk-module
+          path: ivanna-fusion-magisk-module.zip
           if-no-files-found: error
           retention-days: 14
 

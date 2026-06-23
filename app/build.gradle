@@ -20,12 +20,48 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags "-O3 -ffast-math -funroll-loops -march=armv8.2-a+fp16+dotprod -fPIC"
                 arguments "-DANDROID_STL=c++_shared", "-DCMAKE_BUILD_TYPE=Release"
             }
         }
-        ndk {
-            abiFilters 'arm64-v8a'
+    }
+
+    flavorDimensions = ["distribution"]
+    productFlavors {
+        // Para público en general: APK con binarios nativos para las 4
+        // ABIs principales (arm64-v8a, armeabi-v7a, x86_64, x86), sin
+        // depender de root/Magisk. Flags de compilación nativa genéricas
+        // (sin -march específico de ARM, que rompería x86/x86_64).
+        universal {
+            dimension "distribution"
+            ndk {
+                abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'
+            }
+            externalNativeBuild {
+                cmake {
+                    cppFlags "-O3 -ffast-math -funroll-loops -fPIC"
+                }
+            }
+            buildConfigField "boolean", "MAGISK_INTEGRATION", "false"
+        }
+
+        // Para distribución Enterprise/avanzada: solo arm64-v8a (única
+        // ABI realista en dispositivos con Magisk/root modernos), con
+        // las flags de optimización ARM específicas (NEON dotprod) y
+        // habilitando la integración con el módulo Magisk
+        // (DSPController/MagiskBridge ya presentes en el código Kotlin,
+        // ver app/src/main/java/com/ivannafusion/DSPController.kt y
+        // MagiskBridge.kt).
+        enterprise {
+            dimension "distribution"
+            ndk {
+                abiFilters 'arm64-v8a'
+            }
+            externalNativeBuild {
+                cmake {
+                    cppFlags "-O3 -ffast-math -funroll-loops -march=armv8.2-a+fp16+dotprod -fPIC"
+                }
+            }
+            buildConfigField "boolean", "MAGISK_INTEGRATION", "true"
         }
     }
 
@@ -59,6 +95,7 @@ android {
 
     buildFeatures {
         compose true
+        buildConfig true
     }
 
     composeOptions {

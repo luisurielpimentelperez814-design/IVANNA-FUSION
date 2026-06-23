@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK Universal (público)
 on: [push]
 jobs:
   build:
@@ -31,11 +31,18 @@ jobs:
               -dname "CN=Debug, OU=Debug, O=Debug, L=Debug, ST=Debug, C=US"
           fi
 
-      - name: Build APK
-        run: ./gradlew assembleDebug --stacktrace
+      # Variante 'universal': 4 ABIs (arm64-v8a, armeabi-v7a, x86_64,
+      # x86), sin dependencia de root/Magisk (MAGISK_INTEGRATION=false,
+      # ver app/build.gradle productFlavors). Pensada para distribución
+      # pública general — funciona en cualquier dispositivo Android,
+      # con o sin root.
+      - name: Build APK (universal, todas las ABIs)
+        run: ./gradlew assembleUniversalDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: IVANNA-FUSION-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: IVANNA-FUSION-Universal-APK
+          path: app/build/outputs/apk/universal/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
