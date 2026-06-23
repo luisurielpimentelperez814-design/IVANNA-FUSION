@@ -1,5 +1,4 @@
 package com.ivannafusion
-import com.ivannafusion.dsp.DSPState
 
 import android.content.Context
 import android.media.AudioManager
@@ -20,7 +19,8 @@ class AudioEngine {
     private var initialized = false
 
     external fun nativeInit(sampleRate: Int, channels: Int): Boolean
-    external fun nativeProcessAudio(input: FloatArray, output: FloatArray, frames: Int)    external fun nativeSetEQGain(band: Int, gain: Float)
+    external fun nativeProcessAudio(input: FloatArray, output: FloatArray, frames: Int)
+    external fun nativeSetEQGain(band: Int, gain: Float)
     external fun nativeSetEQFreq(band: Int, freq: Float)
     external fun nativeSetEQQ(band: Int, q: Float)
     external fun nativeSetEQBypass(band: Int, bypass: Boolean)
@@ -264,13 +264,13 @@ class AudioEngine {
         val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         return am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 48000
     }
-    fun setMasterVolumePersisted(v: Float) { DSPState.setMasterVolume(v) }
-    fun setBassBoostPersisted(v: Float) { DSPState.setBassBoost(v) }
-    fun setMidRangePersisted(v: Float) { DSPState.setMidRange(v) }
-    fun setTreblePersisted(v: Float) { DSPState.setTreble(v) }
-    fun setReverbLevelPersisted(v: Float) { DSPState.setReverbLevel(v) }
-    fun setDelayTimePersisted(v: Float) { DSPState.setDelayTime(v) }
-    fun setDelayFeedbackPersisted(v: Float) { DSPState.setDelayFeedback(v) }
-    fun setCompressorThresholdPersisted(v: Float) { DSPState.setCompressorThreshold(v) }
-    fun setCompressorRatioPersisted(v: Float) { DSPState.setCompressorRatio(v) }
+    fun setMasterVolumePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setMasterVolume(v) }
+    fun setBassBoostPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setBassBoost(v) }
+    fun setMidRangePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setMidRange(v) }
+    fun setTreblePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setTreble(v) }
+    fun setReverbLevelPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setReverbLevel(v) }
+    fun setDelayTimePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setDelayTime(v) }
+    fun setDelayFeedbackPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setDelayFeedback(v) }
+    fun setCompressorThresholdPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setCompressorThreshold(v) }
+    fun setCompressorRatioPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setCompressorRatio(v) }
 }

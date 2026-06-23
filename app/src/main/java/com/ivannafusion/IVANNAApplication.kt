@@ -16,6 +16,7 @@ class IVANNAApplication : Application() {
         Log.d(TAG, "IVANNA DSP Application iniciada")
         parameterStore = ParameterStore(this)
         DSPState.initialize(parameterStore)
+        com.ivannafusion.dsp.DSPState.initialize(this)  // SharedPreferences para DashboardScreen
         ShmManager.initialize(this)
         ThermalMonitor.initialize(this)
         Log.i(TAG, "✅ ShmManager + ThermalMonitor + DSPState iniciados")
