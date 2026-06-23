@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.ivannafusion.AudioEngine
+import com.ivannafusion.dsp.DSPState
 import com.ivannafusion.ui.components.*
 import com.ivannafusion.ui.theme.*
 
@@ -55,8 +56,13 @@ fun EffectsScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
 @Composable
 private fun EQPanel(audioEngine: AudioEngine) {
     val bands = listOf("32", "64", "125", "250", "500", "1K", "2K", "4K", "8K", "16K")
-    var gains by remember { mutableStateOf(List(10) { 0.5f }) }
-    var bypassed by remember { mutableStateOf(false) }
+    // CORREGIDO: antes 'gains'/'bypassed' eran 'remember { mutableStateOf(...) }'
+    // local — Compose descarta ese estado al salir de la pantalla, por
+    // eso los controles "se regresaban" al cambiar de ventana. Ahora se
+    // leen de DSPState (StateFlow respaldado por SharedPreferences), que
+    // persiste real entre navegaciones y reinicios de la app.
+    val gains = (0 until 10).map { DSPState.eqGains[it].collectAsState().value }
+    val bypassed by DSPState.eqBypass.collectAsState()
 
     IVANNACard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(
@@ -68,7 +74,7 @@ private fun EQPanel(audioEngine: AudioEngine) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("BYPASS", style = MaterialTheme.typography.labelSmall, color = TextSecondary, modifier = Modifier.padding(end = 6.dp))
                 IVANNAToggle(checked = bypassed, onCheckedChange = {
-                    bypassed = it
+                    DSPState.setEqBypass(it)
                     audioEngine.eqSetBypass(it)
                 })
             }
@@ -86,7 +92,7 @@ private fun EQPanel(audioEngine: AudioEngine) {
                 IVANNAKnob(
                     value = gains[index],
                     onValueChange = { newValue ->
-                        gains = gains.toMutableList().also { it[index] = newValue }
+                        DSPState.setEqGain(index, newValue)
                         // Las 10 bandas de UI se mapean a las 8 bandas reales del
                         // motor (clampBand en ivanna_native_lib_v2.cpp); las dos
                         // últimas (8K, 16K) comparten la banda 7 — limitación real
@@ -108,13 +114,13 @@ private fun EQPanel(audioEngine: AudioEngine) {
 
 @Composable
 private fun CompressorPanel(audioEngine: AudioEngine) {
-    var threshold by remember { mutableStateOf(0.5f) }
-    var ratio by remember { mutableStateOf(0.2f) }
-    var attack by remember { mutableStateOf(0.1f) }
-    var release by remember { mutableStateOf(0.3f) }
-    var knee by remember { mutableStateOf(0.3f) }
-    var makeup by remember { mutableStateOf(0.0f) }
-    var bypassed by remember { mutableStateOf(false) }
+    val threshold by DSPState.compressorThreshold.collectAsState()
+    val ratio by DSPState.compressorRatio.collectAsState()
+    val attack by DSPState.compressorAttack.collectAsState()
+    val release by DSPState.compressorRelease.collectAsState()
+    val knee by DSPState.compressorKnee.collectAsState()
+    val makeup by DSPState.compressorMakeup.collectAsState()
+    val bypassed by DSPState.compressorBypass.collectAsState()
 
     IVANNACard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(
@@ -126,7 +132,7 @@ private fun CompressorPanel(audioEngine: AudioEngine) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("BYPASS", style = MaterialTheme.typography.labelSmall, color = TextSecondary, modifier = Modifier.padding(end = 6.dp))
                 IVANNAToggle(checked = bypassed, onCheckedChange = {
-                    bypassed = it
+                    DSPState.setCompressorBypass(it)
                     audioEngine.compSetBypass(it)
                 })
             }
@@ -134,28 +140,28 @@ private fun CompressorPanel(audioEngine: AudioEngine) {
         Spacer(Modifier.height(12.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            IVANNAKnob(value = threshold, onValueChange = { threshold = it; audioEngine.compSetThreshold(it * -60f) }, size = 72.dp, label = "THRESH", unit = "dB", accentColor = AccentMagenta, enabled = !bypassed)
-            IVANNAKnob(value = ratio, onValueChange = { ratio = it; audioEngine.compSetRatio(1f + it * 19f) }, size = 72.dp, label = "RATIO", unit = ":1", accentColor = AccentMagenta, enabled = !bypassed)
-            IVANNAKnob(value = attack, onValueChange = { attack = it; audioEngine.compSetAttack(it * 100f) }, size = 72.dp, label = "ATK", unit = "ms", accentColor = AccentMagenta, enabled = !bypassed)
-            IVANNAKnob(value = release, onValueChange = { release = it; audioEngine.compSetRelease(it * 1000f) }, size = 72.dp, label = "REL", unit = "ms", accentColor = AccentMagenta, enabled = !bypassed)
+            IVANNAKnob(value = threshold, onValueChange = { DSPState.setCompressorThreshold(it); audioEngine.compSetThreshold(it * -60f) }, size = 72.dp, label = "THRESH", unit = "dB", accentColor = AccentMagenta, enabled = !bypassed)
+            IVANNAKnob(value = ratio, onValueChange = { DSPState.setCompressorRatio(it); audioEngine.compSetRatio(1f + it * 19f) }, size = 72.dp, label = "RATIO", unit = ":1", accentColor = AccentMagenta, enabled = !bypassed)
+            IVANNAKnob(value = attack, onValueChange = { DSPState.setCompressorAttack(it); audioEngine.compSetAttack(it * 100f) }, size = 72.dp, label = "ATK", unit = "ms", accentColor = AccentMagenta, enabled = !bypassed)
+            IVANNAKnob(value = release, onValueChange = { DSPState.setCompressorRelease(it); audioEngine.compSetRelease(it * 1000f) }, size = 72.dp, label = "REL", unit = "ms", accentColor = AccentMagenta, enabled = !bypassed)
         }
         Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            IVANNAKnob(value = knee, onValueChange = { knee = it; audioEngine.compSetKnee(it * 12f) }, size = 64.dp, label = "KNEE", unit = "dB", accentColor = AccentMagenta, enabled = !bypassed)
-            IVANNAKnob(value = makeup, onValueChange = { makeup = it; audioEngine.compSetMakeup(it * 24f) }, size = 64.dp, label = "MAKEUP", unit = "dB", accentColor = AccentMagenta, enabled = !bypassed)
+            IVANNAKnob(value = knee, onValueChange = { DSPState.setCompressorKnee(it); audioEngine.compSetKnee(it * 12f) }, size = 64.dp, label = "KNEE", unit = "dB", accentColor = AccentMagenta, enabled = !bypassed)
+            IVANNAKnob(value = makeup, onValueChange = { DSPState.setCompressorMakeup(it); audioEngine.compSetMakeup(it * 24f) }, size = 64.dp, label = "MAKEUP", unit = "dB", accentColor = AccentMagenta, enabled = !bypassed)
         }
     }
 }
 
 @Composable
 private fun ConvolverPanel(audioEngine: AudioEngine) {
-    var reverbType by remember { mutableStateOf("HALL") }
-    var decay by remember { mutableStateOf(0.4f) }
-    var preDelay by remember { mutableStateOf(0.1f) }
-    var damping by remember { mutableStateOf(0.5f) }
-    var diffusion by remember { mutableStateOf(0.7f) }
-    var earlyMix by remember { mutableStateOf(0.5f) }
-    var mix by remember { mutableStateOf(0.3f) }
+    val reverbType by DSPState.reverbType.collectAsState()
+    val decay by DSPState.reverbDecay.collectAsState()
+    val preDelay by DSPState.reverbPreDelay.collectAsState()
+    val damping by DSPState.reverbDamping.collectAsState()
+    val diffusion by DSPState.reverbDiffusion.collectAsState()
+    val earlyMix by DSPState.reverbEarlyMix.collectAsState()
+    val mix by DSPState.reverbMix.collectAsState()
     
     IVANNACard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text("CONVOLVER ELITE", style = MaterialTheme.typography.labelSmall, color = TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
@@ -167,7 +173,7 @@ private fun ConvolverPanel(audioEngine: AudioEngine) {
                 IVANNAButton(
                     text = type,
                     onClick = { 
-                        reverbType = type
+                        DSPState.setReverbType(type)
                         audioEngine.convSetType(type)
                     },
                     accent = if (reverbType == type) AccentViolet else TextSecondary,
@@ -192,22 +198,22 @@ private fun ConvolverPanel(audioEngine: AudioEngine) {
         // Controles principales
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             IVANNAKnob(value = decay, onValueChange = { 
-                decay = it
+                DSPState.setReverbDecay(it)
                 audioEngine.convSetDecay(it * 4.9f + 0.1f)
             }, size = 64.dp, label = "DECAY", unit = "s", accentColor = AccentViolet)
             
             IVANNAKnob(value = preDelay, onValueChange = { 
-                preDelay = it
+                DSPState.setReverbPreDelay(it)
                 audioEngine.convSetPreDelay(it * 200f)
             }, size = 64.dp, label = "PRE-DLY", unit = "ms", accentColor = AccentViolet)
             
             IVANNAKnob(value = damping, onValueChange = { 
-                damping = it
+                DSPState.setReverbDamping(it)
                 audioEngine.convSetDamping(it)
             }, size = 64.dp, label = "DAMP", unit = "", accentColor = AccentViolet)
             
             IVANNAKnob(value = diffusion, onValueChange = { 
-                diffusion = it
+                DSPState.setReverbDiffusion(it)
                 audioEngine.convSetDiffusion(it)
             }, size = 64.dp, label = "DIFF", unit = "", accentColor = AccentViolet)
         }
@@ -216,12 +222,12 @@ private fun ConvolverPanel(audioEngine: AudioEngine) {
         
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             IVANNAKnob(value = earlyMix, onValueChange = { 
-                earlyMix = it
+                DSPState.setReverbEarlyMix(it)
                 audioEngine.convSetEarlyMix(it)
             }, size = 64.dp, label = "EARLY", unit = "", accentColor = AccentViolet)
             
             IVANNAKnob(value = mix, onValueChange = { 
-                mix = it
+                DSPState.setReverbMix(it)
                 audioEngine.convSetMix(it)
             }, size = 64.dp, label = "MIX", unit = "%", accentColor = AccentViolet)
         }
@@ -230,12 +236,12 @@ private fun ConvolverPanel(audioEngine: AudioEngine) {
 
 @Composable
 private fun SpatialPanel(audioEngine: AudioEngine) {
-    var width by remember { mutableStateOf(0.5f) }
-    var depth by remember { mutableStateOf(0.5f) }
-    var diffusion by remember { mutableStateOf(0.3f) }
-    var delay by remember { mutableStateOf(0.15f) }
-    var modRate by remember { mutableStateOf(0.5f) }
-    var mix by remember { mutableStateOf(1.0f) }
+    val width by DSPState.widenerWidth.collectAsState()
+    val depth by DSPState.widenerDepth.collectAsState()
+    val diffusion by DSPState.widenerDiffusion.collectAsState()
+    val delay by DSPState.widenerDelay.collectAsState()
+    val modRate by DSPState.widenerModRate.collectAsState()
+    val mix by DSPState.widenerMix.collectAsState()
     
     IVANNACard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text("DECORRELADOR ESTÉREO", style = MaterialTheme.typography.labelSmall, color = TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
@@ -253,22 +259,22 @@ private fun SpatialPanel(audioEngine: AudioEngine) {
         // Controles principales
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             IVANNAKnob(value = width, onValueChange = { 
-                width = it
+                DSPState.setWidenerWidth(it)
                 audioEngine.decorSetWidth(it * 2f)
             }, size = 64.dp, label = "WIDTH", unit = "", accentColor = AccentEmerald)
             
             IVANNAKnob(value = depth, onValueChange = { 
-                depth = it
+                DSPState.setWidenerDepth(it)
                 audioEngine.decorSetDepth(it)
             }, size = 64.dp, label = "DEPTH", unit = "", accentColor = AccentEmerald)
             
             IVANNAKnob(value = diffusion, onValueChange = { 
-                diffusion = it
+                DSPState.setWidenerDiffusion(it)
                 audioEngine.decorSetDiffusion(it)
             }, size = 64.dp, label = "DIFFUSION", unit = "", accentColor = AccentEmerald)
             
             IVANNAKnob(value = delay, onValueChange = { 
-                delay = it
+                DSPState.setWidenerDelay(it)
                 audioEngine.decorSetDelay(it * 100f)
             }, size = 64.dp, label = "DELAY", unit = "ms", accentColor = AccentEmerald)
         }
@@ -277,12 +283,12 @@ private fun SpatialPanel(audioEngine: AudioEngine) {
         
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             IVANNAKnob(value = modRate, onValueChange = { 
-                modRate = it
+                DSPState.setWidenerModRate(it)
                 audioEngine.decorSetModRate(it * 5f)
             }, size = 64.dp, label = "MOD RATE", unit = "Hz", accentColor = AccentEmerald)
             
             IVANNAKnob(value = mix, onValueChange = { 
-                mix = it
+                DSPState.setWidenerMix(it)
                 audioEngine.decorSetMix(it)
             }, size = 64.dp, label = "MIX", unit = "%", accentColor = AccentEmerald)
         }

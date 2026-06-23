@@ -151,7 +151,8 @@ class AudioEngine {
     fun eqSetQ(band: Int, q: Float) { try { nativeSetEQQ(band, q) } catch (e: Exception) {} }
     fun eqSetEnabled(e: Boolean) { for(i in 0..7) try { nativeSetEQBypass(i, !e) } catch (ex: Exception) {} }
 
-    fun compSetBypass(b: Boolean) { try { nativeSetCompressorBypass(b) } catch (e: Exception) {} }    fun compSetThreshold(t: Float) { try { nativeSetCompressorThreshold(t) } catch (e: Exception) {} }
+    fun compSetBypass(b: Boolean) { try { nativeSetCompressorBypass(b) } catch (e: Exception) {} }
+    fun compSetThreshold(t: Float) { try { nativeSetCompressorThreshold(t) } catch (e: Exception) {} }
     fun compSetRatio(r: Float) { try { nativeSetCompressorRatio(r) } catch (e: Exception) {} }
     fun compSetAttack(a: Float) { try { nativeSetCompressorAttack(a) } catch (e: Exception) {} }
     fun compSetRelease(r: Float) { try { nativeSetCompressorRelease(r) } catch (e: Exception) {} }
