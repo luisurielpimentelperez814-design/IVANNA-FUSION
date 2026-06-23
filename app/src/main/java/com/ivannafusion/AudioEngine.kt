@@ -10,9 +10,8 @@ class AudioEngine {
     companion object {
         init {
             try {
-                System.loadLibrary("ivanna_fusion")
-                System.loadLibrary("ivanna_fft_effect")
-                Log.i("IVANNA_DSP", "✅ Librerías cargadas (motor DSP listo)")
+                System.loadLibrary("ivanna_jni")
+                Log.i("IVANNA_DSP", "✅ Motor DSP JNI cargado")
             } catch (e: UnsatisfiedLinkError) {
                 Log.e("IVANNA_DSP", "❌ Error: ${e.message}")
             }
@@ -21,97 +20,109 @@ class AudioEngine {
 
     private var initialized = false
 
+    external fun nativeInit(sampleRate: Int, channels: Int): Boolean
+    external fun nativeProcessAudio(inputBuffer: FloatArray, outputBuffer: FloatArray, numFrames: Int)
+    external fun nativeSetEQGain(band: Int, gainDB: Float)
+    external fun nativeSetEQFreq(band: Int, freqHz: Float)
+    external fun nativeSetEQQ(band: Int, q: Float)
+    external fun nativeSetEQBypass(band: Int, bypass: Boolean)
+    external fun nativeSetCompressorThreshold(thresholdDB: Float)
+    external fun nativeSetCompressorRatio(ratio: Float)
+    external fun nativeSetCompressorAttack(attackMs: Float)
+    external fun nativeSetCompressorRelease(releaseMs: Float)
+    external fun nativeSetCompressorKnee(kneeDB: Float)
+    external fun nativeSetCompressorMakeup(makeupDB: Float)
+    external fun nativeSetCompressorBypass(bypass: Boolean)
+    external fun nativeSetExciterDrive(drive: Float)
+    external fun nativeSetExciterMix(mix: Float)
+    external fun nativeSetExciterBypass(bypass: Boolean)
+    external fun nativeSetFFTEffect(enabled: Boolean)
+    external fun nativeReset()
+
     fun initialize(context: Context, callback: (Boolean) -> Unit) {
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 val sampleRate = getDeviceSampleRate(context)
-                Log.i("AudioEngine", "Inicializado: $sampleRate Hz")
-                initialized = true
-                callback(true)
+                val success = nativeInit(sampleRate, 2)
+                initialized = success                callback(success)
             } catch (e: Exception) {
-                Log.e("AudioEngine", "Error: ${e.message}")
                 callback(false)
             }
         }
     }
 
-    fun release() { initialized = false }
+    fun release() { initialized = false; nativeReset() }
 
     fun processAudio(inputBuffer: FloatArray, sampleRate: Int): FloatArray {
-        return inputBuffer // Passthrough hasta crear wrapper JNI
+        if (!initialized) return inputBuffer
+        val outputBuffer = FloatArray(inputBuffer.size)
+        nativeProcessAudio(inputBuffer, outputBuffer, inputBuffer.size / 2)
+        return outputBuffer
     }
 
     // EQ
-    fun eqSetBypass(bypass: Boolean) { Log.d("EQ", "Bypass: $bypass") }
-    fun eqSetGain(band: Int, gain: Float) { Log.d("EQ", "Band $band: ${gain}dB") }
-    fun eqSetFreq(band: Int, freq: Float) { Log.d("EQ", "Band $band: ${freq}Hz") }    fun eqSetQ(band: Int, q: Float) { Log.d("EQ", "Band $band: Q=$q") }
-    fun eqSetEnabled(enabled: Boolean) { Log.d("EQ", "Enabled: $enabled") }
+    fun eqSetBypass(bypass: Boolean) { for(i in 0..7) nativeSetEQBypass(i, bypass) }
+    fun eqSetGain(band: Int, gain: Float) { nativeSetEQGain(band, gain) }
+    fun eqSetFreq(band: Int, freq: Float) { nativeSetEQFreq(band, freq) }
+    fun eqSetQ(band: Int, q: Float) { nativeSetEQQ(band, q) }
+    fun eqSetEnabled(enabled: Boolean) { for(i in 0..7) nativeSetEQBypass(i, !enabled) }
 
     // Compressor
-    fun compSetBypass(bypass: Boolean) { Log.d("COMP", "Bypass: $bypass") }
-    fun compSetThreshold(threshold: Float) { Log.d("COMP", "Threshold: ${threshold}dB") }
-    fun compSetRatio(ratio: Float) { Log.d("COMP", "Ratio: ${ratio}:1") }
-    fun compSetAttack(attack: Float) { Log.d("COMP", "Attack: ${attack}ms") }
-    fun compSetRelease(release: Float) { Log.d("COMP", "Release: ${release}ms") }
-    fun compSetKnee(knee: Float) { Log.d("COMP", "Knee: ${knee}dB") }
-    fun compSetMakeup(makeup: Float) { Log.d("COMP", "Makeup: ${makeup}dB") }
-    fun compSetEnabled(enabled: Boolean) { Log.d("COMP", "Enabled: $enabled") }
+    fun compSetBypass(bypass: Boolean) { nativeSetCompressorBypass(bypass) }
+    fun compSetThreshold(threshold: Float) { nativeSetCompressorThreshold(threshold) }
+    fun compSetRatio(ratio: Float) { nativeSetCompressorRatio(ratio) }
+    fun compSetAttack(attack: Float) { nativeSetCompressorAttack(attack) }
+    fun compSetRelease(release: Float) { nativeSetCompressorRelease(release) }
+    fun compSetKnee(knee: Float) { nativeSetCompressorKnee(knee) }
+    fun compSetMakeup(makeup: Float) { nativeSetCompressorMakeup(makeup) }
+    fun compSetEnabled(enabled: Boolean) { nativeSetCompressorBypass(!enabled) }
 
-    // Convolver
-    fun convSetType(type: String) { }
-    fun convPresetSmallRoom() { }
-    fun convPresetLargeHall() { }
-    fun convPresetPlate() { }
-    fun convPresetSpring() { }
-    fun convSetDecay(decay: Float) { }
-    fun convSetPreDelay(preDelay: Float) { }
-    fun convSetDamping(damping: Float) { }
-    fun convSetDiffusion(diffusion: Float) { }
-    fun convSetEarlyMix(earlyMix: Float) { }
-    fun convSetMix(mix: Float) { }
-
-    // Decorrelator
-    fun decorPresetNatural() { }
-    fun decorPresetWide() { }
-    fun decorPresetMonoToStereo() { }
-    fun decorSetWidth(width: Float) { }
-    fun decorSetDepth(depth: Float) { }
-    fun decorSetDiffusion(diffusion: Float) { }
-    fun decorSetDelay(delay: Float) { }
-    fun decorSetModRate(modRate: Float) { }
-    fun decorSetMix(mix: Float) { }
-
-    // AI
+    // Placeholders para UI
+    fun convSetType(type: String) {}
+    fun convPresetSmallRoom() {}
+    fun convPresetLargeHall() {}
+    fun convPresetPlate() {}
+    fun convPresetSpring() {}
+    fun convSetDecay(decay: Float) {}
+    fun convSetPreDelay(preDelay: Float) {}
+    fun convSetDamping(damping: Float) {}
+    fun convSetDiffusion(diffusion: Float) {}
+    fun convSetEarlyMix(earlyMix: Float) {}
+    fun convSetMix(mix: Float) {}
+    fun decorPresetNatural() {}
+    fun decorPresetWide() {}
+    fun decorPresetMonoToStereo() {}
+    fun decorSetWidth(width: Float) {}
+    fun decorSetDepth(depth: Float) {}    fun decorSetDiffusion(diffusion: Float) {}
+    fun decorSetDelay(delay: Float) {}
+    fun decorSetModRate(modRate: Float) {}
+    fun decorSetMix(mix: Float) {}
     fun isAiClassifierLoaded(): Boolean = false
     fun aiGetDetectedGenre(): String = "Unknown"
     fun aiGetConfidence(): Float = 0.0f
     fun aiGetTempo(): Float = 120.0f
-    fun aiSetEnabled(enabled: Boolean) { }
-    fun aiSetAutoAdapt(autoAdapt: Boolean) { }
-    fun aiSetSensitivity(sensitivity: Float) { }
+    fun aiSetEnabled(enabled: Boolean) {}
+    fun aiSetAutoAdapt(autoAdapt: Boolean) {}
+    fun aiSetSensitivity(sensitivity: Float) {}
     fun aiGetCurrentCurveName(): String = "Default"
     fun aiGetCurrentCurveDescription(): String = "Default curve"
-    fun aiApplyCurrentCurve() { }
-
-    // Dashboard    fun getMomentaryLoudness(): Float = -20.0f
+    fun aiApplyCurrentCurve() {}
+    fun getMomentaryLoudness(): Float = -20.0f
     fun getCorrelation(): Float = 0.8f
     fun getLatencyMicros(): Long = 5000L
     fun getGeneration(): Int = 1
     fun getBestFitness(): Float = 0.95f
-
-    // PF Engine
-    fun pfEvoTick(barCount: Int) { }
-    fun applyPFPreset(preset: Any) { }
-    fun pfSetAmp(amp: Int) { }
-    fun pfSetParam(param: String, value: Float) { }
-    fun pfEvoReset() { }
-
-    fun recordUserAdjustment() { }
+    fun pfEvoTick(barCount: Int) {}
+    fun applyPFPreset(preset: Any) {}
+    fun pfSetAmp(amp: Int) {}
+    fun pfSetParam(param: String, value: Float) {}
+    fun pfEvoReset() {}
+    fun recordUserAdjustment() {}
     fun getAIModelVersion(): Int = 1
     fun getAITotalExperiences(): Int = 0
     fun getAIInferenceCount(): Long = 0L
     fun aiGetDeviceTemperature(): Float = 35.0f
-    fun setPreset(presetName: String) { }
+    fun setPreset(presetName: String) {}
 
     private fun getDeviceSampleRate(context: Context): Int {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
