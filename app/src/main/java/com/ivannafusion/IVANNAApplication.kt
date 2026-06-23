@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 class IVANNAApplication : Application() {
     companion object {
@@ -14,32 +15,47 @@ class IVANNAApplication : Application() {
         lateinit var parameterStore: ParameterStore
             private set
         
-        // Hilo de trabajo en segundo plano para no bloquear la UI
         val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        var isInitialized = false
+            private set
     }
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "IVANNA DSP Application iniciada")
+        Log.d(TAG, "=== IVANNA DSP Application iniciada ===")
         
         parameterStore = ParameterStore(this)
+        Log.d(TAG, "✅ ParameterStore creado")
         
-        // FIX ANR: Todo lo que toca Root, Nativo o Hardware se manda a segundo plano
         appScope.launch {
             try {
-                Log.d(TAG, "Iniciando motores en segundo plano...")
+                Log.d(TAG, "🔄 Iniciando DSPState.initialize...")
                 DSPState.initialize(parameterStore)
+                Log.d(TAG, "✅ DSPState.initialize completado")
+                
+                Log.d(TAG, "🔄 Iniciando detectRealHardwareCapabilities...")
                 DSPState.detectRealHardwareCapabilities(this@IVANNAApplication)
+                Log.d(TAG, "✅ detectRealHardwareCapabilities completado")
+                
+                Log.d(TAG, "🔄 Iniciando com.ivannafusion.dsp.DSPState...")
                 com.ivannafusion.dsp.DSPState.initialize(this@IVANNAApplication)
+                Log.d(TAG, "✅ com.ivannafusion.dsp.DSPState completado")
                 
+                Log.d(TAG, "🔄 Iniciando ShmManager (puede tardar)...")
                 ShmManager.initialize(this@IVANNAApplication)
-                ThermalMonitor.initialize(this@IVANNAApplication)
+                Log.d(TAG, "✅ ShmManager completado")
                 
-                Log.i(TAG, "✅ ShmManager + ThermalMonitor + DSPState iniciados en segundo plano")
+                Log.d(TAG, "🔄 Iniciando ThermalMonitor...")
+                ThermalMonitor.initialize(this@IVANNAApplication)
+                Log.d(TAG, "✅ ThermalMonitor completado")
+                
+                isInitialized = true
+                Log.i(TAG, "✅✅✅ TODOS LOS MOTORES INICIADOS CORRECTAMENTE ✅✅✅")
+                
             } catch (e: UnsatisfiedLinkError) {
-                Log.e(TAG, "Error de librería nativa (C++)", e)
+                Log.e(TAG, "❌ Error de librería nativa (C++): ${e.message}", e)
             } catch (e: Exception) {
-                Log.e(TAG, "Error general en inicialización", e)
+                Log.e(TAG, "❌ Error general: ${e.message}", e)
             }
         }
     }
