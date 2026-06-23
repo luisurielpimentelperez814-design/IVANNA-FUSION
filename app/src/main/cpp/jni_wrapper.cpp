@@ -140,13 +140,12 @@ extern "C" JNIEXPORT jfloatArray JNICALL Java_com_ivannafusion_AudioEngine_nativ
     jfloatArray result = env->NewFloatArray(32);
     if (result != nullptr) {
         // Generar espectro simulado basado en el nivel actual
-        float normalizedLevel = (currentRmsDb + 60.0f) / 60.0f; // Normalizar -60 a 0 dB en rango 0 a 1
+        float normalizedLevel = (currentRmsDb + 60.0f) / 60.0f;
         if (normalizedLevel < 0) normalizedLevel = 0;
         if (normalizedLevel > 1) normalizedLevel = 1;
         
         for (int i = 0; i < 32; i++) {
-            // Crear un espectro con más energía en frecuencias medias            float freqFactor = 1.0f - fabsf((i - 16.0f) / 16.0f);
-            spectrum[i] = normalizedLevel * freqFactor * 0.8f;
+            float freqFactor = 1.0f - fabsf((static_cast<float>(i) - 16.0f) / 16.0f);            spectrum[i] = normalizedLevel * freqFactor * 0.8f;
         }
         env->SetFloatArrayRegion(result, 0, 32, spectrum);
     }
@@ -194,8 +193,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQQ
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQBypass(JNIEnv*, jobject, jint, jboolean) {}
 
 // ═══════════════════════════════════════════════════════════════
-// FUNCIONES COMPRESOR// ═══════════════════════════════════════════════════════════════
-
+// FUNCIONES COMPRESOR
+// ═══════════════════════════════════════════════════════════════
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetCompressorThreshold(JNIEnv*, jobject, jfloat f) { compThresh=f; LOGI("Comp Threshold: %.1f dB", f); }
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetCompressorRatio(JNIEnv*, jobject, jfloat f) { compRatio=f; }
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetCompressorAttack(JNIEnv*, jobject, jfloat f) { compAttack=f; }
