@@ -41,7 +41,7 @@
  * efecto — eso ahora pasa exclusivamente por la vtable de abajo.
  */
 
-#include <hardware/audio_effect.h>
+#include "audio_effect_compat.h"
 #include <cstdlib>
 #include <cstring>
 #include <cerrno>

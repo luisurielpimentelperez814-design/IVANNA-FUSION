@@ -2,39 +2,54 @@ package com.ivannafusion.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Tema oscuro profesional inspirado en FabFilter/Waves
-val BackgroundPrimary = Color(0xFF0A0E1A)
-val BackgroundSecondary = Color(0xFF131824)
-val BackgroundTertiary = Color(0xFF1C2333)
+/*
+ * IVANNA FUSION — Sistema de color v2
+ * Dirección: Instrumentación de precisión (rack de estudio, no "dark app neón")
+ *
+ * Paleta: 4 valores semánticos + fondos escalonados.
+ * Negro cálido carbón, papel envejecido, latón apagado, verde musgo.
+ */
 
-val AccentCyan = Color(0xFF00D9FF)
-val AccentViolet = Color(0xFF8B5CF6)
-val AccentEmerald = Color(0xFF10B981)
-val AccentAmber = Color(0xFFF59E0B)
-val AccentRose = Color(0xFFF43F5E)
+// ── Fondos (carbón cálido, no azul-negro) ─────────────────────────────────────
+val BackgroundPrimary   = Color(0xFF171410)   // carbón oscuro cálido
+val BackgroundSecondary = Color(0xFF1F1C14)   // superficie levantada
+val BackgroundTertiary  = Color(0xFF272318)   // panel de control
 
-val TextPrimary = Color(0xFFF1F5F9)
-val TextSecondary = Color(0xFF94A3B8)
-val TextTertiary = Color(0xFF64748B)
+// ── Texto (papel envejecido, no blanco LED) ───────────────────────────────────
+val TextPrimary   = Color(0xFFE5DFC8)         // "papel" de instrumento
+val TextSecondary = Color(0xFF9A9378)         // lectura desgastada
+val TextTertiary  = Color(0xFF68624F)         // serigrafía apagada
 
-val KnobBackground = Color(0xFF1E293B)
-val KnobForeground = Color(0xFF00D9FF)
-val KnobTrack = Color(0xFF334155)
+// ── Acento único — latón apagado (usado con moderación) ──────────────────────
+val AccentCyan   = Color(0xFFC9A85C)          // latón / gold muted  ← acento principal
+val TextAccent   = Color(0xFFC9A85C)
 
-// Colores adicionales para UI Premium
-val BorderSubtle = Color(0xFF2D3748)
-val TextAccent = Color(0xFF00D9FF)
-val SignalHot = Color(0xFFFF3B30)
-val SignalWarm = Color(0xFFFF9500)
-val SignalCool = Color(0xFF34C759)
-val SignalMute = Color(0xFF8E8E93)
-val AccentMagenta = Color(0xFFFF00FF)
+// ── Señal (verde musgo = saludable, cobre = clip) ─────────────────────────────
+val AccentEmerald   = Color(0xFF6E8467)       // verde musgo — señal OK
+val SignalCool      = Color(0xFF6E8467)
+val AccentMagenta   = Color(0xFFB85540)       // cobre-rojo — peligro/clip
+val SignalHot       = Color(0xFFB85540)
+val AccentRose      = Color(0xFFB85540)
 
-// Gradientes y materiales
-val MasterGradient = Color(0xFF1A1A2E)
-val Carbon = Color(0xFF0F0F14)
-val PrecisionCyan = Color(0xFF00FFFF)
-val Graphite = Color(0xFF2C2C34)
-val Titanium = Color(0xFF4A4A56)
-val Platinum = Color(0xFFE5E5EA)
-val Silver = Color(0xFFC7C7CC)
+// ── Tonos de soporte (variantes del latón / neutros) ─────────────────────────
+val AccentViolet = Color(0xFF9A9378)          // igual que TextSecondary (datos secundarios)
+val AccentAmber  = Color(0xFFC9A85C)          // igual que acento principal
+val SignalWarm   = Color(0xFFB07840)          // ámbar desgastado (advertencia)
+val SignalMute   = Color(0xFF68624F)          // apagado
+
+// ── Knob / control físico ─────────────────────────────────────────────────────
+val KnobBackground  = Color(0xFF1A1710)       // cuerpo del knob
+val KnobForeground  = Color(0xFFC9A85C)       // indicador de latón
+val KnobTrack       = Color(0xFF3A3626)       // pista gastada
+
+// ── Bordes (ranura de rack) ───────────────────────────────────────────────────
+val BorderSubtle    = Color(0xFF3A3626)       // borde de ranura metálica
+
+// ── Extras ────────────────────────────────────────────────────────────────────
+val MasterGradient  = Color(0xFF171410)
+val Carbon          = Color(0xFF0F0E0A)
+val PrecisionCyan   = Color(0xFFC9A85C)       // redirigido a latón
+val Graphite        = Color(0xFF272318)
+val Titanium        = Color(0xFF4A4538)
+val Platinum        = Color(0xFFE5DFC8)
+val Silver          = Color(0xFF9A9378)

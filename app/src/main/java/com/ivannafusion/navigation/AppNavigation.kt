@@ -15,7 +15,8 @@ import com.ivannafusion.PresetManager
 import com.ivannafusion.ui.components.IVANNANavItem
 import com.ivannafusion.ui.screens.*
 import com.ivannafusion.ui.screens.PFEngineScreen
-import com.ivannafusion.ui.theme.BackgroundSecondary
+import com.ivannafusion.ui.theme.*
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun AppNavigation(audioEngine: AudioEngine, presetManager: PresetManager) {
@@ -23,9 +24,9 @@ fun AppNavigation(audioEngine: AudioEngine, presetManager: PresetManager) {
     var currentRoute by remember { mutableStateOf("dashboard") }
     
     Scaffold(
-        containerColor = BackgroundSecondary,
+        containerColor = BackgroundPrimary,
         bottomBar = {
-            Surface(color = BackgroundSecondary, tonalElevation = 8.dp, shadowElevation = 8.dp) {
+            Surface(color = Color(0xFF1F1C14), tonalElevation = 8.dp, shadowElevation = 8.dp) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly

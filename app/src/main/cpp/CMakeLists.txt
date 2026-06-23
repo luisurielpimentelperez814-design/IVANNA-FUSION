@@ -14,7 +14,7 @@ target_link_libraries(ivanna_jni log android)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Target omega_effect (Audio Effect HAL para módulo Magisk)
-# Usa el header estándar del NDK: <hardware/audio_effect.h>
+# Usa header local audio_effect_compat.h (NDK r25+ removió hardware/audio_effect.h)
 # ─────────────────────────────────────────────────────────────────────────────
 add_library(omega_effect SHARED omega_effect.cpp)
 
