@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivannafusion.AMP_NAMES
+import com.ivannafusion.DSPState
 import com.ivannafusion.AudioEngine
 import com.ivannafusion.PF_PRESETS
 import com.ivannafusion.PFPreset
@@ -30,16 +31,16 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun PFEngineScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
-    var ampModel   by remember { mutableIntStateOf(4) }
-    var drive      by remember { mutableFloatStateOf(1.0f) }
-    var wet        by remember { mutableFloatStateOf(0.6f) }
-    var alpha      by remember { mutableFloatStateOf(1.0f) }
-    var delta      by remember { mutableFloatStateOf(0.4f) }
-    var sigma      by remember { mutableFloatStateOf(0.5f) }
-    var lowGain    by remember { mutableFloatStateOf(0.0f) }
-    var midGain    by remember { mutableFloatStateOf(0.0f) }
-    var highGain   by remember { mutableFloatStateOf(0.0f) }
-    var presence   by remember { mutableFloatStateOf(0.0f) }
+    var ampModel   by remember { mutableIntStateOf(DSPState.pfAmpModel) }
+    var drive      by remember { mutableFloatStateOf(DSPState.pfDrive) }
+    var wet        by remember { mutableFloatStateOf(DSPState.pfWet) }
+    var alpha      by remember { mutableFloatStateOf(DSPState.pfAlpha) }
+    var delta      by remember { mutableFloatStateOf(DSPState.pfDelta) }
+    var sigma      by remember { mutableFloatStateOf(DSPState.pfSigma) }
+    var lowGain    by remember { mutableFloatStateOf(DSPState.pfLowGain) }
+    var midGain    by remember { mutableFloatStateOf(DSPState.pfMidGain) }
+    var highGain   by remember { mutableFloatStateOf(DSPState.pfHighGain) }
+    var presence   by remember { mutableFloatStateOf(DSPState.pfPresence) }
     var evoActive  by remember { mutableStateOf(false) }
     var barCount   by remember { mutableIntStateOf(0) }
     var activePreset by remember { mutableStateOf<PFPreset?>(null) }
@@ -144,7 +145,7 @@ fun PFEngineScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
                         fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
                     PFRow("Drive %.2f".format(drive), drive, 0f..4f, AccentMagenta) {
-                        drive = it; audioEngine.pfSetParam("drive", it) }
+                        drive = it; DSPState.pfDrive = it; audioEngine.pfSetParam("drive", it) }
                     PFRow("Wet %.0f%%".format(wet * 100), wet, 0f..1f, AccentCyan) {
                         wet = it; audioEngine.pfSetParam("wet", it) }
                     PFRow("α Tilt %.2f".format(alpha), alpha, 0.5f..2f, AccentViolet) {
