@@ -68,7 +68,7 @@ private fun EQPanel(audioEngine: AudioEngine) {
                 Text("BYPASS", style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary, modifier = Modifier.padding(end = 6.dp))
                 IVANNAToggle(checked = bypassed, onCheckedChange = {
-                    bypassed = it; DSPState.eqBypassed = it; audioEngine.eqSetBypass(it)
+                    bypassed = it; DSPState.eqBypassed = it; audioEngine.eqSetBypass(0, it)
                 })
             }
         }

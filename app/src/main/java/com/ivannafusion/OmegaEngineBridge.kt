@@ -85,7 +85,8 @@ class OmegaEngineBridge {
                 Log.w(TAG, "Daemon no conectado.")
                 return
             }
-            val payload = "{"action":"$action","value":"$value"}\n"
+            val payload = """{"action":"$action","value":"$value"}
+"""
             writer?.print(payload)
             writer?.flush()
         } catch (e: Exception) {

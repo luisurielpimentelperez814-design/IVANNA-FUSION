@@ -66,6 +66,9 @@ object DSPState {
     var pfHighGain  by mutableFloatStateOf(0.0f)
     var pfPresence  by mutableFloatStateOf(0.0f)
     var pfSag       by mutableFloatStateOf(0.1f)
+    var pfFreq      by mutableFloatStateOf(1000.0f)
+    var pfResonance by mutableFloatStateOf(1.0f)
+    var pfMix       by mutableFloatStateOf(0.5f)
 
     // ── Global ───────────────────────────────────────────────────────────────
     var masterVolume  by mutableFloatStateOf(1.0f)

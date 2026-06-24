@@ -54,7 +54,7 @@ fun PFEngineScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
 
     LaunchedEffect(evoActive) {
         if (evoActive) while (evoActive) {
-            audioEngine.pfEvoTick(barCount++)
+            audioEngine.pfEvoTick()
             delay(500)
         }
     }
@@ -89,7 +89,7 @@ fun PFEngineScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
                     Button(
                         onClick = {
                             activePreset = preset
-                            audioEngine.applyPFPreset(preset)
+                            audioEngine.applyPFPreset(preset.name)
                             ampModel = preset.ampModel
                             drive = preset.drive; wet = preset.wet
                             alpha = preset.alpha; delta = preset.delta; sigma = preset.sigma
