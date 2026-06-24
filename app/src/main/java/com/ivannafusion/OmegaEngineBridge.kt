@@ -1,5 +1,7 @@
 package com.ivannafusion
 
+import android.net.LocalSocket
+import android.net.LocalSocketAddress
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -7,20 +9,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
-import java.net.Socket
 
 /**
  * OmegaEngineBridge: Controla el daemon root de Magisk (omega_daemon) 
- * mediante sockets para el motor Omega_in.
+ * mediante Unix Domain Socket (abstract namespace) para el motor Omega_in.
+ * 
+ * CORRECCIÓN: Cambiado de TCP (127.0.0.1:8500) a Unix socket abstracto
+ * para ser compatible con omega_daemon.cpp
  */
 class OmegaEngineBridge {
 
     companion object {
         private const val TAG = "OmegaEngineBridge"
-        private const val DAEMON_PORT = 8500 
+        private const val SOCKET_NAME = "omega_daemon_socket"
     }
 
-    // --- VARIABLES DE ESTADO DECLARADAS A NIVEL DE CLASE (CORRECCIÓN DE ERRORES) ---
+    // --- VARIABLES DE ESTADO ---
     
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
@@ -31,7 +35,10 @@ class OmegaEngineBridge {
     private val _deviceTemp = MutableStateFlow(35.0f)
     val deviceTemp: StateFlow<Float> = _deviceTemp.asStateFlow()
 
-    private var socket: Socket? = null
+    private val _isConnected = MutableStateFlow(false)
+    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+
+    private var socket: LocalSocket? = null
     private var writer: PrintWriter? = null
     private var reader: BufferedReader? = null
     private var telemetryThread: Thread? = null
@@ -41,13 +48,16 @@ class OmegaEngineBridge {
 
     fun connectToDaemon() {
         try {
-            socket = Socket("127.0.0.1", DAEMON_PORT)
-            writer = PrintWriter(socket!!.getOutputStream(), true)
-            reader = BufferedReader(InputStreamReader(socket!!.getInputStream()))
-            Log.d(TAG, "Conectado al daemon Omega")
+            socket = LocalSocket()
+            socket?.connect(LocalSocketAddress(SOCKET_NAME, LocalSocketAddress.Namespace.ABSTRACT))
+            writer = PrintWriter(socket!!.outputStream, true)
+            reader = BufferedReader(InputStreamReader(socket!!.inputStream))
+            _isConnected.value = true
+            Log.d(TAG, "✅ Conectado al daemon Omega vía Unix socket abstracto")
             startTelemetryListener()
         } catch (e: Exception) {
-            Log.e(TAG, "Error conectando al daemon: ${e.message}")
+            _isConnected.value = false
+            Log.e(TAG, "❌ Error conectando al daemon: ${e.message}")
         }
     }
 
@@ -71,11 +81,11 @@ class OmegaEngineBridge {
 
     private fun sendCommandToDaemon(action: String, value: String) {
         try {
-            if (writer == null) {
+            if (writer == null || !_isConnected.value) {
                 Log.w(TAG, "Daemon no conectado.")
                 return
             }
-            val payload = "{\"action\":\"$action\",\"value\":\"$value\"}\n"
+            val payload = "{"action":"$action","value":"$value"}\n"
             writer?.print(payload)
             writer?.flush()
         } catch (e: Exception) {
@@ -113,6 +123,7 @@ class OmegaEngineBridge {
 
     fun disconnect() {
         isListening = false
+        _isConnected.value = false
         try {
             reader?.close()
             writer?.close()
