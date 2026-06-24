@@ -99,6 +99,17 @@ void Compressor::process(const float* inL, const float* inR,
         // ── Detección de nivel RMS (ventana deslizante) ───────────────────
         float xL = inL[i], xR = inR[i];
 
+        // Protección NaN/Inf: si la entrada llegara corrupta (por ejemplo
+        // desde una etapa anterior del pipeline), sanitizar ANTES de que
+        // entre a la ventana deslizante circular (rms_buf_). Sin esto, un
+        // solo sample NaN contaminaría r_sum y por tanto env_rms_ durante
+        // los próximos RMS_WINDOW samples (el valor envenenado permanece
+        // en el buffer circular hasta que se sobrescribe), no solo el
+        // sample actual — más persistente que un NaN suelto en una
+        // variable simple.
+        if (std::isnan(xL) || std::isinf(xL)) xL = 0.f;
+        if (std::isnan(xR) || std::isinf(xR)) xR = 0.f;
+
         // Valor cuadrático del par estéreo (RMS linked)
         float xSq = 0.5f * (xL*xL + xR*xR);
 
