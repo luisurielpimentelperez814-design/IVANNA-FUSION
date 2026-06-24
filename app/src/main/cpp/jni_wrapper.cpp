@@ -247,3 +247,34 @@ extern "C" JNIEXPORT jfloat JNICALL Java_com_ivannafusion_AudioEngine_nativeGetI
 extern "C" JNIEXPORT jfloat JNICALL Java_com_ivannafusion_AudioEngine_nativeGetOutputLevel(JNIEnv*, jobject) {
     return lastOutputLevel;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// OMEGA DAEMON - Funciones JNI para controlar el daemon root
+// ═══════════════════════════════════════════════════════════════
+
+// Declaraciones forward de funciones del daemon
+extern bool omega_daemon_start();
+extern void omega_daemon_stop();
+extern bool omega_daemon_is_running();
+
+extern "C" JNIEXPORT jboolean JNICALL Java_com_ivannafusion_OmegaDaemon_nativeStart(JNIEnv* env, jobject thiz) {
+    LOGI("OmegaDaemon::nativeStart() llamado desde Kotlin");
+    bool result = omega_daemon_start();
+    if (result) {
+        LOGI("✅ OmegaDaemon iniciado correctamente");
+    } else {
+        LOGE("❌ OmegaDaemon no pudo iniciarse (puede requerir root)");
+    }
+    return static_cast<jboolean>(result);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_OmegaDaemon_nativeStop(JNIEnv* env, jobject thiz) {
+    LOGI("OmegaDaemon::nativeStop() llamado desde Kotlin");
+    omega_daemon_stop();
+    LOGI("OmegaDaemon detenido");
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_com_ivannafusion_OmegaDaemon_nativeIsRunning(JNIEnv* env, jobject thiz) {
+    bool running = omega_daemon_is_running();
+    return static_cast<jboolean>(running);
+}
