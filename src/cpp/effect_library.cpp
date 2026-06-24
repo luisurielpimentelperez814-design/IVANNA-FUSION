@@ -75,7 +75,7 @@ static const effect_descriptor_t kEffectDescriptor = {
     // EFFECT_CMD_SET_VOLUME sigue funcionando sin este flag — solo deja de
     // anunciarse como capacidad explícita ante audioserver.
     .cpuLoad       = 120,       // estimado: 1.2% CPU en Snapdragon 4 Gen 2
-    .memoryUsage   = 400,       // ~400 KB
+    .memoryUsage   = 410,       // ~400 KB + StereoWidener (algunos floats/atomics, <1KB real)
     .name          = "IVANNA FUSION DSP",
     .implementor   = "GORE TNS",
 };

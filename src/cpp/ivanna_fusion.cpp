@@ -20,6 +20,7 @@ bool IvannaFusionEngine::init(float samplerate, int channel_count) noexcept {
     peq_.setSamplerate(samplerate);
     comp_.setSamplerate(samplerate);
     exciter_.setSamplerate(samplerate);
+    widener_.setSamplerate(samplerate);
 
     return true;
 }
@@ -28,6 +29,7 @@ void IvannaFusionEngine::reset() noexcept {
     peq_.resetState();
     comp_.resetState();
     exciter_.resetState();
+    widener_.resetState();
     std::memset(buf_l_, 0, sizeof(buf_l_));
     std::memset(buf_r_, 0, sizeof(buf_r_));
 }
@@ -54,7 +56,16 @@ void IvannaFusionEngine::process(const float* inL, const float* inR,
     comp_.process(buf_l_, buf_r_, buf_l_, buf_r_, n);
 
     // ── Etapa 3: Excitador Armónico ──────────────────────────────────────────
-    exciter_.process(buf_l_, buf_r_, outL, outR, n);
+    exciter_.process(buf_l_, buf_r_, buf_l_, buf_r_, n);
+
+    // ── Etapa 4: Expansión Estéreo (Mid-Side widening) ───────────────────────
+    // Va AL FINAL del pipeline a propósito: las etapas anteriores (EQ,
+    // compresor linked-stereo, exciter) operan de forma simétrica sobre
+    // L/R y no alteran la relación entre canales de forma impredecible,
+    // así que el widener lee la imagen estéreo ya tonal/dinámicamente
+    // procesada, sin que un cambio posterior de EQ/dinámica vuelva a
+    // desbalancear lo que el widener ya ajustó.
+    widener_.process(buf_l_, buf_r_, outL, outR, n);
 }
 
 // ─── Control de parámetros ───────────────────────────────────────────────────
@@ -102,6 +113,10 @@ bool IvannaFusionEngine::setParam(int32_t id, float value) noexcept {
     if (id == PARAM_GLOBAL_BYPASS) { setGlobalBypass(value != 0.f); return true; }
     // Preset
     if (id == PARAM_PRESET_LOAD)   { loadPreset((int)value); return true; }
+    // Stereo Widener
+    if (id == PARAM_WIDENER_WIDTH)       { widener_.setWidth(value);             return true; }
+    if (id == PARAM_WIDENER_BASSPROTECT) { widener_.setBassProtect(value != 0.f); return true; }
+    if (id == PARAM_WIDENER_BYPASS)      { widener_.setBypass(value != 0.f);     return true; }
 
     return false;
 }

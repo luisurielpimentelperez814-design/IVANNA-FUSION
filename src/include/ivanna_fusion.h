@@ -8,6 +8,7 @@
 #include "parametric_eq.h"
 #include "compressor.h"
 #include "harmonic_exciter.h"
+#include "stereo_widener.h"
 #include <cstdint>
 #include <atomic>
 
@@ -49,6 +50,12 @@ enum EffectParamId : int32_t {
     PARAM_GLOBAL_BYPASS   = 0x70,  // bypass total (int32: 0/1)
     PARAM_GET_GAIN_DB     = 0x71,  // read-only: ganancia compresor actual
     PARAM_PRESET_LOAD     = 0x72,  // cargar preset: 0=flat, 1=rock_clasico
+
+    // Stereo Widener (Mid-Side widening — ver stereo_widener.h para la
+    // matemática correcta: side = (L-R)*0.5, NO x[n]-x[n-1])
+    PARAM_WIDENER_WIDTH       = 0x80,  // width 0.0..2.0 (float)
+    PARAM_WIDENER_BASSPROTECT = 0x81,  // bass protect (int32: 0/1)
+    PARAM_WIDENER_BYPASS      = 0x82,  // bypass (int32: 0/1)
 };
 
 // ─── Motor principal ──────────────────────────────────────────────────────────
@@ -74,11 +81,13 @@ public:
     dsp::ParametricEQ&   peq()      noexcept { return peq_; }
     dsp::Compressor&     comp()     noexcept { return comp_; }
     dsp::HarmonicExciter& exciter() noexcept { return exciter_; }
+    dsp::StereoWidener&  widener()  noexcept { return widener_; }
 
 private:
     dsp::ParametricEQ    peq_;
     dsp::Compressor      comp_;
     dsp::HarmonicExciter exciter_;
+    dsp::StereoWidener   widener_;
 
     std::atomic<bool>    global_bypass_ { false };
     float                samplerate_   = 48000.f;

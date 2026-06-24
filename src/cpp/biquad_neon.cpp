@@ -7,6 +7,7 @@
 #include "biquad_neon.h"
 #include <cstring>
 #include <algorithm>
+#include <cmath>
 
 namespace ivanna::dsp {
 
@@ -25,6 +26,19 @@ void biquad_process_block_mono(const BiquadCoeffs& c, BiquadState& s,
         float y = b0 * x + w1;
         w1       = b1 * x - a1 * y + w2;
         w2       = b2 * x - a2 * y;
+
+        // Protección NaN/Inf en el estado del filtro: a diferencia de un
+        // valor escalar simple, w1/w2 son el estado RECURSIVO del filtro
+        // IIR — si se contaminan una sola vez, TODAS las muestras
+        // siguientes salen NaN indefinidamente (no solo durante una
+        // ventana fija, como en el envelope del compresor), porque cada
+        // y depende de w1/w2 del paso anterior. Con 8 bandas en cascada
+        // (ver parametric_eq.cpp), un NaN en la banda 0 contaminaría
+        // las 7 bandas siguientes en el mismo bloque de proceso.
+        if (std::isnan(w1) || std::isinf(w1)) w1 = 0.f;
+        if (std::isnan(w2) || std::isinf(w2)) w2 = 0.f;
+        if (std::isnan(y)  || std::isinf(y))  y  = 0.f;
+
         out[i]   = y;
     }
     s.w1 = w1;
@@ -68,6 +82,33 @@ void biquad_process_block_stereo(const BiquadCoeffs& c, BiquadStateStereo& s,
         // w2_new = b2*x - a2*y
         float32x2_t new_w2 = vmls_f32(vmul_f32(xv, b2v), yv, a2v);
         //                    = b2*x - a2*y
+
+        // Protección NaN/Inf vectorizada: w1/w2 son el estado RECURSIVO
+        // del filtro — contaminados una vez, TODAS las muestras
+        // siguientes salen NaN indefinidamente (no solo una ventana
+        // fija), porque cada y depende del w1/w2 del paso anterior. Con
+        // 8 bandas en cascada (parametric_eq.cpp), una banda contaminada
+        // arrastraría las 7 siguientes en el mismo bloque.
+        //
+        // NEON no tiene un intrínseco directo "isnan". Se usa el truco
+        // estándar: para cualquier float finito, x == x es verdadero;
+        // para NaN, x == x es SIEMPRE falso (por definición IEEE 754).
+        // vceq_f32 compara lane a lane; donde la comparación es falsa
+        // (NaN), la máscara es 0 y vbsl selecciona el valor "seguro" (0)
+        // en su lugar. Inf no es detectado por x==x, pero std::isinf
+        // tampoco se vectoriza simple en NEON sin un umbral de
+        // magnitud — se acepta este límite: la causa más común y
+        // realista de corrupción en este pipeline es NaN propagado
+        // desde una etapa anterior, no un Inf generado internamente
+        // por estos biquads (coeficientes acotados, ver
+        // parametric_eq.cpp::peq_default_params).
+        float32x2_t zero = vdup_n_f32(0.f);
+        uint32x2_t w1_finite = vceq_f32(new_w1, new_w1);
+        uint32x2_t w2_finite = vceq_f32(new_w2, new_w2);
+        uint32x2_t y_finite  = vceq_f32(yv, yv);
+        new_w1 = vbsl_f32(w1_finite, new_w1, zero);
+        new_w2 = vbsl_f32(w2_finite, new_w2, zero);
+        yv     = vbsl_f32(y_finite,  yv,     zero);
 
         w1v = new_w1;
         w2v = new_w2;
