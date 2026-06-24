@@ -437,4 +437,10 @@ Java_com_ivannafusion_OmegaDaemon_nativeGetLatency(JNIEnv*, jobject) {
     return g_shared ? g_shared->current_latency_ms.load() : 0.0f;
 }
 
+
+JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_OmegaDaemon_nativeIsRunning(JNIEnv*, jobject) {
+    return g_running.load() ? JNI_TRUE : JNI_FALSE;
+}
+
 } // extern "C"
