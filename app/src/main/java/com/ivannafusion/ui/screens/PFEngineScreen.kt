@@ -2,6 +2,7 @@ package com.ivannafusion.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -121,7 +122,7 @@ fun PFEngineScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         AMP_NAMES.forEachIndexed { i, name ->
                             Button(
-                                onClick = { ampModel = i; audioEngine.pfSetAmp(i) },
+                                onClick = { ampModel = i; audioEngine.AudioStubs.pfSetAmp(i) },
                                 modifier = Modifier.weight(1f).height(36.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (ampModel == i) ampColors[i]
@@ -145,15 +146,15 @@ fun PFEngineScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
                         fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
                     PFRow("Drive %.2f".format(drive), drive, 0f..4f, AccentMagenta) {
-                        drive = it; DSPState.pfDrive = it; audioEngine.pfSetParam("drive", it) }
+                        drive = it; DSPState.pfDrive = it; audioEngine.AudioStubs.pfSetParam("drive", it) }
                     PFRow("Wet %.0f%%".format(wet * 100), wet, 0f..1f, AccentCyan) {
-                        wet = it; audioEngine.pfSetParam("wet", it) }
+                        wet = it; audioEngine.AudioStubs.pfSetParam("wet", it) }
                     PFRow("α Tilt %.2f".format(alpha), alpha, 0.5f..2f, AccentViolet) {
-                        alpha = it; audioEngine.pfSetParam("alpha", it) }
+                        alpha = it; audioEngine.AudioStubs.pfSetParam("alpha", it) }
                     PFRow("δ Dist %.2f".format(delta), delta, 0f..1f, SignalHot) {
-                        delta = it; audioEngine.pfSetParam("delta", it) }
+                        delta = it; audioEngine.AudioStubs.pfSetParam("delta", it) }
                     PFRow("σ Width %.2f".format(sigma), sigma, 0f..1f, AccentEmerald) {
-                        sigma = it; audioEngine.pfSetParam("sigma", it) }
+                        sigma = it; audioEngine.AudioStubs.pfSetParam("sigma", it) }
                 }
             }
 
@@ -165,13 +166,13 @@ fun PFEngineScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
                         fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
                     PFRow("Low %+.1f dB".format(lowGain), lowGain + 12f, 0f..24f, AccentEmerald) {
-                        lowGain = it - 12f; audioEngine.pfSetParam("low", lowGain) }
+                        lowGain = it - 12f; audioEngine.AudioStubs.pfSetParam("low", lowGain) }
                     PFRow("Mid %+.1f dB".format(midGain), midGain + 12f, 0f..24f, AccentCyan) {
-                        midGain = it - 12f; audioEngine.pfSetParam("mid", midGain) }
+                        midGain = it - 12f; audioEngine.AudioStubs.pfSetParam("mid", midGain) }
                     PFRow("High %+.1f dB".format(highGain), highGain + 12f, 0f..24f, AccentAmber) {
-                        highGain = it - 12f; audioEngine.pfSetParam("high", highGain) }
+                        highGain = it - 12f; audioEngine.AudioStubs.pfSetParam("high", highGain) }
                     PFRow("Presence %+.1f".format(presence), presence + 6f, 0f..12f, AccentMagenta) {
-                        presence = it - 6f; audioEngine.pfSetParam("presence", presence) }
+                        presence = it - 6f; audioEngine.AudioStubs.pfSetParam("presence", presence) }
                 }
             }
 

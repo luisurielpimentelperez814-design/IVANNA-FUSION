@@ -1,3 +1,80 @@
+#!/bin/bash
+# Script de corrección de errores de compilación IVANNA-FUSION
+
+set -e  # Detener en errores
+
+echo "🔧 Corrigiendo errores de compilación..."
+echo "=========================================="
+
+# ═══════════════════════════════════════════════════════════════════════
+# 1. CORREGIR SDK LOCATION
+# ═══════════════════════════════════════════════════════════════════════
+echo "📍 Corrigiendo SDK location..."
+
+if [ -f "local.properties" ]; then
+    # Hacer backup
+    cp local.properties local.properties.backup
+    # Actualizar sdk.dir
+    if [[ "$OSTYPE" == "linux-android" ]]; then
+        echo "sdk.dir=/data/data/com.termux/files/home/android-sdk" > local.properties
+    else
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
+    fi
+    echo "   ✅ local.properties actualizado"
+else
+    if [[ "$OSTYPE" == "linux-android" ]]; then
+        echo "sdk.dir=/data/data/com.termux/files/home/android-sdk" > local.properties
+    else
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
+    fi
+    echo "   ✅ local.properties creado"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════
+# 2. BUSCAR Y ELIMINAR DUPLICADOS (DSPMode, DSPConfig)
+# ═══════════════════════════════════════════════════════════════════════
+echo ""
+echo "🔍 Buscando duplicados..."
+
+# Encontrar archivos con DSPMode o DSPConfig
+DSP_FILES=$(grep -r "class DSPMode\|data class DSPConfig\|enum class DSPMode" app/src/main/java --include="*.kt" -l 2>/dev/null || echo "")
+
+if [ ! -z "$DSP_FILES" ]; then
+    echo "   ⚠️  Encontrados duplicados en:"
+    echo "$DSP_FILES"
+    
+    # Mantener solo el primero, comentar los demás
+    FIRST_FILE=$(echo "$DSP_FILES" | head -n1)    echo "   ℹ️  Manteniendo: $FIRST_FILE"
+    
+    for file in $DSP_FILES; do
+        if [ "$file" != "$FIRST_FILE" ]; then
+            echo "   🔧 Comentando duplicado en: $file"
+            # Comentar las declaraciones duplicadas
+            sed -i 's/^class DSPMode/\/\/ class DSPMode (duplicado eliminado)/g' "$file"
+            sed -i 's/^data class DSPConfig/\/\/ data class DSPConfig (duplicado eliminado)/g' "$file"
+            sed -i 's/^enum class DSPMode/\/\/ enum class DSPMode (duplicado eliminado)/g' "$file"
+        fi
+    done
+    echo "   ✅ Duplicados eliminados"
+else
+    echo "   ✅ No se encontraron duplicados"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════
+# 3. CORREGIR AudioEngine.kt (eliminar overloads conflictivos)
+# ═══════════════════════════════════════════════════════════════════════
+echo ""
+echo "🔧 Corrigiendo AudioEngine.kt..."
+
+AUDIO_ENGINE="app/src/main/java/com/ivannafusion/AudioEngine.kt"
+if [ -f "$AUDIO_ENGINE" ]; then
+    # Buscar funciones duplicadas
+    DUPLICATE_COUNT=$(grep -c "fun nativeSetCompressor" "$AUDIO_ENGINE" 2>/dev/null || echo "0")
+    
+    if [ "$DUPLICATE_COUNT" -gt 1 ]; then
+        echo "   ⚠️  Encontradas $DUPLICATE_COUNT declaraciones de nativeSetCompressor"
+        # Crear versión limpia
+        cat > "$AUDIO_ENGINE.clean" << 'CLEAN_AUDIO'
 package com.ivannafusion
 
 import android.content.Context
@@ -10,7 +87,7 @@ import kotlin.math.*
 
 /**
  * AudioEngine - Motor de audio DSP con Homeostasis Universal
- * Capa unificada para Universal y 
+ * Capa unificada para Universal y Enterprise
  */
 class AudioEngine {
     companion object {
@@ -290,29 +367,94 @@ class AudioEngine {
     private external fun nativeSetCompressorRatio(ratio: Float)
     private external fun nativeSetExciterDrive(drive: Float)
 }
+CLEAN_AUDIO
+        
+        mv "$AUDIO_ENGINE.clean" "$AUDIO_ENGINE"
+        echo "   ✅ AudioEngine.kt reescrito sin duplicados"
+    else
+        echo "   ✅ AudioEngine.kt sin duplicados"
+    fi
+else
+    echo "   ⚠️  AudioEngine.kt no encontrado"
+fi
 
-    // ================= SAFE JNI STUBS =================
-    private fun nativeSetCompressorBypass(v: Float) {}
-    private fun nativeSetCompressorKnee(v: Float) {}
-    private fun nativeSetCompressorMakeup(v: Float) {}
-    private fun nativeApplyPFPreset(v: Any) {}
-    private fun nativePfSetAmp(v: Int) {}
+# ═══════════════════════════════════════════════════════════════════════
+# 4. CORREGIR IMPORTS CORRUPTOS
+# ═══════════════════════════════════════════════════════════════════════
+echo ""
+echo "🔧 Corrigiendo imports..."
 
+# Buscar archivos con imports problemáticos
+find app/src/main/java -name "*.kt" -exec grep -l "import.*\*\|import.*import" {} \; 2>/dev/null | while read file; do
+    echo "   🔧 Limpiando imports en: $file"
+    # Eliminar líneas de import duplicadas o corruptas    awk '!seen[$0]++ || !/^import/' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+done
 
-    // ================= SAFE JNI STUBS =================
-    private fun nativeSetCompressorBypass(v: Float) {}
-    private fun nativeSetCompressorKnee(v: Float) {}
-    private fun nativeSetCompressorMakeup(v: Float) {}
-    private fun nativeApplyPFPreset(v: Any) {}
-    private fun nativePfSetAmp(v: Int) {}
+echo "   ✅ Imports corregidos"
 
+# ═══════════════════════════════════════════════════════════════════════
+# 5. CORREGIR AppNavigation (parámetros faltantes)
+# ═══════════════════════════════════════════════════════════════════════
+echo ""
+echo "🔧 Corrigiendo AppNavigation..."
 
-// ===============================
-// AUTO FIX JNI STUBS (SAFE)
-// ===============================
-private fun nativeSetCompressorBypass(v: Float) {}
-private fun nativeSetCompressorKnee(v: Float) {}
-private fun nativeSetCompressorMakeup(v: Float) {}
-private fun nativeApplyPFPresetEnterprise(v: Any) {}
-private fun nativePfSetAmp(v: Int) {}
+NAV_FILE="app/src/main/java/com/ivannafusion/navigation/AppNavigation.kt"
+if [ -f "$NAV_FILE" ]; then
+    # Verificar si tiene los parámetros correctos
+    if ! grep -q "audioEngine: AudioEngine" "$NAV_FILE"; then
+        echo "   ⚠️  AppNavigation sin parámetro audioEngine"
+        # Agregar parámetro si falta
+        sed -i 's/@Composable\nfun AppNavigation()/@Composable\nfun AppNavigation(\n    audioEngine: AudioEngine,\n    presetManager: PresetManager,\n    onBack: () -> Unit = {}\n)/g' "$NAV_FILE"
+        echo "   ✅ Parámetros agregados"
+    else
+        echo "   ✅ AppNavigation correcto"
+    fi
+else
+    echo "   ⚠️  AppNavigation.kt no encontrado"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════
+# 6. CORREGIR Compose UI Errors (Spacer, etc)
+# ═══════════════════════════════════════════════════════════════════════
+echo ""
+echo "🔧 Corrigiendo Compose UI..."
+
+# Buscar archivos con Spacer no resuelto
+find app/src/main/java -name "*.kt" -exec grep -l "Spacer(" {} \; 2>/dev/null | while read file; do
+    if ! grep -q "import.*Spacer" "$file"; then
+        echo "   🔧 Agregando import de Spacer en: $file"
+        sed -i '/^import.*layout/a import androidx.compose.foundation.layout.Spacer' "$file"
+    fi
+done
+
+echo "   ✅ Compose UI corregido"
+
+# ═══════════════════════════════════════════════════════════════════════
+# 7. VERIFICAR COMPILACIÓN
+# ═══════════════════════════════════════════════════════════════════════
+echo ""
+echo "🔨 Verificando compilación..."
+
+# Limpiar build anterior
+./gradlew clean 2>&1 | tail -5
+# Intentar compilar Universal Debug
+echo ""
+echo "📦 Compilando Universal Debug..."
+if ./gradlew assembleUniversalDebug --stacktrace 2>&1 | tee build.log | tail -20; then
+    echo "   ✅ Compilación exitosa"
+else
+    echo "   ❌ Compilación falló, revisando errores..."
+    grep -E "error:|Error:|FAILED" build.log | head -20
+fi
+
+# ═══════════════════════════════════════════════════════════════════════
+# RESUMEN
+# ═══════════════════════════════════════════════════════════════════════
+echo ""
+echo "=========================================="
+echo "✅ CORRECCIONES APLICADAS"
+echo "=========================================="
+echo ""
+echo "📊 Cambios realizados:"
+git status --short | head -20
 

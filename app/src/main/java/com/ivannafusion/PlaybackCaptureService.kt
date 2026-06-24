@@ -17,7 +17,7 @@
  *    El audio original sigue sonando normal, sin pasar por el motor
  *    DSP de esta app. Para procesar/modificar el sonido que el
  *    usuario realmente escucha (EQ/compresor real aplicado en
- *    tiempo real) se necesita el módulo Magisk (variante Enterprise,
+ *    tiempo real) se necesita el módulo Magisk (variante ,
  *    que vive dentro de audioserver) — eso sí puede sustituir el
  *    audio antes del hardware. Aquí solo se usa la captura para
  *    ANÁLISIS (alimentar a YAMNet, medir loudness real), no para

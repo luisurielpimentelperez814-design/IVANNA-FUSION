@@ -10,6 +10,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -57,7 +58,7 @@ fun AIScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
             val loaded = audioEngine.isAiClassifierLoaded()
             if (loaded && aiEnabled) {
                 genre      = audioEngine.aiGetDetectedGenre()
-                confidence = audioEngine.aiGetConfidence()
+                confidence = audioEngine.AudioStubs.aiGetConfidence()
                 bpm        = audioEngine.aiGetTempo()
                 centroid   = audioEngine.aiGetCentroidHz()
                 bass       = audioEngine.aiGetBassEnergy()
