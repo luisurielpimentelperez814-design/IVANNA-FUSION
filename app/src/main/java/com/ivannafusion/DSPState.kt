@@ -169,4 +169,60 @@ object DSPState {
     fun saveGlobal() = scope.launch {
         store?.saveGlobal(masterVolume, globalBypass, currentPreset)
     }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // PF ENGINE SETTERS
+    // ═══════════════════════════════════════════════════════════════
+    
+    fun setPfDrive(value: Float) {
+        _pfDrive.value = value
+        saveToPrefs("pf_drive", value)
+    }
+    
+    fun setPfWet(value: Float) {
+        _pfWet.value = value
+        saveToPrefs("pf_wet", value)
+    }
+    
+    fun setPfAlpha(value: Float) {
+        _pfAlpha.value = value
+        saveToPrefs("pf_alpha", value)
+    }
+    
+    fun setPfBeta(value: Float) {
+        _pfBeta.value = value
+        saveToPrefs("pf_beta", value)
+    }
+    
+    fun setPfDelta(value: Float) {
+        _pfDelta.value = value
+        saveToPrefs("pf_delta", value)
+    }
+    
+    fun setPfSigma(value: Float) {
+        _pfSigma.value = value
+        saveToPrefs("pf_sigma", value)
+    }
+    
+    fun setPfFreq(value: Float) {
+        _pfFreq.value = value
+        saveToPrefs("pf_freq", value)
+    }
+    
+    fun setPfResonance(value: Float) {
+        _pfResonance.value = value
+        saveToPrefs("pf_resonance", value)
+    }
+    
+    fun setPfMix(value: Float) {
+        _pfMix.value = value        saveToPrefs("pf_mix", value)
+    }
+    
+    fun resetPfEvolution() {
+        setPfAlpha(0.5f)
+        setPfBeta(0.5f)
+        setPfDelta(0.5f)
+        setPfSigma(0.5f)
+        android.util.Log.i("DSPState", "PF Evolution reset")
+    }
 }

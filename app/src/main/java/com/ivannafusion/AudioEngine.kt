@@ -315,4 +315,96 @@ private fun nativeSetCompressorKnee(v: Float) {}
 private fun nativeSetCompressorMakeup(v: Float) {}
 private fun nativeApplyPFPresetEnterprise(v: Any) {}
 private fun nativePfSetAmp(v: Int) {}
-
+    
+    // ═══════════════════════════════════════════════════════════════
+    // PF ENGINE - Funciones agregadas para resolver referencias
+    // ═══════════════════════════════════════════════════════════════
+    
+    /**
+     * Establece un parámetro específico del PF Engine
+     * @param paramName Nombre del parámetro (drive, wet, alpha, beta, etc.)
+     * @param value Valor del parámetro (0.0 a 1.0 típicamente)
+     */
+    fun pfSetParam(paramName: String, value: Float) {
+        when (paramName) {
+            "drive" -> DSPState.setPfDrive(value)
+            "wet" -> DSPState.setPfWet(value)
+            "alpha" -> DSPState.setPfAlpha(value)
+            "beta" -> DSPState.setPfBeta(value)
+            "delta" -> DSPState.setPfDelta(value)
+            "sigma" -> DSPState.setPfSigma(value)
+            "freq" -> DSPState.setPfFreq(value)
+            "resonance" -> DSPState.setPfResonance(value)
+            "mix" -> DSPState.setPfMix(value)
+            else -> {
+                // Parámetro desconocido, log para debug
+                android.util.Log.w("AudioEngine", "pfSetParam: parámetro desconocido '$paramName'")
+            }
+        }
+        
+        // Aplicar al engine nativo si está disponible
+        try {
+            nativePfSetParam(paramName, value)
+        } catch (e: Exception) {
+            // Fallback silencioso si no hay implementación nativa
+        }
+    }
+    
+    /**     * Resetea la evolución del PF Engine a valores iniciales
+     */
+    fun pfEvoReset() {
+        DSPState.resetPfEvolution()
+        
+        // Aplicar reset al engine nativo si está disponible
+        try {
+            nativePfEvoReset()
+        } catch (e: Exception) {
+            // Fallback silencioso
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // Funciones nativas opcionales (stubs si no existen en C++)
+    // ═══════════════════════════════════════════════════════════════
+    
+    private external fun nativePfSetParam(paramName: String, value: Float)
+    private external fun nativePfEvoReset()
+    
+    /**
+     * Aplica un preset completo al sistema
+     * @param presetName Nombre del preset a aplicar
+     */
+    fun setPreset(presetName: String) {
+        // Cargar preset desde DSPState
+        DSPState.loadPreset(presetName)
+        
+        // Aplicar valores a todos los subsistemas
+        val preset = DSPState.getCurrentPreset()        
+        // EQ
+        preset.eqGains?.forEachIndexed { band, gain ->
+            eqSetGain(band, gain)
+        }
+        
+        // Compresor
+        preset.compThreshold?.let { compSetThreshold(it) }
+        preset.compRatio?.let { compSetRatio(it) }
+        preset.compAttack?.let { compSetAttack(it) }
+        preset.compRelease?.let { compSetRelease(it) }
+        
+        // Convolver
+        preset.convolverPreset?.let { convPreset(it) }
+        
+        // Spatial
+        preset.spatialWidth?.let { spatialSetWidth(it) }
+        preset.spatialDepth?.let { spatialSetDepth(it) }
+        
+        // PF Engine
+        preset.pfDrive?.let { pfSetParam("drive", it) }
+        preset.pfWet?.let { pfSetParam("wet", it) }
+        
+        // Persistir preset actual
+        DSPState.setCurrentPreset(presetName)
+        
+        android.util.Log.i("AudioEngine", "Preset '$presetName' aplicado")
+    }
+}
