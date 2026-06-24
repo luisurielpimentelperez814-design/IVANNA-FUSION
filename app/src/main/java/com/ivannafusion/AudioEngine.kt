@@ -115,7 +115,7 @@ class AudioEngine {
             var frameCounter = 0
 
             while (isActive) {
-                val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+                val read = audioRecord?.read(buffer, 0, buffer.size, android.media.AudioRecord.READ_BLOCKING) ?: 0
                 if (read > 0) {
                     try {
                         nativeProcessAudio(buffer, outputBuffer, read / 2)

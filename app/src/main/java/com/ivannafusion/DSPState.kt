@@ -175,47 +175,39 @@ object DSPState {
     // ═══════════════════════════════════════════════════════════════
     
     fun setPfDrive(value: Float) {
-        _pfDrive.value = value
-        saveToPrefs("pf_drive", value)
+        pfDrive = value
     }
     
     fun setPfWet(value: Float) {
-        _pfWet.value = value
-        saveToPrefs("pf_wet", value)
+        pfWet = value
     }
     
     fun setPfAlpha(value: Float) {
-        _pfAlpha.value = value
-        saveToPrefs("pf_alpha", value)
+        pfAlpha = value
     }
     
     fun setPfBeta(value: Float) {
-        _pfBeta.value = value
-        saveToPrefs("pf_beta", value)
+        pfBeta = value
     }
     
     fun setPfDelta(value: Float) {
-        _pfDelta.value = value
-        saveToPrefs("pf_delta", value)
+        pfDelta = value
     }
     
     fun setPfSigma(value: Float) {
-        _pfSigma.value = value
-        saveToPrefs("pf_sigma", value)
+        pfSigma = value
     }
     
     fun setPfFreq(value: Float) {
-        _pfFreq.value = value
-        saveToPrefs("pf_freq", value)
+        pfFreq = value
     }
     
     fun setPfResonance(value: Float) {
-        _pfResonance.value = value
-        saveToPrefs("pf_resonance", value)
+        pfResonance = value
     }
     
     fun setPfMix(value: Float) {
-        _pfMix.value = value        saveToPrefs("pf_mix", value)
+        pfMix = value
     }
     
     fun resetPfEvolution() {
