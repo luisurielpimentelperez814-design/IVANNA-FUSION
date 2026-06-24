@@ -391,15 +391,15 @@ class AudioEngine {
     // ── PF Engine ────────────────────────────────────────────────────────────
     fun pfSetParam(paramName: String, value: Float) {
         when (paramName) {
-            "drive" -> DSPState.setPfDrive(value)
-            "wet" -> DSPState.setPfWet(value)
-            "alpha" -> DSPState.setPfAlpha(value)
-            "beta" -> DSPState.setPfBeta(value)
-            "delta" -> DSPState.setPfDelta(value)
-            "sigma" -> DSPState.setPfSigma(value)
-            "freq" -> DSPState.setPfFreq(value)
-            "resonance" -> DSPState.setPfResonance(value)
-            "mix" -> DSPState.setPfMix(value)
+            "drive" -> DSPState.updatePfDrive(value)
+            "wet" -> DSPState.updatePfWet(value)
+            "alpha" -> DSPState.updatePfAlpha(value)
+            "beta" -> DSPState.updatePfBeta(value)
+            "delta" -> DSPState.updatePfDelta(value)
+            "sigma" -> DSPState.updatePfSigma(value)
+            "freq" -> DSPState.updatePfFreq(value)
+            "resonance" -> DSPState.updatePfResonance(value)
+            "mix" -> DSPState.updatePfMix(value)
             "amp_model" -> { /* índice de modelo de amplificador — sin tabla de modelos real conectada todavía */ }
             else -> Log.w(TAG, "pfSetParam: parámetro desconocido '$paramName'")
         }

@@ -177,47 +177,47 @@ object DSPState {
     // PF ENGINE SETTERS
     // ═══════════════════════════════════════════════════════════════
     
-    fun setPfDrive(value: Float) {
+    fun updatePfDrive(value: Float) {
         pfDrive = value
     }
     
-    fun setPfWet(value: Float) {
+    fun updatePfWet(value: Float) {
         pfWet = value
     }
     
-    fun setPfAlpha(value: Float) {
+    fun updatePfAlpha(value: Float) {
         pfAlpha = value
     }
     
-    fun setPfBeta(value: Float) {
+    fun updatePfBeta(value: Float) {
         pfBeta = value
     }
     
-    fun setPfDelta(value: Float) {
+    fun updatePfDelta(value: Float) {
         pfDelta = value
     }
     
-    fun setPfSigma(value: Float) {
+    fun updatePfSigma(value: Float) {
         pfSigma = value
     }
     
-    fun setPfFreq(value: Float) {
+    fun updatePfFreq(value: Float) {
         pfFreq = value
     }
     
-    fun setPfResonance(value: Float) {
+    fun updatePfResonance(value: Float) {
         pfResonance = value
     }
     
-    fun setPfMix(value: Float) {
+    fun updatePfMix(value: Float) {
         pfMix = value
     }
     
     fun resetPfEvolution() {
-        setPfAlpha(0.5f)
-        setPfBeta(0.5f)
-        setPfDelta(0.5f)
-        setPfSigma(0.5f)
+        updatePfAlpha(0.5f)
+        updatePfBeta(0.5f)
+        updatePfDelta(0.5f)
+        updatePfSigma(0.5f)
         android.util.Log.i("DSPState", "PF Evolution reset")
     }
 }
