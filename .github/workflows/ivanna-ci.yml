@@ -48,7 +48,7 @@ jobs:
       - name: Validate AAPT2
         run: |
           file $ANDROID_SDK_ROOT/build-tools/34.0.0/aapt2
-          $ANDROID_SDK_ROOT/build-tools/34.0.0/aapt2 --version
+          $ANDROID_SDK_ROOT/build-tools/34.0.0/aapt2 version
 
 
 # ─────────────────────────────
