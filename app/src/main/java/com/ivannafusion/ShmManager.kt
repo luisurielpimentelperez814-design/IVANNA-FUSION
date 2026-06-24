@@ -1,20 +1,25 @@
 package com.ivannafusion
 
 import android.content.Context
-import android.os.SharedMemory
 import android.system.OsConstants
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 
 object ShmManager {
     private val _shmStatus = MutableStateFlow("Inicializando...")
     val shmStatus: StateFlow<String> = _shmStatus.asStateFlow()
-    private var hyperplaneBuffer: ByteBuffer? = null
-    private var sharedMemory: SharedMemory? = null
-
+    
+    private var hyperplaneBuffer: MappedByteBuffer? = null
+    private var shmFile: RandomAccessFile? = null
+    
     var nativeLibLoaded: Boolean = false
         private set
     var shmInitialized: Boolean = false
@@ -22,54 +27,64 @@ object ShmManager {
     var lastError: String? = null
         private set
 
+    // CORRECCIÓN: Usar el mismo path que omega_daemon.cpp
+    private const val SHM_PATH = "/data/local/tmp/omega_shared_mem"
     private const val SHM_SIZE = 2 * 1024 * 1024
 
     // Offsets (deben coincidir con audio_orchestrator.cpp Hyperplane struct)
-    // biquad_coefs[64][5] = 64*5*4 = 1280 bytes
     private const val OFFSET_BIQUAD    = 0
-    // kalman_state[3] floats = 12 bytes
     private const val OFFSET_KALMAN    = OFFSET_BIQUAD + 1280
-    // poblacion_evolutiva[128][256] = 32768 bytes
     private const val OFFSET_POBLACION = OFFSET_KALMAN + 12
-    // temp_soc[10] shorts = 20 bytes
     private const val OFFSET_TEMP      = OFFSET_POBLACION + 32768
-    // sched_table[8][8][4][4][3] = 3072 bytes
     private const val OFFSET_SCHED     = OFFSET_TEMP + 20
-    // seq_counter uint64 = 8 bytes (aligned to 8)
     private const val OFFSET_SEQ       = OFFSET_SCHED + 3072
-    // active_buffer uint8 = 1 byte
     private const val OFFSET_ACTIVE    = OFFSET_SEQ + 8
 
     fun initialize(context: Context) {
-        _shmStatus.value = "Creando SharedMemory..."
+        _shmStatus.value = "Abriendo shared memory file..."
         try {
-            val shm = SharedMemory.create("ivanna_hyperplane", SHM_SIZE)
-            shm.setProtect(OsConstants.PROT_READ or OsConstants.PROT_WRITE)
-            val buf = shm.mapReadWrite()
-            buf.order(ByteOrder.nativeOrder())
-            // Inicializar a cero para que los valores iniciales sean válidos
-            buf.position(0)
-            repeat(SHM_SIZE / 4) { buf.putInt(0) }
-            buf.position(0)
-            sharedMemory = shm
-            hyperplaneBuffer = buf
-            try {
-                val addressField = java.nio.Buffer::class.java.getDeclaredField("address")
-                addressField.isAccessible = true
-                val address = addressField.getLong(buf)
-                nativeMlock(address, SHM_SIZE.toLong())
-            } catch (_: Exception) {}
+            // CORRECCIÓN: Usar file mapping en lugar de SharedMemory API
+            val file = File(SHM_PATH)
+            
+            // Crear el archivo si no existe (requiere root)
+            if (!file.exists()) {
+                try {
+                    // Intentar crear con permisos de root
+                    val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "touch $SHM_PATH && chmod 666 $SHM_PATH"))
+                    process.waitFor()
+                } catch (e: Exception) {
+                    Log.w("IVANNA-SHM", "No se puede crear archivo SHM (requiere root): ${e.message}")
+                }
+            }
+            
+            // Abrir el archivo
+            shmFile = RandomAccessFile(file, "rw")
+            shmFile?.setLength(SHM_SIZE.toLong())
+            
+            // Mapear el archivo en memoria
+            val channel = shmFile?.channel
+            hyperplaneBuffer = channel?.map(FileChannel.MapMode.READ_WRITE, 0, SHM_SIZE.toLong())
+            hyperplaneBuffer?.order(ByteOrder.nativeOrder())
+            
+            // Inicializar a cero
+            hyperplaneBuffer?.position(0)
+            repeat(SHM_SIZE / 4) { hyperplaneBuffer?.putInt(0) }
+            hyperplaneBuffer?.position(0)
+            
             shmInitialized = true
-            _shmStatus.value = "SHM mlock OK ✅"
-            android.util.Log.i("IVANNA-SHM", "SharedMemory.create OK size=$SHM_SIZE offsets: seq=$OFFSET_SEQ kalman=$OFFSET_KALMAN")
+            _shmStatus.value = "SHM file mapping OK ✅"
+            Log.i("IVANNA-SHM", "SharedMemory file mapping OK path=$SHM_PATH size=$SHM_SIZE")
+            
         } catch (e: Exception) {
             lastError = e.message
             _shmStatus.value = "Fallback buffer directo 🟠"
+            Log.w("IVANNA-SHM", "File mapping falló: ${e.message}, usando buffer directo")
+            
+            // Fallback: buffer directo en memoria
             val buf = ByteBuffer.allocateDirect(SHM_SIZE)
             buf.order(ByteOrder.nativeOrder())
-            hyperplaneBuffer = buf
+            hyperplaneBuffer = buf as MappedByteBuffer?
             shmInitialized = true
-            android.util.Log.w("IVANNA-SHM", "SharedMemory falló: ${e.message}")
         }
     }
 
@@ -77,7 +92,6 @@ object ShmManager {
 
     fun getBuffer(): ByteBuffer? = hyperplaneBuffer
 
-    // Crear una vista duplicada para lecturas seguras sin modificar position global
     private fun buf(): ByteBuffer? = hyperplaneBuffer?.duplicate()?.order(ByteOrder.nativeOrder())
 
     fun readSeqCounter(): Long = buf()?.getLong(OFFSET_SEQ) ?: 0L
@@ -105,7 +119,6 @@ object ShmManager {
         return ShortArray(10) { b.getShort(OFFSET_TEMP + it * 2) }
     }
 
-    // ── Variables canónicas leídas desde SHM — accesibles desde UI ─────────────
     var kalman_fase_rad: Float = 0f
         private set
     var kalman_frec_hz: Float = 0f
@@ -115,33 +128,24 @@ object ShmManager {
     var shm_buffer_activo: Int = 0
         private set
 
-    // Suavizado exponencial (filtro de un polo) para la LECTURA en UI de
-    // los valores de Kalman. El filtro de Kalman en C++ (audio_orchestrator.cpp)
-    // ya hace su propio suavizado interno sobre el audio real; esto es
-    // una capa adicional puramente cosmética para que los NÚMEROS
-    // mostrados en pantalla no salten frame a frame cuando se refrescan
-    // varias veces por segundo desde refreshCanonicalVars(). No afecta
-    // ningún cálculo de audio, solo lo que se ve en la UI.
     private fun smoothForDisplay(prev: Float, raw: Float, mu: Float = 0.3f): Float {
         if (raw.isNaN() || raw.isInfinite()) return prev
         if (prev.isNaN() || prev.isInfinite()) return raw
         return (prev + mu * raw) / (1.0f + mu)
     }
 
-    /** Refresca todas las variables canónicas desde el buffer SHM. Llamar desde corrutina UI. */
     fun refreshCanonicalVars() {
         val b = buf() ?: return
         kalman_fase_rad   = smoothForDisplay(kalman_fase_rad, b.getFloat(OFFSET_KALMAN))
         kalman_frec_hz    = smoothForDisplay(kalman_frec_hz, b.getFloat(OFFSET_KALMAN + 4))
-        shm_seq_counter   = b.getLong(OFFSET_SEQ)        // contador, no se suaviza
-        shm_buffer_activo = b.get(OFFSET_ACTIVE).toInt().and(0xFF)  // índice, no se suaviza
+        shm_seq_counter   = b.getLong(OFFSET_SEQ)
+        shm_buffer_activo = b.get(OFFSET_ACTIVE).toInt().and(0xFF)
     }
 
     fun writeFusionLevel(level: Float) {
         hyperplaneBuffer?.putFloat(OFFSET_KALMAN + 12, level)
     }
 
-    /** Escribe hasta 10 temperaturas (Short) en la zona temp_soc del hiperplano. */
     fun writeTemperatures(temps: ShortArray) {
         val b = hyperplaneBuffer ?: return
         val count = minOf(temps.size, 10)
@@ -153,8 +157,8 @@ object ShmManager {
     fun close() {
         _shmStatus.value = "SHM cerrada"
         hyperplaneBuffer = null
-        sharedMemory?.close()
-        sharedMemory = null
+        shmFile?.close()
+        shmFile = null
         shmInitialized = false
     }
 
