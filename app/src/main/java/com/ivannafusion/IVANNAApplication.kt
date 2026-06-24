@@ -49,6 +49,25 @@ class IVANNAApplication : Application() {
                 ThermalMonitor.initialize(this@IVANNAApplication)
                 Log.d(TAG, "✅ ThermalMonitor completado")
                 
+                // CORRECCIÓN: Iniciar OmegaDaemon
+                Log.d(TAG, "🔄 Iniciando OmegaDaemon...")
+                try {
+                    OmegaDaemon.nativeStart()
+                    Log.d(TAG, "✅ OmegaDaemon iniciado correctamente")
+                } catch (e: Exception) {
+                    Log.e(TAG, "⚠️ OmegaDaemon no pudo iniciarse (puede requerir root): ${e.message}")
+                }
+                
+                // CORRECCIÓN: Conectar OmegaMagiskBridge
+                Log.d(TAG, "🔄 Conectando OmegaMagiskBridge...")
+                try {
+                    val bridge = OmegaMagiskBridge()
+                    bridge.connect()
+                    Log.d(TAG, "✅ OmegaMagiskBridge conectado")
+                } catch (e: Exception) {
+                    Log.e(TAG, "⚠️ OmegaMagiskBridge no pudo conectarse: ${e.message}")
+                }
+                
                 isInitialized = true
                 Log.i(TAG, "✅✅✅ TODOS LOS MOTORES INICIADOS CORRECTAMENTE ✅✅✅")
                 
