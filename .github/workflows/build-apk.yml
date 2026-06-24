@@ -12,8 +12,19 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Android NDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Install required SDK components
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmake;3.22.1" "ndk;25.2.9519653"
+          yes | sdkmanager --licenses || true
+
+      - name: Create local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          cat local.properties
 
       - name: Grant permission
         run: chmod +x gradlew
@@ -31,13 +42,13 @@ jobs:
               -dname "CN=Debug, OU=Debug, O=Debug, L=Debug, ST=Debug, C=US"
           fi
 
-      # Variante 'universal': 4 ABIs (arm64-v8a, armeabi-v7a, x86_64,
-      # x86), sin dependencia de root/Magisk (MAGISK_INTEGRATION=false,
-      # ver app/build.gradle productFlavors). Pensada para distribución
-      # pública general — funciona en cualquier dispositivo Android,
-      # con o sin root.
+      - name: Clean Gradle cache
+        run: |
+          rm -rf ~/.gradle/caches/
+          ./gradlew clean || true
+
       - name: Build APK (universal, todas las ABIs)
-        run: ./gradlew assembleUniversalDebug --stacktrace
+        run: ./gradlew assembleUniversalDebug --stacktrace --no-daemon --refresh-dependencies
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
