@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
         // bindService(); para mantenerlo simple, AudioEngine se conecta
         // como companion-level callback estático en el propio servicio.
         PlaybackCaptureService.globalAudioCallback = { mono ->
-            audioEngine?.AudioStubs.feedExternalMonoAudio(mono, PlaybackCaptureService.CAPTURE_SAMPLE_RATE)
+            audioEngine?.feedExternalMonoAudio(mono, PlaybackCaptureService.CAPTURE_SAMPLE_RATE)
         }
     }
 

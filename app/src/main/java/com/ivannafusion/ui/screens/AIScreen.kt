@@ -58,7 +58,7 @@ fun AIScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
             val loaded = audioEngine.isAiClassifierLoaded()
             if (loaded && aiEnabled) {
                 genre      = audioEngine.aiGetDetectedGenre()
-                confidence = audioEngine.AudioStubs.aiGetConfidence()
+                confidence = audioEngine.aiGetConfidence()
                 bpm        = audioEngine.aiGetTempo()
                 centroid   = audioEngine.aiGetCentroidHz()
                 bass       = audioEngine.aiGetBassEnergy()

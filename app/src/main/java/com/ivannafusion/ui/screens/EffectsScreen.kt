@@ -68,7 +68,7 @@ private fun EQPanel(audioEngine: AudioEngine) {
                 Text("BYPASS", style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary, modifier = Modifier.padding(end = 6.dp))
                 IVANNAToggle(checked = bypassed, onCheckedChange = {
-                    bypassed = it; DSPState.eqBypassed = it; audioEngine.AudioStubs.eqSetBypass(it)
+                    bypassed = it; DSPState.eqBypassed = it; audioEngine.eqSetBypass(it)
                 })
             }
         }
@@ -114,7 +114,7 @@ private fun CompressorPanel(audioEngine: AudioEngine) {
                 Text("BYPASS", style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary, modifier = Modifier.padding(end = 6.dp))
                 IVANNAToggle(checked = bypassed, onCheckedChange = {
-                    bypassed = it; DSPState.compBypassed = it; audioEngine.AudioStubs.compSetBypass(it)
+                    bypassed = it; DSPState.compBypassed = it; audioEngine.compSetBypass(it)
                 })
             }
         }
@@ -123,28 +123,28 @@ private fun CompressorPanel(audioEngine: AudioEngine) {
             IVANNAKnob(value = threshold, size = 72.dp, label = "THRESH", unit = "dB",
                 accentColor = AccentMagenta, enabled = !bypassed,
                 onValueChange = { threshold = it; DSPState.compThreshold = it
-                    DSPState.saveCompressor(); audioEngine.AudioStubs.compSetThreshold(it * -60f) })
+                    DSPState.saveCompressor(); audioEngine.compSetThreshold(it * -60f) })
             IVANNAKnob(value = ratio, size = 72.dp, label = "RATIO", unit = ":1",
                 accentColor = AccentMagenta, enabled = !bypassed,
                 onValueChange = { ratio = it; DSPState.compRatio = it
-                    DSPState.saveCompressor(); audioEngine.AudioStubs.compSetRatio(1f + it * 19f) })
+                    DSPState.saveCompressor(); audioEngine.compSetRatio(1f + it * 19f) })
             IVANNAKnob(value = attack, size = 72.dp, label = "ATK", unit = "ms",
                 accentColor = AccentMagenta, enabled = !bypassed,
                 onValueChange = { attack = it; DSPState.compAttack = it
-                    DSPState.saveCompressor(); audioEngine.AudioStubs.compSetAttack(it * 100f) })
+                    DSPState.saveCompressor(); audioEngine.compSetAttack(it * 100f) })
             IVANNAKnob(value = release, size = 72.dp, label = "REL", unit = "ms",
                 accentColor = AccentMagenta, enabled = !bypassed,
                 onValueChange = { release = it; DSPState.compRelease = it
-                    DSPState.saveCompressor(); audioEngine.AudioStubs.compSetRelease(it * 1000f) })
+                    DSPState.saveCompressor(); audioEngine.compSetRelease(it * 1000f) })
         }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             IVANNAKnob(value = knee, size = 64.dp, label = "KNEE", unit = "dB",
                 accentColor = AccentMagenta, enabled = !bypassed,
-                onValueChange = { knee = it; DSPState.compKnee = it; audioEngine.AudioStubs.compSetKnee(it * 12f) })
+                onValueChange = { knee = it; DSPState.compKnee = it; audioEngine.compSetKnee(it * 12f) })
             IVANNAKnob(value = makeup, size = 64.dp, label = "MAKEUP", unit = "dB",
                 accentColor = AccentMagenta, enabled = !bypassed,
-                onValueChange = { makeup = it; DSPState.compMakeup = it; audioEngine.AudioStubs.compSetMakeup(it * 24f) })
+                onValueChange = { makeup = it; DSPState.compMakeup = it; audioEngine.compSetMakeup(it * 24f) })
         }
     }
 }

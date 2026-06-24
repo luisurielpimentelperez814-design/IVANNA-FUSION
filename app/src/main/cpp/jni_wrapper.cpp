@@ -17,7 +17,16 @@ static inline float homeostasis(float n, float omega, float mu) {
 
 struct Biquad {
     float b0=1, b1=0, b2=0, a1=0, a2=0, x1=0, x2=0, y1=0, y2=0;
-    void setPeaking(float freq, float sr, float gainDB, float Q) {
+    // CORREGIDO: freq/Q/gain por banda ahora se guardan y se usan para
+    // recalcular los coeficientes reales cada vez que cualquiera de los
+    // 3 cambia — antes nativeSetEQFreq/nativeSetEQQ estaban vacíos
+    // ({}), así que mover esos controles en la UI no tenía ningún
+    // efecto audible (el bug reportado: "se activan pero no hay efecto").
+    float freq = 1000.f, gainDB = 0.f, Q = 1.41f;
+    bool bypassed = false;
+
+    void setPeaking(float freqIn, float sr, float gainDBIn, float Qin) {
+        freq = freqIn; gainDB = gainDBIn; Q = Qin;
         float A = powf(10.0f, gainDB/40.0f);
         float w0 = 2.0f * M_PI * freq / sr;
         float alpha = sinf(w0) / (2.0f * Q);
@@ -26,7 +35,10 @@ struct Biquad {
         float a0 = 1.0f + alpha/A; a1 = -2.0f*cosw0; a2 = 1.0f - alpha/A;
         b0/=a0; b1/=a0; b2/=a0; a1/=a0; a2/=a0;
     }
+    void setFreq(float freqIn, float sr) { setPeaking(freqIn, sr, gainDB, Q); }
+    void setQ(float Qin, float sr) { setPeaking(freq, sr, gainDB, Qin); }
     float process(float in) {
+        if (bypassed) return in;
         float out = b0*in + b1*x1 + b2*x2 - a1*y1 - a2*y2;
         x2=x1; x1=in; y2=y1; y1=out; return out;
     }
@@ -39,6 +51,7 @@ static bool compBypass=false;
 static float excDrive=1, excMix=0.5;
 static bool excBypass=false, fftEnabled=false;
 static bool initialized=false;
+static float g_sampleRate = 48000.f;
 static float lastInputLevel=0, lastOutputLevel=0;
 static float homeostaticSpectrum[32] = {0};
 static float currentRmsDb = -60.0f;
@@ -64,9 +77,15 @@ static char detectedGenre[32] = "Unknown";
 // INICIALIZACIÓN
 >>>>>>> origin/app/src/main/cpp/jni_wrapper.cpp
 extern "C" JNIEXPORT jboolean JNICALL Java_com_ivannafusion_AudioEngine_nativeInit(JNIEnv*, jobject, jint sr, jint) {
-    for(int i=0; i<8; i++) eq[i].setPeaking(1000, 48000, 0, 1.41);
+    g_sampleRate = (float)sr;
+    // 8 bandas con frecuencias iniciales razonables (gráfico/parámetro
+    // estándar de un EQ paramétrico de 8 bandas), no las 8 fijadas en
+    // 1000Hz que tenía la versión anterior (eso hacía que sonaran
+    // idénticas hasta que alguien llamara a setFreq, que estaba vacío).
+    static const float defaultFreqs[8] = {60.f, 150.f, 400.f, 1000.f, 2500.f, 6000.f, 10000.f, 16000.f};
+    for(int i=0; i<8; i++) eq[i].setPeaking(defaultFreqs[i], g_sampleRate, 0, 1.41f);
     initialized=true;
-    LOGI("DSP Homeostático inicializado a %d Hz", sr);
+    LOGI("DSP inicializado a %d Hz", sr);
     return JNI_TRUE;
 }
 extern "C" JNIEXPORT void JNICALL
@@ -251,10 +270,10 @@ extern "C" JNIEXPORT jfloat JNICALL Java_com_ivannafusion_AudioEngine_nativeGetB
 extern "C" JNIEXPORT jstring JNICALL Java_com_ivannafusion_AudioEngine_nativeAiGetDetectedGenre(JNIEnv* env, jobject) { return env->NewStringUTF(detectedGenre); }
 extern "C" JNIEXPORT jfloat JNICALL Java_com_ivannafusion_AudioEngine_nativeAiGetTempo(JNIEnv*, jobject) { return tempo; }
 
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQGain(JNIEnv*, jobject, jint band, jfloat gain) { if(band>=0 && band<8) eq[band].setPeaking(1000, 48000, gain, 1.41); }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQFreq(JNIEnv*, jobject, jint, jfloat) {}
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQQ(JNIEnv*, jobject, jint, jfloat) {}
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQBypass(JNIEnv*, jobject, jint, jboolean) {}
+extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQGain(JNIEnv*, jobject, jint band, jfloat gain) { if(band>=0 && band<8) eq[band].setPeaking(eq[band].freq, g_sampleRate, gain, eq[band].Q); }
+extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQFreq(JNIEnv*, jobject, jint band, jfloat freqHz) { if(band>=0 && band<8) eq[band].setFreq(freqHz, g_sampleRate); }
+extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQQ(JNIEnv*, jobject, jint band, jfloat q) { if(band>=0 && band<8) eq[band].setQ(q, g_sampleRate); }
+extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetEQBypass(JNIEnv*, jobject, jint band, jboolean bypass) { if(band>=0 && band<8) eq[band].bypassed = bypass; }
 <<<<<<< HEAD
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSetCompressorThreshold(JNIEnv*, jobject, jfloat f) { compThresh=f; }
 =======
