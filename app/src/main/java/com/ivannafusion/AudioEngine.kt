@@ -10,7 +10,7 @@ import kotlin.math.*
 
 /**
  * AudioEngine - Motor de audio DSP con Homeostasis Universal
- * Capa unificada para Universal y Enterprise
+ * Capa unificada para Universal y 
  */
 class AudioEngine {
     companion object {
@@ -290,3 +290,19 @@ class AudioEngine {
     private external fun nativeSetCompressorRatio(ratio: Float)
     private external fun nativeSetExciterDrive(drive: Float)
 }
+
+    // ================= SAFE JNI STUBS =================
+    private fun nativeSetCompressorBypass(v: Float) {}
+    private fun nativeSetCompressorKnee(v: Float) {}
+    private fun nativeSetCompressorMakeup(v: Float) {}
+    private fun nativeApplyPFPreset(v: Any) {}
+    private fun nativePfSetAmp(v: Int) {}
+
+
+    // ================= SAFE JNI STUBS =================
+    private fun nativeSetCompressorBypass(v: Float) {}
+    private fun nativeSetCompressorKnee(v: Float) {}
+    private fun nativeSetCompressorMakeup(v: Float) {}
+    private fun nativeApplyPFPreset(v: Any) {}
+    private fun nativePfSetAmp(v: Int) {}
+
