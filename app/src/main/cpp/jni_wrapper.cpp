@@ -6,6 +6,26 @@
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "IVANNA_DSP", __VA_ARGS__)
 
+// ═══════════════════════════════════════════════════════════════
+// Suavizado exponencial (filtro de un polo / promedio móvil
+// exponencial) — técnica estándar de DSP, NO un descubrimiento
+// nuevo. Se usa para que los medidores de la UI (RMS, espectro) no
+// salten abruptamente frame a frame, sin alterar el audio real que
+// pasa por el motor (eq/comp/exciter siguen procesando muestra a
+// muestra sin este suavizado).
+//
+// smooth(prev, raw, mu) = (prev + mu*raw) / (1 + mu)
+// Es algebraicamente equivalente a un EMA con alpha = mu/(1+mu):
+// smooth = prev*(1-alpha) + raw*alpha. mu más alto = más reactivo
+// (sigue rápido los cambios), mu más bajo = más suave (más estable
+// visualmente, más lento a reaccionar).
+// ═══════════════════════════════════════════════════════════════
+static inline float smoothMetric(float prev, float raw, float mu) {
+    if (std::isnan(raw) || std::isinf(raw)) return prev;
+    if (std::isnan(prev) || std::isinf(prev)) return raw;
+    return (prev + mu * raw) / (1.0f + mu);
+}
+
 // Biquad Filter para EQ
 struct Biquad {
     float b0=1, b1=0, b2=0, a1=0, a2=0, x1=0, x2=0, y1=0, y2=0;
@@ -91,12 +111,20 @@ Java_com_ivannafusion_AudioEngine_nativeProcessAudio(JNIEnv* env, jobject, jfloa
             float coeff = (lvl > compEnv) ? 
                 (1.0f - expf(-1.0f/(compAttack*0.001f*48000.0f))) : 
                 (1.0f - expf(-1.0f/(compRelease*0.001f*48000.0f)));
-            compEnv = coeff*lvl + (1.0f-coeff)*compEnv;
+            float newEnv = coeff*lvl + (1.0f-coeff)*compEnv;
+            // Protección: si compEnv alguna vez se vuelve NaN/Inf (por
+            // ejemplo si attack/release llegaran a 0 desde la UI,
+            // dividiendo por cero en expf(-1.0f/0)), sin este chequeo
+            // el compresor quedaría mudo permanentemente hasta
+            // nativeReset(), porque NaN se propaga en toda operación
+            // aritmética siguiente.
+            compEnv = (std::isnan(newEnv) || std::isinf(newEnv)) ? lvl : newEnv;
             
             float gr = (compEnv > compThresh) ? (compThresh-compEnv)*(1.0f-1.0f/compRatio) : 0;
             float gain = powf(10.0f, (gr+compMakeup)/20.0f);
             L *= gain;
-            R *= gain;        }
+            R *= gain;
+        }
         
         if(!excBypass) {
             L = L + (tanhf(L*excDrive) - L) * excMix;
@@ -117,11 +145,16 @@ Java_com_ivannafusion_AudioEngine_nativeProcessAudio(JNIEnv* env, jobject, jfloa
     lastInputLevel = inputSum / (frames*2);
     lastOutputLevel = outputSum / (frames*2);
     
-    // Actualizar RMS basado en el nivel de entrada
+    // Suavizado exponencial del RMS reportado a la UI (ver smoothMetric
+    // arriba). El audio en sí ya se procesó sample-a-sample sin este
+    // suavizado; esto solo estabiliza el NÚMERO que se muestra en el
+    // medidor, evitando que salte bruscamente entre bloques de 2048
+    // muestras (~43ms a 48kHz) procesados consecutivamente.
     if (lastInputLevel > 0.001f) {
-        currentRmsDb = 20.0f * log10f(lastInputLevel);
+        float rawRmsDb = 20.0f * log10f(lastInputLevel);
+        currentRmsDb = smoothMetric(currentRmsDb, rawRmsDb, 0.35f);
     } else {
-        currentRmsDb = -60.0f;
+        currentRmsDb = smoothMetric(currentRmsDb, -60.0f, 0.35f);
     }
     
     env->ReleaseFloatArrayElements(in, inBuf, 0);
@@ -145,7 +178,16 @@ extern "C" JNIEXPORT jfloatArray JNICALL Java_com_ivannafusion_AudioEngine_nativ
         if (normalizedLevel > 1) normalizedLevel = 1;
         
         for (int i = 0; i < 32; i++) {
-            float freqFactor = 1.0f - fabsf((static_cast<float>(i) - 16.0f) / 16.0f);            spectrum[i] = normalizedLevel * freqFactor * 0.8f;
+            float freqFactor = 1.0f - fabsf((static_cast<float>(i) - 16.0f) / 16.0f);
+            float rawBand = normalizedLevel * freqFactor * 0.8f;
+            // Suavizado con mu adaptativo: si el valor crudo cambió
+            // mucho respecto al anterior, mu sube (sigue el cambio más
+            // rápido); si cambió poco, mu se mantiene bajo (más estable
+            // visualmente). Evita que las barras "tiemblen" entre
+            // llamadas consecutivas sin atrasar reacciones a cambios
+            // reales de volumen.
+            float adaptiveMu = 0.3f * (1.0f + fabsf(rawBand - spectrum[i]));
+            spectrum[i] = fmaxf(0.0f, fminf(1.0f, smoothMetric(spectrum[i], rawBand, adaptiveMu)));
         }
         env->SetFloatArrayRegion(result, 0, 32, spectrum);
     }
