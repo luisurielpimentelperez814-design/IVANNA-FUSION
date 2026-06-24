@@ -115,13 +115,26 @@ object ShmManager {
     var shm_buffer_activo: Int = 0
         private set
 
+    // Suavizado exponencial (filtro de un polo) para la LECTURA en UI de
+    // los valores de Kalman. El filtro de Kalman en C++ (audio_orchestrator.cpp)
+    // ya hace su propio suavizado interno sobre el audio real; esto es
+    // una capa adicional puramente cosmética para que los NÚMEROS
+    // mostrados en pantalla no salten frame a frame cuando se refrescan
+    // varias veces por segundo desde refreshCanonicalVars(). No afecta
+    // ningún cálculo de audio, solo lo que se ve en la UI.
+    private fun smoothForDisplay(prev: Float, raw: Float, mu: Float = 0.3f): Float {
+        if (raw.isNaN() || raw.isInfinite()) return prev
+        if (prev.isNaN() || prev.isInfinite()) return raw
+        return (prev + mu * raw) / (1.0f + mu)
+    }
+
     /** Refresca todas las variables canónicas desde el buffer SHM. Llamar desde corrutina UI. */
     fun refreshCanonicalVars() {
         val b = buf() ?: return
-        kalman_fase_rad   = b.getFloat(OFFSET_KALMAN)
-        kalman_frec_hz    = b.getFloat(OFFSET_KALMAN + 4)
-        shm_seq_counter   = b.getLong(OFFSET_SEQ)
-        shm_buffer_activo = b.get(OFFSET_ACTIVE).toInt().and(0xFF)
+        kalman_fase_rad   = smoothForDisplay(kalman_fase_rad, b.getFloat(OFFSET_KALMAN))
+        kalman_frec_hz    = smoothForDisplay(kalman_frec_hz, b.getFloat(OFFSET_KALMAN + 4))
+        shm_seq_counter   = b.getLong(OFFSET_SEQ)        // contador, no se suaviza
+        shm_buffer_activo = b.get(OFFSET_ACTIVE).toInt().and(0xFF)  // índice, no se suaviza
     }
 
     fun writeFusionLevel(level: Float) {
