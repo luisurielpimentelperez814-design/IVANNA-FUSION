@@ -159,6 +159,8 @@ class AudioEngine {
                 val rawGenre = detectGenre(homeostaticSpectrum)
                 if (rawGenre == homeostaticGenre || Math.random() > 0.7) {
                     homeostaticGenre = rawGenre
+                } else {
+                    // Mantener el género actual
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Error actualizando métricas: ${e.message}")
