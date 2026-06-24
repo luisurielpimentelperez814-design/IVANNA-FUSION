@@ -1,276 +1,205 @@
 package com.ivannafusion
 
 import android.content.Context
-import android.media.AudioManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.util.Log
+import kotlinx.coroutines.*
+import kotlin.math.*
 
 class AudioEngine {
     companion object {
-        init {
-            try {
-                System.loadLibrary("ivanna_jni")
-                Log.i("IVANNA_DSP", "✅ Librería nativa cargada")
-            } catch (e: Exception) {
-                Log.e("IVANNA_DSP", "❌ Error: ${e.message}")
-            }
+        private const val TAG = "AudioEngine"
+        private const val SAMPLE_RATE = 48000
+        private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_STEREO
+        private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_FLOAT
+        
+        fun homeostasis(n: Float, omega: Float, mu: Float = 0.3f): Float {
+            if (omega.isNaN() || omega.isInfinite()) return n
+            if (n.isNaN() || n.isInfinite()) return omega
+            return (n + mu * omega) / (1.0f + mu)
         }
     }
 
-    private var initialized = false
-
-    external fun nativeInit(sampleRate: Int, channels: Int): Boolean
-    external fun nativeProcessAudio(input: FloatArray, output: FloatArray, frames: Int)
-    external fun nativeSetEQGain(band: Int, gain: Float)
-    external fun nativeSetEQFreq(band: Int, freq: Float)
-    external fun nativeSetEQQ(band: Int, q: Float)
-    external fun nativeSetEQBypass(band: Int, bypass: Boolean)
-    external fun nativeSetCompressorThreshold(t: Float)
-    external fun nativeSetCompressorRatio(r: Float)
-    external fun nativeSetCompressorAttack(a: Float)
-    external fun nativeSetCompressorRelease(r: Float)
-    external fun nativeSetCompressorKnee(k: Float)
-    external fun nativeSetCompressorMakeup(m: Float)
-    external fun nativeSetCompressorBypass(b: Boolean)
-    external fun nativeSetExciterDrive(d: Float)
-    external fun nativeSetExciterMix(m: Float)
-    external fun nativeSetExciterBypass(b: Boolean)
-    external fun nativeSetFFTEffect(enabled: Boolean)
-    external fun nativeReset()
-    external fun nativeGetInputLevel(): Float
-    external fun nativeGetOutputLevel(): Float
+    private var audioRecord: AudioRecord? = null
+    private var processingJob: Job? = null
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val eqGains = FloatArray(8) { 0f }
+    private var compThreshold = -20f
+    private var compRatio = 4f
+    private var exciterDrive = 1f
+    
+    @Volatile private var homeostaticRmsDb = -60f
+    @Volatile private var homeostaticSpectrum = FloatArray(32)
+    @Volatile private var homeostaticCorrelation = 1f
+    @Volatile private var homeostaticLatencyMicros = 5000
+    @Volatile private var homeostaticGeneration = 0
+    @Volatile private var homeostaticFitness = 0f
+    @Volatile private var homeostaticTempo = 120f
+    @Volatile private var homeostaticGenre = "ROCK"
+    
+    private val spectrumHistory = ArrayDeque<FloatArray>()
+    private val onsetHistory = ArrayDeque<Long>()
+        init {
+        try {
+            System.loadLibrary("ivanna_jni")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "Error cargando librería nativa", e)
+        }
+    }
 
     fun initialize(context: Context, callback: (Boolean) -> Unit) {
-        val sr = getDeviceSampleRate(context)
-        val ok = try {
-            nativeInit(sr, 2)
-        } catch (e: Exception) {
-            Log.e("AudioEngine", "Error: ${e.message}")
-            false
+        scope.launch {
+            try {
+                val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
+                if (bufferSize <= 0) { callback(false); return@launch }
+                audioRecord = AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT, bufferSize * 2)
+                if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) { callback(false); return@launch }
+                try { nativeInit(SAMPLE_RATE, 2) } catch (e: Exception) {}
+                audioRecord?.startRecording()
+                startProcessing()
+                callback(true)
+            } catch (e: Exception) { callback(false) }
         }
-        initialized = ok
-
-        // YAMNet (clasificador real, ver YamnetClassifier.kt). Si
-        // app/src/main/assets/yamnet.tflite no existe todavía (ver
-        // assets/README_MODEL.txt), initialize() devuelve false e
-        // isAiClassifierLoaded() queda false — sin crashear y sin
-        // simular una clasificación falsa.
-        val yamnetLoaded = YamnetClassifier.initialize(context)
-        Log.i("AudioEngine", "YAMNet cargado: $yamnetLoaded")
-
-        callback(ok)
     }
 
-    @Volatile private var lastYamnetResult: YamnetClassifier.Result? = null
-    @Volatile var lastSpectralResult: SpectralClassifier.Classification? = null
-    private val spectralAccum = FloatArray(SpectralClassifier.BLOCK_SIZE)
-    private var spectralAccumPos = 0
-    private val yamnetAccumulator = FloatArray(YamnetClassifier.INPUT_SAMPLES)
-    private var yamnetAccumPos = 0
-    private var yamnetSourceSampleRate = 48000
-    private var yamnetClassifying = false  // evita solapar inferencias si una tarda más que el bloque siguiente
-
-    fun release() { initialized = false; try { nativeReset() } catch (e: Exception) {}; YamnetClassifier.release() }
-    
-    /**
-     * Punto de entrada para audio MONO ya capturado externamente (ver
-     * PlaybackCaptureService — captura de audio interno del sistema vía
-     * AudioPlaybackCapture). A diferencia de processAudio(), esto NO
-     * pasa por el motor DSP nativo (nativeProcessAudio) — solo alimenta
-     * al clasificador YAMNet. Tiene sentido mantenerlos separados:
-     * processAudio() es audio que la propia app está reproduciendo/
-     * procesando localmente (estéreo), mientras que esto es una copia
-     * de solo-análisis de lo que otras apps están reproduciendo (mono,
-     * ya a 16kHz porque PlaybackCaptureService captura directo a esa
-     * tasa).
-     */
-    fun feedExternalMonoAudio(monoSamples: FloatArray, sourceSampleRate: Int) {
-        if (!YamnetClassifier.isLoaded) return
-        yamnetSourceSampleRate = sourceSampleRate
-        // feedYamnetAccumulator espera un buffer intercalado L/R; para
-        // audio ya mono, L=R=mono duplica la muestra sin alterar el
-        // promedio que la función calcula internamente.
-        val pseudoStereo = FloatArray(monoSamples.size * 2)
-        for (i in monoSamples.indices) {
-            pseudoStereo[i * 2] = monoSamples[i]
-            pseudoStereo[i * 2 + 1] = monoSamples[i]
-        }
-        feedYamnetAccumulator(pseudoStereo)
-    }
-
-    fun processAudio(input: FloatArray, sr: Int): FloatArray {
-        if (!initialized) return input
-        val output = FloatArray(input.size)
-        try { nativeProcessAudio(input, output, input.size / 2) } catch (e: Exception) { return input }
-
-        if (YamnetClassifier.isLoaded) {
-            yamnetSourceSampleRate = sr
-            feedYamnetAccumulator(input)
-        }
-        feedSpectralAccumulator(input)
-
-        return output
-    }
-
-    /**
-     * Convierte el bloque estéreo intercalado a mono (promedio L/R),
-     * lo decima a 16kHz (decimación simple por relación de enteros —
-     * suficiente para clasificación de eventos de audio, no para
-     * reproducción), y lo acumula hasta tener exactamente
-     * YamnetClassifier.INPUT_SAMPLES muestras, momento en el que
-     * dispara una inferencia en un hilo separado para no bloquear el
-     * camino de audio que llamó a processAudio().
-     */
-    private fun feedYamnetAccumulator(stereoInterleaved: FloatArray) {
-        val ratio = (yamnetSourceSampleRate.toFloat() / YamnetClassifier.SAMPLE_RATE_HZ).coerceAtLeast(1f)
-        var srcIdx = 0f
-        val frames = stereoInterleaved.size / 2
-        while (srcIdx.toInt() < frames && yamnetAccumPos < yamnetAccumulator.size) {
-            val f = srcIdx.toInt()
-            val mono = (stereoInterleaved[f * 2] + stereoInterleaved[f * 2 + 1]) * 0.5f
-            yamnetAccumulator[yamnetAccumPos++] = mono
-            srcIdx += ratio
-        }
-
-        if (yamnetAccumPos >= yamnetAccumulator.size && !yamnetClassifying) {
-            yamnetClassifying = true
-            val block = yamnetAccumulator.copyOf()
-            yamnetAccumPos = 0
-            Thread {
-                try {
-                    val result = YamnetClassifier.classify(block)
-                    if (result != null) lastYamnetResult = result
-                } finally {
-                    yamnetClassifying = false
+    private fun startProcessing() {
+        processingJob = scope.launch {
+            val buffer = FloatArray(2048)
+            val outputBuffer = FloatArray(2048)
+            var frameCounter = 0
+            while (isActive) {
+                val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+                if (read > 0) {
+                    try { nativeProcessAudio(buffer, outputBuffer, read / 2) } catch (e: Exception) {}
+                    frameCounter++
+                    if (frameCounter % 10 == 0) updateMetrics(buffer, read)
                 }
-            }.apply { isDaemon = true; start() }
-        }
-    }
-
-    private fun feedSpectralAccumulator(stereoInterleaved: FloatArray) {
-        val frames = stereoInterleaved.size / 2
-        for (i in 0 until frames) {
-            if (spectralAccumPos < spectralAccum.size) {
-                spectralAccum[spectralAccumPos++] =
-                    (stereoInterleaved[i * 2] + stereoInterleaved[i * 2 + 1]) * 0.5f
+                delay(10)
             }
         }
-        if (spectralAccumPos >= spectralAccum.size) {
-            val block = spectralAccum.copyOf(); spectralAccumPos = 0
-            Thread { lastSpectralResult = SpectralClassifier.analyze(block) }.apply { isDaemon = true; start() }
+    }
+
+    private suspend fun updateMetrics(buffer: FloatArray, size: Int) {
+        withContext(Dispatchers.Default) {
+            try {
+                var sum = 0f
+                for (i in 0 until size) sum += buffer[i] * buffer[i]
+                val rms = sqrt(sum / size)
+                val rawRms = if (rms > 0.0001f) 20 * log10(rms).toFloat() else -60f
+                homeostaticRmsDb = homeostasis(homeostaticRmsDb, rawRms, 0.3f)
+                
+                val rawSpectrum = calculateFFT(buffer, size)                homeostaticSpectrum = FloatArray(32) { i ->
+                    val adaptiveMu = 0.3f * (1.0f + abs(rawSpectrum[i] - homeostaticSpectrum[i]))
+                    homeostasis(homeostaticSpectrum[i], rawSpectrum[i], adaptiveMu)
+                }
+                
+                val rawCorrelation = calculateCorrelation(buffer, size)
+                homeostaticCorrelation = homeostasis(homeostaticCorrelation, rawCorrelation, 0.2f)
+                
+                val rawBpm = detectBPM(buffer, size)
+                if (rawBpm > 0) homeostaticTempo = homeostasis(homeostaticTempo, rawBpm, 0.1f)
+                
+                val rawGenre = detectGenre(homeostaticSpectrum)
+                if (rawGenre == homeostaticGenre || Math.random() > 0.7) homeostaticGenre = rawGenre
+            } catch (e: Exception) {}
         }
     }
 
-    fun getInputLevel(): Float = try { nativeGetInputLevel() } catch (e: Exception) { 0f }
-    fun getOutputLevel(): Float = try { nativeGetOutputLevel() } catch (e: Exception) { 0f }
-
-    fun eqSetBypass(b: Boolean) { for(i in 0..7) try { nativeSetEQBypass(i, b) } catch (e: Exception) {} }
-    fun eqSetGain(band: Int, gain: Float) { try { nativeSetEQGain(band, gain) } catch (e: Exception) {} }
-    fun eqSetFreq(band: Int, freq: Float) { try { nativeSetEQFreq(band, freq) } catch (e: Exception) {} }
-    fun eqSetQ(band: Int, q: Float) { try { nativeSetEQQ(band, q) } catch (e: Exception) {} }
-    fun eqSetEnabled(e: Boolean) { for(i in 0..7) try { nativeSetEQBypass(i, !e) } catch (ex: Exception) {} }
-
-    fun compSetBypass(b: Boolean) { try { nativeSetCompressorBypass(b) } catch (e: Exception) {} }
-    fun compSetThreshold(t: Float) { try { nativeSetCompressorThreshold(t) } catch (e: Exception) {} }
-    fun compSetRatio(r: Float) { try { nativeSetCompressorRatio(r) } catch (e: Exception) {} }
-    fun compSetAttack(a: Float) { try { nativeSetCompressorAttack(a) } catch (e: Exception) {} }
-    fun compSetRelease(r: Float) { try { nativeSetCompressorRelease(r) } catch (e: Exception) {} }
-    fun compSetKnee(k: Float) { try { nativeSetCompressorKnee(k) } catch (e: Exception) {} }
-    fun compSetMakeup(m: Float) { try { nativeSetCompressorMakeup(m) } catch (e: Exception) {} }
-    fun compSetEnabled(e: Boolean) { try { nativeSetCompressorBypass(!e) } catch (ex: Exception) {} }
-
-    fun excSetDrive(d: Float) { try { nativeSetExciterDrive(d) } catch (e: Exception) {} }
-    fun excSetMix(m: Float) { try { nativeSetExciterMix(m) } catch (e: Exception) {} }
-    fun excSetBypass(b: Boolean) { try { nativeSetExciterBypass(b) } catch (e: Exception) {} }
-
-    fun fftSetEnabled(e: Boolean) { try { nativeSetFFTEffect(e) } catch (ex: Exception) {} }
-
-    fun convSetType(t: String) {}
-    fun convPresetSmallRoom() {}
-    fun convPresetLargeHall() {}
-    fun convPresetPlate() {}
-    fun convPresetSpring() {}
-    fun convSetDecay(d: Float) {}
-    fun convSetPreDelay(d: Float) {}
-    fun convSetDamping(d: Float) {}
-    fun convSetDiffusion(d: Float) {}
-    fun convSetEarlyMix(m: Float) {}
-    fun convSetMix(m: Float) {}
-    fun decorPresetNatural() {}
-    fun decorPresetWide() {}
-    fun decorPresetMonoToStereo() {}
-    fun decorSetWidth(w: Float) {}
-    fun decorSetDepth(d: Float) {}
-    fun decorSetDiffusion(d: Float) {}
-    fun decorSetDelay(d: Float) {}
-    fun decorSetModRate(r: Float) {}
-    fun decorSetMix(m: Float) {}
-    fun isAiClassifierLoaded(): Boolean = YamnetClassifier.isLoaded || lastSpectralResult != null
-    fun aiGetDetectedGenre(): String = lastYamnetResult?.topLabel ?: lastSpectralResult?.label ?: "Analizando..."
-    fun aiGetConfidence(): Float = lastYamnetResult?.topScore?.coerceIn(0f,1f) ?: lastSpectralResult?.confidence ?: 0f
-    fun aiGetTempo(): Float = lastSpectralResult?.bpm ?: 120f
-    fun aiGetCentroidHz(): Float = lastSpectralResult?.centroidHz ?: 0f
-    fun aiGetBassEnergy(): Float = lastSpectralResult?.bassEnergy ?: 0f
-    fun aiGetMidEnergy(): Float = lastSpectralResult?.midEnergy ?: 0f
-    fun aiGetHighEnergy(): Float = lastSpectralResult?.highEnergy ?: 0f
-    fun aiGetRmsDb(): Float = lastSpectralResult?.rmsDb ?: -60f
-    fun aiGetZcr(): Float = lastSpectralResult?.zcr ?: 0f
-    fun aiGetSpectrum(): FloatArray = lastSpectralResult?.spectrum ?: FloatArray(32)
-    fun aiSetEnabled(e: Boolean) {}
-    fun aiSetAutoAdapt(a: Boolean) {}
-    fun aiSetSensitivity(s: Float) {}
-    fun aiGetCurrentCurveName(): String = "Default"
-    fun aiGetCurrentCurveDescription(): String = "Default"
-    fun aiApplyCurrentCurve() {}
-    fun getMomentaryLoudness(): Float = lastSpectralResult?.rmsDb ?: -60f
-    fun getCorrelation(): Float = 0.8f
-    fun getLatencyMicros(): Long = 5000L
-    fun getGeneration(): Int = 1
-    fun getBestFitness(): Float = 0.95f
-    fun pfEvoTick(bar: Int) { MagiskBridge.sendCommand("pf:evo:tick=$bar") }
-    fun pfEvoReset() { MagiskBridge.sendCommand("pf:evo:reset") }
-    fun pfSetAmp(a: Int) {
-        MagiskBridge.setAmp(a)
-        DSPState.pfAmpModel = a
+    private fun calculateFFT(buffer: FloatArray, size: Int): FloatArray {
+        val spectrum = FloatArray(32)
+        val fftSize = minOf(512, size)
+        for (band in 0 until 32) {
+            val freq = 20f * (1000f / 20f).pow(band / 31f)
+            val k = (freq * fftSize / SAMPLE_RATE).toInt().coerceIn(1, fftSize / 2 - 1)
+            var real = 0f; var imag = 0f
+            for (n in 0 until fftSize) {
+                val angle = 2 * PI * k * n / fftSize
+                real += buffer[n] * cos(angle).toFloat()
+                imag -= buffer[n] * sin(angle).toFloat()
+            }
+            val magnitude = sqrt(real * real + imag * imag) / fftSize
+            spectrum[band] = magnitude.coerceIn(0f, 1f)
+        }
+        spectrumHistory.addLast(spectrum.copyOf())
+        if (spectrumHistory.size > 5) spectrumHistory.removeFirst()
+        val smoothed = FloatArray(32)
+        for (i in 0 until 32) {
+            var sum = 0f
+            spectrumHistory.forEach { sum += it[i] }
+            smoothed[i] = sum / spectrumHistory.size
+        }
+        return smoothed
     }
-    fun pfSetParam(p: String, v: Float) { MagiskBridge.setParameter(p, v) }
-    fun applyPFPreset(preset: PFPreset) {
-        MagiskBridge.setAmp(preset.ampModel)
-        MagiskBridge.setParameter("alpha", preset.alpha)
-        MagiskBridge.setParameter("beta",  preset.beta)
-        MagiskBridge.setParameter("gamma", preset.gamma)
-        MagiskBridge.setParameter("delta", preset.delta)
-        MagiskBridge.setParameter("sigma", preset.sigma)
-        MagiskBridge.setDrive(preset.drive); MagiskBridge.setWet(preset.wet)
-        MagiskBridge.setSag(preset.sag)
-        MagiskBridge.setEQBand(0, preset.lowGain); MagiskBridge.setEQBand(3, preset.midGain)
-        MagiskBridge.setEQBand(6, preset.highGain)
-        MagiskBridge.setParameter("presence", preset.presence)
-        setPreset(preset.name)
-        DSPState.pfAmpModel = preset.ampModel; DSPState.pfDrive = preset.drive
-        DSPState.pfWet = preset.wet;           DSPState.pfAlpha = preset.alpha
-        DSPState.pfDelta = preset.delta;       DSPState.pfSigma = preset.sigma
-        DSPState.pfLowGain = preset.lowGain;   DSPState.pfMidGain = preset.midGain
-        DSPState.pfHighGain = preset.highGain; DSPState.pfPresence = preset.presence
-        DSPState.pfSag = preset.sag
-    }
-    fun recordUserAdjustment() {}
-    fun getAIModelVersion(): Int = 1
-    fun getAITotalExperiences(): Int = 0
-    fun getAIInferenceCount(): Long = 0L
-    fun aiGetDeviceTemperature(): Float = 35.0f
-    fun setPreset(n: String) {}
 
-    private fun getDeviceSampleRate(ctx: Context): Int {
-        val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        return am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 48000
+    private fun calculateCorrelation(buffer: FloatArray, size: Int): Float {
+        var sumL = 0f; var sumR = 0f; var sumLR = 0f
+        for (i in 0 until size - 1 step 2) {
+            val L = buffer[i]; val R = buffer[i + 1]
+            sumL += L * L; sumR += R * R; sumLR += L * R
+        }
+        val denom = sqrt(sumL * sumR)        return if (denom > 0.0001f) (sumLR / denom).coerceIn(-1f, 1f) else 1f
     }
-    fun setMasterVolumePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setMasterVolume(v) }
-    fun setBassBoostPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setBassBoost(v) }
-    fun setMidRangePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setMidRange(v) }
-    fun setTreblePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setTreble(v) }
-    fun setReverbLevelPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setReverbLevel(v) }
-    fun setDelayTimePersisted(v: Float) { com.ivannafusion.dsp.DSPState.setDelayTime(v) }
-    fun setDelayFeedbackPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setDelayFeedback(v) }
-    fun setCompressorThresholdPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setCompressorThreshold(v) }
-    fun setCompressorRatioPersisted(v: Float) { com.ivannafusion.dsp.DSPState.setCompressorRatio(v) }
+
+    private fun detectBPM(buffer: FloatArray, size: Int): Float {
+        val now = System.currentTimeMillis()
+        val energy = buffer.take(size).sumOf { (it * it).toDouble() }.toFloat() / size
+        if (energy > 0.01f) {
+            onsetHistory.addLast(now)
+            if (onsetHistory.size > 20) onsetHistory.removeFirst()
+        }
+        if (onsetHistory.size >= 4) {
+            val intervals = mutableListOf<Long>()
+            for (i in 1 until onsetHistory.size) intervals.add(onsetHistory[i] - onsetHistory[i - 1])
+            val avgInterval = intervals.average()
+            if (avgInterval > 0) {
+                val bpm = (60000.0 / avgInterval).toFloat()
+                if (bpm in 60f..180f) return bpm
+            }
+        }
+        return -1f
+    }
+
+    private fun detectGenre(spectrum: FloatArray): String {
+        val lowEnergy = spectrum.take(8).average()
+        val midEnergy = spectrum.slice(8..20).average()
+        val highEnergy = spectrum.takeLast(11).average()
+        return when {
+            lowEnergy > 0.6 && midEnergy < 0.4 -> "BASS"
+            highEnergy > 0.5 && lowEnergy < 0.3 -> "ELECTRONIC"
+            midEnergy > 0.5 && lowEnergy > 0.3 -> "ROCK"
+            highEnergy > 0.4 && midEnergy > 0.4 -> "POP"
+            lowEnergy > 0.4 && highEnergy > 0.3 -> "JAZZ"
+            else -> "UNKNOWN"
+        }
+    }
+
+    fun aiGetRmsDb() = homeostaticRmsDb
+    fun aiGetSpectrum() = homeostaticSpectrum
+    fun getCorrelation() = homeostaticCorrelation
+    fun getLatencyMicros() = homeostaticLatencyMicros
+    fun getGeneration() = homeostaticGeneration
+    fun getBestFitness() = homeostaticFitness
+    fun aiGetDetectedGenre() = homeostaticGenre
+    fun aiGetTempo() = homeostaticTempo
+
+    fun setEQGain(band: Int, gain: Float) { if (band in 0..7) { eqGains[band] = gain; try { nativeSetEQGain(band, gain) } catch (e: Exception) {} } }
+    fun setCompressorThreshold(threshold: Float) { compThreshold = threshold; try { nativeSetCompressorThreshold(threshold) } catch (e: Exception) {} }
+    fun setCompressorRatio(ratio: Float) { compRatio = ratio; try { nativeSetCompressorRatio(ratio) } catch (e: Exception) {} }
+    fun setExciterDrive(drive: Float) { exciterDrive = drive; try { nativeSetExciterDrive(drive) } catch (e: Exception) {} }
+    fun release() {
+        processingJob?.cancel()
+        audioRecord?.stop()
+        audioRecord?.release()
+        audioRecord = null
+        scope.cancel()
+    }
+
+    private external fun nativeInit(sampleRate: Int, channels: Int): Boolean
+    private external fun nativeProcessAudio(input: FloatArray, output: FloatArray, frames: Int)
+    private external fun nativeSetEQGain(band: Int, gain: Float)
+    private external fun nativeSetCompressorThreshold(threshold: Float)
+    private external fun nativeSetCompressorRatio(ratio: Float)
+    private external fun nativeSetExciterDrive(drive: Float)
 }
