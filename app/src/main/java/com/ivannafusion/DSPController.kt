@@ -90,16 +90,16 @@ object DSPController {
     fun eqSetFreq(band: Int, freq: Float) { if (band < 8) setParam(0x10 + band, freq) }
     fun eqSetQ(band: Int, q: Float) { if (band < 8) setParam(0x20 + band, q) }
     fun eqSetEnabled(band: Int, enabled: Boolean) { if (band < 8) setParam(0x30 + band, if(enabled) 1 else 0) }
-    fun eqSetBypass(bypass: Boolean) = setParam(0x40, if(bypass) 1 else 0)
+    fun AudioStubs.eqSetBypass(bypass: Boolean) = setParam(0x40, if(bypass) 1 else 0)
 
     // Compressor
-    fun compSetThreshold(thr: Float) = setParam(0x50, thr)
-    fun compSetRatio(ratio: Float) = setParam(0x51, ratio)
-    fun compSetKnee(knee: Float) = setParam(0x52, knee)
-    fun compSetAttack(attack: Float) = setParam(0x53, attack)
-    fun compSetRelease(release: Float) = setParam(0x54, release)
-    fun compSetMakeup(makeup: Float) = setParam(0x55, makeup)
-    fun compSetBypass(bypass: Boolean) = setParam(0x56, if(bypass) 1 else 0)
+    fun AudioStubs.compSetThreshold(thr: Float) = setParam(0x50, thr)
+    fun AudioStubs.compSetRatio(ratio: Float) = setParam(0x51, ratio)
+    fun AudioStubs.compSetKnee(knee: Float) = setParam(0x52, knee)
+    fun AudioStubs.compSetAttack(attack: Float) = setParam(0x53, attack)
+    fun AudioStubs.compSetRelease(release: Float) = setParam(0x54, release)
+    fun AudioStubs.compSetMakeup(makeup: Float) = setParam(0x55, makeup)
+    fun AudioStubs.compSetBypass(bypass: Boolean) = setParam(0x56, if(bypass) 1 else 0)
 
     // Exciter
     fun excSetDrive(drive: Float) = setParam(0x60, drive)

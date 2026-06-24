@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ─── Flags de compilación ─────────────────────────────────────────────────────
 set(CMAKE_CXX_FLAGS_RELEASE
-    "-O3  -march=armv8-a+simd -ftree-vectorize \
+    "-O3 -ffast-math -march=armv8-a+simd -ftree-vectorize \
      -fno-exceptions -fno-rtti \
      -ffunction-sections -fdata-sections \
      -Wno-unused-result")
