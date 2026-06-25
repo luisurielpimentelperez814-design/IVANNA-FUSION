@@ -41,34 +41,27 @@ class SpatialAudioEngineV2 {
         audioTrack?.play()
 
         scope.launch {
-            val inputShort = ShortArray(bufferSize)
-            val outL = ShortArray(bufferSize)
-            val outR = ShortArray(bufferSize)
+            val input = ShortArray(bufferSize)  // AudioRecord.read() con ShortArray
+            val outL = FloatArray(bufferSize)
+            val outR = FloatArray(bufferSize)
             while (isRunning) {
-                val read = audioRecord?.read(inputShort, 0, bufferSize) ?: 0
+                val read = audioRecord?.read(input, 0, bufferSize) ?: 0
                 if (read > 0) {
-                    // Convertir ShortArray a FloatArray para el procesamiento
+                    // Convertir ShortArray a FloatArray para el motor espacial
                     val inputFloat = FloatArray(bufferSize)
-                    for (i in 0 until bufferSize) {
-                        inputFloat[i] = inputShort[i] / 32767.0f
+                    for (i in 0 until read) {
+                        inputFloat[i] = input[i] / 32767.0f
                     }
-                    val outLFloat = FloatArray(bufferSize)
-                    val outRFloat = FloatArray(bufferSize)
-                    val posX = 10
-                    val posY = 0
-                    val posZ = 5
+                    val posX = DSPState.posX
+                    val posY = DSPState.posY
+                    val posZ = DSPState.posZ
                     val mu = DSPState.mu
-                    IvannaNativeLib.nativeRenderSpatialBlock(inputFloat, outLFloat, outRFloat, posX, posY, posZ, mu)
-                    // Convertir de vuelta a ShortArray
-                    for (i in 0 until bufferSize) {
-                        outL[i] = (outLFloat[i] * 32767.0f).toShort()
-                        outR[i] = (outRFloat[i] * 32767.0f).toShort()
-                    }
-                    // Mezclar en stereo
+                    IvannaNativeLib.nativeRenderSpatialBlock(inputFloat, outL, outR, posX, posY, posZ, mu)
+                    // Mezclar y reproducir (float a short)
                     val mixed = ShortArray(bufferSize * 2)
                     for (i in 0 until bufferSize) {
-                        mixed[i * 2] = outL[i]
-                        mixed[i * 2 + 1] = outR[i]
+                        mixed[i * 2] = (outL[i] * 32767).toInt().coerceIn(-32768, 32767).toShort()
+                        mixed[i * 2 + 1] = (outR[i] * 32767).toInt().coerceIn(-32768, 32767).toShort()
                     }
                     audioTrack?.write(mixed, 0, mixed.size, AudioTrack.WRITE_BLOCKING)
                 }
