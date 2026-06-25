@@ -3,7 +3,8 @@ package com.ivannafusion
 import android.content.Context
 import android.media.AudioManager
 import android.util.Log
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -30,55 +31,55 @@ object DSPState {
     fun saveEQ() { /* DataStore pendiente — los valores ya viven en eqGains */ }
 
     // ── Compresor (normalizado 0..1) ──────────────────────────────────────────
-    var compThreshold by mutableFloatStateOf(0.5f)   // 0 = 0 dB  / 1 = -60 dB
-    var compRatio     by mutableFloatStateOf(0.2f)   // 0 = 1:1   / 1 = 20:1
-    var compAttack    by mutableFloatStateOf(0.1f)   // 0 = 0 ms  / 1 = 200 ms
-    var compRelease   by mutableFloatStateOf(0.3f)   // 0 = 0 ms  / 1 = 3000 ms
-    var compKnee      by mutableFloatStateOf(0.125f) // 0 = 0 dB  / 1 = 24 dB
-    var compMakeup    by mutableFloatStateOf(0.0f)   // 0 = 0 dB  / 1 = 36 dB
+    var compThreshold by mutableStateOf(0.5f)   // 0 = 0 dB  / 1 = -60 dB
+    var compRatio     by mutableStateOf(0.2f)   // 0 = 1:1   / 1 = 20:1
+    var compAttack    by mutableStateOf(0.1f)   // 0 = 0 ms  / 1 = 200 ms
+    var compRelease   by mutableStateOf(0.3f)   // 0 = 0 ms  / 1 = 3000 ms
+    var compKnee      by mutableStateOf(0.125f) // 0 = 0 dB  / 1 = 24 dB
+    var compMakeup    by mutableStateOf(0.0f)   // 0 = 0 dB  / 1 = 36 dB
     var compBypassed: Boolean = false
 
     fun saveCompressor() { /* DataStore pendiente */ }
 
     // ── Convolver ─────────────────────────────────────────────────────────────
     var convType      by mutableStateOf("HALL")
-    var convDecay     by mutableFloatStateOf(0.4f)   // 0..1 → 0.1..10 s
-    var convPreDelay  by mutableFloatStateOf(0.1f)   // 0..1 → 0..500 ms
-    var convDamping   by mutableFloatStateOf(0.5f)
-    var convDiffusion by mutableFloatStateOf(0.7f)
-    var convEarlyMix  by mutableFloatStateOf(0.5f)
-    var convMix       by mutableFloatStateOf(0.3f)   // 0..1 → 0..100 %
-    var convEarlyDelay by mutableFloatStateOf(0.2f)
-    var convEarlyDecay by mutableFloatStateOf(0.1f)
+    var convDecay     by mutableStateOf(0.4f)   // 0..1 → 0.1..10 s
+    var convPreDelay  by mutableStateOf(0.1f)   // 0..1 → 0..500 ms
+    var convDamping   by mutableStateOf(0.5f)
+    var convDiffusion by mutableStateOf(0.7f)
+    var convEarlyMix  by mutableStateOf(0.5f)
+    var convMix       by mutableStateOf(0.3f)   // 0..1 → 0..100 %
+    var convEarlyDelay by mutableStateOf(0.2f)
+    var convEarlyDecay by mutableStateOf(0.1f)
 
     // ── Spatial / Decorrelador ────────────────────────────────────────────────
-    var spatWidth     by mutableFloatStateOf(0.5f)   // 0..1 → 0..5
-    var spatDepth     by mutableFloatStateOf(0.5f)
-    var spatDiffusion by mutableFloatStateOf(0.5f)
-    var spatDelay     by mutableFloatStateOf(0.2f)   // 0..1 → 0..200 ms
-    var spatModRate   by mutableFloatStateOf(0.5f)   // 0..1 → 0..15 Hz
-    var spatMix       by mutableFloatStateOf(0.3f)   // 0..1 → 0..100 %
+    var spatWidth     by mutableStateOf(0.5f)   // 0..1 → 0..5
+    var spatDepth     by mutableStateOf(0.5f)
+    var spatDiffusion by mutableStateOf(0.5f)
+    var spatDelay     by mutableStateOf(0.2f)   // 0..1 → 0..200 ms
+    var spatModRate   by mutableStateOf(0.5f)   // 0..1 → 0..15 Hz
+    var spatMix       by mutableStateOf(0.3f)   // 0..1 → 0..100 %
 
     // ── PF-Engine ─────────────────────────────────────────────────────────────
     var pfAmpModel: Int = 0
-    var pfDrive    by mutableFloatStateOf(0.5f)
-    var pfWet      by mutableFloatStateOf(0.3f)
-    var pfAlpha    by mutableFloatStateOf(1.0f)
-    var pfBeta     by mutableFloatStateOf(0.0f)
-    var pfDelta    by mutableFloatStateOf(0.5f)
-    var pfSigma    by mutableFloatStateOf(0.5f)
-    var pfLowGain  by mutableFloatStateOf(0.0f)
-    var pfMidGain  by mutableFloatStateOf(0.0f)
-    var pfHighGain by mutableFloatStateOf(0.0f)
-    var pfPresence by mutableFloatStateOf(0.0f)
-    var pfFreq     by mutableFloatStateOf(1000f)
-    var pfResonance by mutableFloatStateOf(0.0f)
-    var pfMix      by mutableFloatStateOf(0.5f)
+    var pfDrive    by mutableStateOf(0.5f)
+    var pfWet      by mutableStateOf(0.3f)
+    var pfAlpha    by mutableStateOf(1.0f)
+    var pfBeta     by mutableStateOf(0.0f)
+    var pfDelta    by mutableStateOf(0.5f)
+    var pfSigma    by mutableStateOf(0.5f)
+    var pfLowGain  by mutableStateOf(0.0f)
+    var pfMidGain  by mutableStateOf(0.0f)
+    var pfHighGain by mutableStateOf(0.0f)
+    var pfPresence by mutableStateOf(0.0f)
+    var pfFreq     by mutableStateOf(1000f)
+    var pfResonance by mutableStateOf(0.0f)
+    var pfMix      by mutableStateOf(0.5f)
 
     // ── AI / Motor adaptativo ─────────────────────────────────────────────────
     var aiEnabled     by mutableStateOf(false)
     var aiAutoAdapt   by mutableStateOf(true)
-    var aiSensitivity by mutableFloatStateOf(0.5f)
+    var aiSensitivity by mutableStateOf(0.5f)
 
     // ── Hardware (read-only desde fuera) ──────────────────────────────────────
     var deviceSampleRateHz:     Int     = 48000;  private set

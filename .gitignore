@@ -25,3 +25,10 @@ ghp_*
 id_*
 *.pub
 .ssh/
+
+*.bak
+*.backup
+fix_*.sh
+CONTINUATION_PROMPT*.md
+REPAIRS_SUMMARY.md
+ARCHITECTURE.md
