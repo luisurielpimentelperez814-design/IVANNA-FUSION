@@ -9,9 +9,9 @@ import com.ivannafusion.AudioEngine
 import com.ivannafusion.DSPState
 
 @Composable
-fun AIScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
-    var aiEnabled by remember { mutableStateOf(DSPState.aiEnabled) }
-    var aiAutoAdapt by remember { mutableStateOf(DSPState.aiAutoAdapt) }
+fun AIScreen(onBack: () -> Unit) {
+    var aiEnabled by remember { mutableStateOf<Boolean>(DSPState.aiEnabled) }
+    var aiAutoAdapt by remember { mutableStateOf<Boolean>(DSPState.aiAutoAdapt) }
     var aiSensitivity by remember { mutableFloatStateOf(DSPState.aiSensitivity) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {

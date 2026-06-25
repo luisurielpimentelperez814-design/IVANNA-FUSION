@@ -48,7 +48,7 @@ fun AppNavigation(audioEngine: AudioEngine, presetManager: PresetManager) {
         ) {
             composable("dashboard") { DashboardScreen(audioEngine = audioEngine, onNavigate = { route -> currentRoute = route; navController.navigate(route) }) }
             composable("effects") { EffectsScreen(audioEngine = audioEngine, onBack = { navController.popBackStack() }) }
-            composable("ai") { AIScreen(audioEngine = audioEngine, onBack = { navController.popBackStack() }) }
+            composable("ai") { AIScreen(onBack = { navController.popBackStack() }) }
             composable("presets") { PresetsScreen(audioEngine = audioEngine, presetManager = presetManager, onBack = { navController.popBackStack() }) }
             composable("settings") { SettingsScreen(onBack = { navController.popBackStack() }) }
             composable("pfengine") { PFEngineScreen(audioEngine = audioEngine, onBack = { navController.popBackStack() }) }

@@ -196,7 +196,7 @@ private fun CompressorPanel(audioEngine: AudioEngine) {
 // ─── Convolver ────────────────────────────────────────────────────────────────
 @Composable
 private fun ConvolverPanel(audioEngine: AudioEngine) {
-    var reverbType by remember { mutableStateOf(DSPState.convType) }
+    var reverbType by remember { mutableStateOf<String>(DSPState.convType) }
     var decay     by remember { mutableFloatStateOf(DSPState.convDecay * 9.9f + 0.1f) }    // 0.1..10 s
     var preDelay  by remember { mutableFloatStateOf(DSPState.convPreDelay * 500f) }          // 0..500 ms
     var damping   by remember { mutableFloatStateOf(DSPState.convDamping) }
