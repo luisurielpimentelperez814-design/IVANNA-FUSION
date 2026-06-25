@@ -11,7 +11,7 @@ class SpatialAudioEngineV2 {
     private var isRunning = false
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
-    private val bufferSize = 64
+    private val bufferSize = 256
     private val sampleRate = 48000
 
     fun start() {
@@ -41,23 +41,26 @@ class SpatialAudioEngineV2 {
         audioTrack?.play()
 
         scope.launch {
-            val input = FloatArray(bufferSize)
-            val outL = FloatArray(bufferSize)
-            val outR = FloatArray(bufferSize)
+            val inputShort = ShortArray(bufferSize)
+            val outputL = FloatArray(bufferSize)
+            val outputR = FloatArray(bufferSize)
+
             while (isRunning) {
-                val read = audioRecord?.read(input, 0, bufferSize) ?: 0
+                val read = audioRecord?.read(inputShort, 0, bufferSize) ?: 0
                 if (read > 0) {
-                    val posX = 10
-                    val posY = 0
-                    val posZ = 5
+                    val inputFloat = FloatArray(read) { i -> inputShort[i] / 32767.0f }
                     val mu = DSPState.mu
-                    IvannaNativeLib.nativeRenderSpatialBlock(input, outL, outR, posX, posY, posZ, mu)
-                    val mixed = FloatArray(bufferSize * 2)
-                    for (i in 0 until bufferSize) {
-                        mixed[i * 2] = outL[i]
-                        mixed[i * 2 + 1] = outR[i]
+                    val posX = DSPState.posX
+                    val posY = DSPState.posY
+                    val posZ = DSPState.posZ
+                    IvannaNativeLib.nativeRenderSpatialBlock(inputFloat, outputL, outputR, posX, posY, posZ, mu)
+                    val mixed = FloatArray(read * 2)
+                    for (i in 0 until read) {
+                        mixed[i * 2] = outputL[i]
+                        mixed[i * 2 + 1] = outputR[i]
                     }
-                    audioTrack?.write(mixed, 0, mixed.size, AudioTrack.WRITE_BLOCKING)
+                    val outShort = ShortArray(mixed.size) { i -> (mixed[i] * 32767.0f).toInt().toShort() }
+                    audioTrack?.write(outShort, 0, outShort.size, AudioTrack.WRITE_BLOCKING)
                 }
             }
         }
