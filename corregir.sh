@@ -24,7 +24,7 @@ cd "$PROJECT_DIR" || { echo -e "${ROJO}No se encuentra el proyecto en $PROJECT_D
 echo -e "${AMARILLO}Corrigiendo SpatialAudioEngineV2.kt...${NC}"
 if [ -f app/src/main/java/com/ivannafusion/SpatialAudioEngineV2.kt ]; then
     # Reemplazar "nativeRenderSpatial" por "nativeRenderSpatialBlock"
-    sed -i 's/nativeRenderSpatialBlock(/nativeRenderSpatialBlock(/g' app/src/main/java/com/ivannafusion/SpatialAudioEngineV2.kt
+    sed -i 's/nativeRenderSpatial(/nativeRenderSpatialBlock(/g' app/src/main/java/com/ivannafusion/SpatialAudioEngineV2.kt
     echo -e "${VERDE}✅ SpatialAudioEngineV2.kt corregido.${NC}"
 else
     echo -e "${ROJO}No se encontró SpatialAudioEngineV2.kt, saltando.${NC}"
