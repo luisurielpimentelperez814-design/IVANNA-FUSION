@@ -4,7 +4,16 @@ project("ivanna_jni")
 # ─────────────────────────────────────────────────────────────────────────────
 # Target ivanna_jni (JNI wrapper para la APK)
 # ─────────────────────────────────────────────────────────────────────────────
-add_library(ivanna_jni SHARED jni_wrapper.cpp)
+add_library(ivanna_jni SHARED
+    jni_wrapper.cpp
+    # evolutionary_kernel.cpp provee Java_com_ivannafusion_IvannaNativeLib_nativeInitializeEvolution /
+    # nativeGetBestFitness / nativeGetGeneration / nativeEvolveStep.
+    # phase_oracle.cpp provee nativePredictSamples / nativeGetPhaseState / nativeSetPhaseParameters.
+    # Sin estas dos inclusiones IvannaNativeLib declaraba external fun apuntando a símbolos que nunca
+    # se compilaban → UnsatisfiedLinkError en runtime.
+    evolutionary_kernel.cpp
+    phase_oracle.cpp
+)
 
 target_include_directories(ivanna_jni PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

@@ -249,3 +249,94 @@ extern "C" JNIEXPORT jfloat JNICALL Java_com_ivannafusion_AudioEngine_nativeGetO
 }
 
 // ═══════════════════════════════════════════════════════════════
+// STUBS DE IvannaNativeLib — funciones declaradas en IvannaNativeLib.kt
+// que NO tienen implementación real todavía en este target.
+// Están aquí para que el linker las resuelva y evitar el
+// UnsatisfiedLinkError que ocurría antes de este commit.
+// Cuando existan implementaciones reales, reemplazar estos stubs
+// en sus archivos fuente correspondientes (o aquí mismo) sin
+// cambiar los nombres de símbolo.
+// ═══════════════════════════════════════════════════════════════
+
+// --- Audio Engine bridge (AudioEngine.kt ya gestiona el motor real; ---
+// --- estos son un segundo punto de entrada alternativo pendiente)   ---
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeInitAudioEngine(JNIEnv*, jobject, jint sampleRate, jint bufferSize) {
+    LOGI("IvannaNativeLib.nativeInitAudioEngine(%d, %d) — stub", sampleRate, bufferSize);
+    return JNI_TRUE;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeProcessAudio(JNIEnv* env, jobject, jfloatArray in, jfloatArray out) {
+    jsize len = env->GetArrayLength(in);
+    // Passthrough stub: copia entrada → salida sin procesar
+    jfloat* inBuf  = env->GetFloatArrayElements(in,  nullptr);
+    jfloat* outBuf = env->GetFloatArrayElements(out, nullptr);
+    jsize   outLen = env->GetArrayLength(out);
+    jsize   copy   = len < outLen ? len : outLen;
+    for (jsize i = 0; i < copy; i++) outBuf[i] = inBuf[i];
+    env->ReleaseFloatArrayElements(in,  inBuf,  JNI_ABORT);
+    env->ReleaseFloatArrayElements(out, outBuf, 0);
+    return (jint)copy;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeReleaseAudioEngine(JNIEnv*, jobject) {
+    LOGI("IvannaNativeLib.nativeReleaseAudioEngine — stub");
+    return JNI_TRUE;
+}
+
+// --- Preset / Persistence ---
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeLoadPreset(JNIEnv* env, jobject, jstring presetName) {
+    const char* name = env->GetStringUTFChars(presetName, nullptr);
+    LOGI("IvannaNativeLib.nativeLoadPreset('%s') — stub", name);
+    env->ReleaseStringUTFChars(presetName, name);
+    return JNI_TRUE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeSavePreset(JNIEnv* env, jobject, jstring presetName) {
+    const char* name = env->GetStringUTFChars(presetName, nullptr);
+    LOGI("IvannaNativeLib.nativeSavePreset('%s') — stub", name);
+    env->ReleaseStringUTFChars(presetName, name);
+    return JNI_TRUE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeGetCurrentParams(JNIEnv* env, jobject) {
+    LOGI("IvannaNativeLib.nativeGetCurrentParams — stub");
+    return env->NewStringUTF("{}");
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeSetParams(JNIEnv* env, jobject, jstring params) {
+    const char* p = env->GetStringUTFChars(params, nullptr);
+    LOGI("IvannaNativeLib.nativeSetParams('%s') — stub", p);
+    env->ReleaseStringUTFChars(params, p);
+    return JNI_TRUE;
+}
+
+// --- AI Engine ---
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeInitializeAI(JNIEnv* env, jobject, jstring modelPath) {
+    const char* path = env->GetStringUTFChars(modelPath, nullptr);
+    LOGI("IvannaNativeLib.nativeInitializeAI('%s') — stub (requiere modelo .tflite cargado)", path);
+    env->ReleaseStringUTFChars(modelPath, path);
+    return JNI_FALSE;  // false = modelo no disponible todavía; la UI debe manejarlo
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeInferenceAI(JNIEnv* env, jobject, jfloatArray inputData) {
+    LOGI("IvannaNativeLib.nativeInferenceAI — stub, devolviendo array vacío");
+    jfloatArray result = env->NewFloatArray(1);
+    float zero = 0.0f;
+    env->SetFloatArrayRegion(result, 0, 1, &zero);
+    return result;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_ivannafusion_IvannaNativeLib_nativeReleaseAI(JNIEnv*, jobject) {
+    LOGI("IvannaNativeLib.nativeReleaseAI — stub");
+    return JNI_TRUE;
+}
