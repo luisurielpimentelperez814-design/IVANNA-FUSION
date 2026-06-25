@@ -494,6 +494,10 @@ class AudioEngine {
     fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
     fun updatePfMix(value: Float) { DSPState.pfMix = value }
     fun resetPfEvolution() { /* stub */ }
+    // Métodos PF adicionales (añadidos por script)
+    fun pfGetBarCount(): Int { return 0 /* stub */ }
+    fun pfEvoStop() { /* stub */ }
+    fun pfEvoReset() { /* stub */ }
 }
 
 // ===== Stubs para PF-Engine (añadidos para evitar errores de compilación) =====
@@ -510,6 +514,10 @@ fun pfSetAmp(model: Int) {
     fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
     fun updatePfMix(value: Float) { DSPState.pfMix = value }
     fun resetPfEvolution() { /* stub */ }
+    // Métodos PF adicionales (añadidos por script)
+    fun pfGetBarCount(): Int { return 0 /* stub */ }
+    fun pfEvoStop() { /* stub */ }
+    fun pfEvoReset() { /* stub */ }
 }
 
 fun pfSetParam(name: String, value: Float) {
@@ -525,6 +533,10 @@ fun pfSetParam(name: String, value: Float) {
     fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
     fun updatePfMix(value: Float) { DSPState.pfMix = value }
     fun resetPfEvolution() { /* stub */ }
+    // Métodos PF adicionales (añadidos por script)
+    fun pfGetBarCount(): Int { return 0 /* stub */ }
+    fun pfEvoStop() { /* stub */ }
+    fun pfEvoReset() { /* stub */ }
 }
 
 fun applyPFPreset(name: String) {
@@ -540,6 +552,10 @@ fun applyPFPreset(name: String) {
     fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
     fun updatePfMix(value: Float) { DSPState.pfMix = value }
     fun resetPfEvolution() { /* stub */ }
+    // Métodos PF adicionales (añadidos por script)
+    fun pfGetBarCount(): Int { return 0 /* stub */ }
+    fun pfEvoStop() { /* stub */ }
+    fun pfEvoReset() { /* stub */ }
 }
 
 fun pfEvoTick() {
@@ -555,6 +571,10 @@ fun pfEvoTick() {
     fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
     fun updatePfMix(value: Float) { DSPState.pfMix = value }
     fun resetPfEvolution() { /* stub */ }
+    // Métodos PF adicionales (añadidos por script)
+    fun pfGetBarCount(): Int { return 0 /* stub */ }
+    fun pfEvoStop() { /* stub */ }
+    fun pfEvoReset() { /* stub */ }
 }
 
 fun pfEvoReset() {
@@ -570,6 +590,10 @@ fun pfEvoReset() {
     fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
     fun updatePfMix(value: Float) { DSPState.pfMix = value }
     fun resetPfEvolution() { /* stub */ }
+    // Métodos PF adicionales (añadidos por script)
+    fun pfGetBarCount(): Int { return 0 /* stub */ }
+    fun pfEvoStop() { /* stub */ }
+    fun pfEvoReset() { /* stub */ }
 }
 
 fun pfEvoStop() {
@@ -585,6 +609,10 @@ fun pfEvoStop() {
     fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
     fun updatePfMix(value: Float) { DSPState.pfMix = value }
     fun resetPfEvolution() { /* stub */ }
+    // Métodos PF adicionales (añadidos por script)
+    fun pfGetBarCount(): Int { return 0 /* stub */ }
+    fun pfEvoStop() { /* stub */ }
+    fun pfEvoReset() { /* stub */ }
 }
 
 fun pfGetBarCount(): Int = 0
