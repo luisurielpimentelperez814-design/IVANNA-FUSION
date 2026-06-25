@@ -53,7 +53,7 @@ jobs:
             -alias androiddebugkey \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
-            -dname "CN=GORE TNS, OU=IVANNA, O=IVANNA-FUSION, L=MX, ST=Estado de Mexico, C=MX"
+            -dname "CN=Debug, OU=Android, O=Android, L=Unknown, ST=Unknown, C=US"
 
       - name: Clean Gradle caches
         run: |
