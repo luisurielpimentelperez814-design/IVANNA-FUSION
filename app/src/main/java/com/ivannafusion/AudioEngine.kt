@@ -391,7 +391,20 @@ class AudioEngine {
     // ── PF Engine ────────────────────────────────────────────────────────────
     fun pfSetParam(paramName: String, value: Float) {
         when (paramName) {
-            "amp_model" -> { /* índice de modelo de amplificador — sin tabla de modelos real conectada todavía */ }
+            "drive"     -> DSPState.pfDrive     = value
+            "wet"       -> DSPState.pfWet       = value
+            "alpha"     -> DSPState.pfAlpha     = value
+            "beta"      -> DSPState.pfBeta      = value
+            "delta"     -> DSPState.pfDelta     = value
+            "sigma"     -> DSPState.pfSigma     = value
+            "freq"      -> DSPState.pfFreq      = value
+            "resonance" -> DSPState.pfResonance = value
+            "mix"       -> DSPState.pfMix       = value
+            "low"       -> DSPState.pfLowGain   = value
+            "mid"       -> DSPState.pfMidGain   = value
+            "high"      -> DSPState.pfHighGain  = value
+            "presence"  -> DSPState.pfPresence  = value
+            "amp_model" -> DSPState.pfAmpModel  = value.toInt()
             else -> Log.w(TAG, "pfSetParam: parámetro desconocido '$paramName'")
         }
     }
@@ -499,120 +512,3 @@ class AudioEngine {
     fun pfEvoStop() { /* stub */ }
     fun pfEvoReset() { /* stub */ }
 }
-
-// ===== Stubs para PF-Engine (añadidos para evitar errores de compilación) =====
-fun pfSetAmp(model: Int) {
-    // Implementación real iría aquí
-    // PF-Engine methods (added by patch)
-    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
-    fun updatePfWet(value: Float) { DSPState.pfWet = value }
-    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
-    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
-    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
-    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
-    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
-    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
-    fun updatePfMix(value: Float) { DSPState.pfMix = value }
-    fun resetPfEvolution() { /* stub */ }
-    // Métodos PF adicionales (añadidos por script)
-    fun pfGetBarCount(): Int { return 0 /* stub */ }
-    fun pfEvoStop() { /* stub */ }
-    fun pfEvoReset() { /* stub */ }
-}
-
-fun pfSetParam(name: String, value: Float) {
-    // Implementación real iría aquí
-    // PF-Engine methods (added by patch)
-    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
-    fun updatePfWet(value: Float) { DSPState.pfWet = value }
-    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
-    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
-    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
-    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
-    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
-    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
-    fun updatePfMix(value: Float) { DSPState.pfMix = value }
-    fun resetPfEvolution() { /* stub */ }
-    // Métodos PF adicionales (añadidos por script)
-    fun pfGetBarCount(): Int { return 0 /* stub */ }
-    fun pfEvoStop() { /* stub */ }
-    fun pfEvoReset() { /* stub */ }
-}
-
-fun applyPFPreset(name: String) {
-    // Implementación real iría aquí
-    // PF-Engine methods (added by patch)
-    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
-    fun updatePfWet(value: Float) { DSPState.pfWet = value }
-    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
-    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
-    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
-    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
-    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
-    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
-    fun updatePfMix(value: Float) { DSPState.pfMix = value }
-    fun resetPfEvolution() { /* stub */ }
-    // Métodos PF adicionales (añadidos por script)
-    fun pfGetBarCount(): Int { return 0 /* stub */ }
-    fun pfEvoStop() { /* stub */ }
-    fun pfEvoReset() { /* stub */ }
-}
-
-fun pfEvoTick() {
-    // Implementación real iría aquí
-    // PF-Engine methods (added by patch)
-    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
-    fun updatePfWet(value: Float) { DSPState.pfWet = value }
-    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
-    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
-    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
-    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
-    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
-    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
-    fun updatePfMix(value: Float) { DSPState.pfMix = value }
-    fun resetPfEvolution() { /* stub */ }
-    // Métodos PF adicionales (añadidos por script)
-    fun pfGetBarCount(): Int { return 0 /* stub */ }
-    fun pfEvoStop() { /* stub */ }
-    fun pfEvoReset() { /* stub */ }
-}
-
-fun pfEvoReset() {
-    // Implementación real iría aquí
-    // PF-Engine methods (added by patch)
-    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
-    fun updatePfWet(value: Float) { DSPState.pfWet = value }
-    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
-    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
-    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
-    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
-    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
-    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
-    fun updatePfMix(value: Float) { DSPState.pfMix = value }
-    fun resetPfEvolution() { /* stub */ }
-    // Métodos PF adicionales (añadidos por script)
-    fun pfGetBarCount(): Int { return 0 /* stub */ }
-    fun pfEvoStop() { /* stub */ }
-    fun pfEvoReset() { /* stub */ }
-}
-
-fun pfEvoStop() {
-    // Implementación real iría aquí
-    // PF-Engine methods (added by patch)
-    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
-    fun updatePfWet(value: Float) { DSPState.pfWet = value }
-    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
-    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
-    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
-    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
-    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
-    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
-    fun updatePfMix(value: Float) { DSPState.pfMix = value }
-    fun resetPfEvolution() { /* stub */ }
-    // Métodos PF adicionales (añadidos por script)
-    fun pfGetBarCount(): Int { return 0 /* stub */ }
-    fun pfEvoStop() { /* stub */ }
-    fun pfEvoReset() { /* stub */ }
-}
-
-fun pfGetBarCount(): Int = 0

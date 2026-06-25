@@ -5,6 +5,7 @@ import android.media.AudioManager
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import com.ivannafusion.persistence.ParameterStore
 
 object DSPState {
     private const val TAG = "DSPState"
@@ -49,18 +50,7 @@ object DSPState {
     var aiEnabled: Boolean = false
     var aiAutoAdapt: Boolean = true
     var aiSensitivity: Float = 0.5f
-1    var pfBeta: Float = 0.0f
-    var pfFreq: Float = 1000f
-    var pfResonance: Float = 0.0f
-    var pfMix: Float = 0.5f
-    var aiEnabled: Boolean = false
-    var aiAutoAdapt: Boolean = true
-    var aiSensitivity: Float = 0.5f
-
-    // AI
-    var aiEnabled: Boolean = false
-    var aiAutoAdapt: Boolean = false
-    var aiSensitivity: Float = 0.5f
+    var pfBeta: Float = 0.0f
 
     // Hardware
     var deviceSampleRateHz: Int = 48000

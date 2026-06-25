@@ -53,6 +53,7 @@ class IVANNAApplication : Application() {
 
                 // Arrancar el daemon JNI (es no-op si el standalone de Magisk
                 // ya está corriendo — solo conecta el socket).
+                val daemonOk = OmegaDaemon.start()
                 Log.d(TAG, if (daemonOk) "✅ OmegaDaemon iniciado" else "⚠️ OmegaDaemon no disponible (¿Magisk standalone corriendo?)")
 
                 // Pequeña espera para que el socket esté listo antes de conectar
