@@ -81,11 +81,18 @@ android {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
+        // libomega_effect.so es un efecto AudioFlinger — AudioFlinger la carga
+        // desde /vendor/lib64/soundfx/ (instalada por el módulo Magisk).
+        // La APK nunca hace System.loadLibrary("omega_effect"), por lo que
+        // empaquetarla en el APK no sirve y puede causar conflictos de versión.
+        jniLibs {
+            excludes += ['**/libomega_effect.so']
+        }
     }
 
     externalNativeBuild {
         cmake {
-            path "src/CMakeLists.txt"
+            path "src/main/cpp/CMakeLists.txt"
         }
     }
 }
@@ -101,6 +108,11 @@ dependencies {
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.compose.runtime:runtime-livedata'
     implementation 'androidx.constraintlayout:constraintlayout-compose:1.0.1'
+
+    // Navigation Compose
+    implementation 'androidx.navigation:navigation-compose:2.7.7'
+    // Material Icons Extended (Dashboard, GraphicEq, etc.)
+    implementation 'androidx.compose.material:material-icons-extended'
 
     // DataStore
     implementation 'androidx.datastore:datastore-preferences:1.0.0'
