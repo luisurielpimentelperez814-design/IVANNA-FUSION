@@ -1,4 +1,0 @@
-#!/system/bin/sh
-# Iniciar daemon al boot
-sleep 5
-/system/bin/omega_daemon &

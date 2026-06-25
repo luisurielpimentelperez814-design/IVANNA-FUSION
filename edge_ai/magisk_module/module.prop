@@ -1,6 +1,0 @@
-id=omega_in
-name=Omega_in Edge AI Engine
-version=v1.0.0
-versionCode=1
-author=IVANNA Fusion
-description=Mobile Edge AI audio processing. Sliced Wasserstein, Complex CNN, Mamba-Tiny. Snapdragon 7s Gen 2 optimized.
