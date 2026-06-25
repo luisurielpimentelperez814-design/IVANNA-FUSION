@@ -5,7 +5,6 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -15,10 +14,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.*
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,14 +29,12 @@ fun SettingsScreen(onBack: () -> Unit) {
     val transitionState = remember { MutableTransitionState(false) }
     transitionState.targetState = true
 
-    // Valores reales desde DSPState
+    // Valores REALES del hardware (ahora existen en DSPState)
     val sampleRate = DSPState.deviceSampleRateHz
     val framesPerBuffer = DSPState.deviceFramesPerBuffer
     val supportsHighRes = DSPState.deviceSupportsHighRes
-    val bufferLatencyUs = if (sampleRate > 0 && framesPerBuffer > 0)
-        (framesPerBuffer.toLong() * 1_000_000L / sampleRate) else 0L
+    val bufferLatencyUs = DSPState.deviceBufferLatencyUs
 
-    // Información de sesión
     val sessionInfo = listOf(
         SessionInfo("Versión", "2.1.0", Icons.Outlined.Info),
         SessionInfo("Build", "2025.06.21", Icons.Outlined.Build),
@@ -47,10 +42,10 @@ fun SettingsScreen(onBack: () -> Unit) {
     )
 
     val hardwareItems = listOf(
-        HardwareItem("Sample Rate", "$sampleRate Hz", Icons.Outlined.Speed, "Frecuencia nativa del dispositivo"),
+        HardwareItem("Sample Rate", "$sampleRate Hz", Icons.Outlined.Speed, "Frecuencia de muestreo nativa"),
         HardwareItem("Formato interno", "32-bit float", Icons.Outlined.Analytics, "Procesamiento en coma flotante"),
         HardwareItem("Frames por buffer", if (framesPerBuffer > 0) "$framesPerBuffer" else "—", Icons.Outlined.ViewAgenda, "Tamaño del bloque de procesamiento"),
-        HardwareItem("Latencia estimada", if (bufferLatencyUs > 0) "${bufferLatencyUs} μs" else "—", Icons.Outlined.Timer, "Latencia de ida y vuelta del buffer")
+        HardwareItem("Latencia estimada", if (bufferLatencyUs > 0) "${bufferLatencyUs} μs" else "—", Icons.Outlined.Timer, "Latencia de ida y vuelta")
     )
 
     LazyColumn(
@@ -58,27 +53,15 @@ fun SettingsScreen(onBack: () -> Unit) {
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF0A0A0F),
-                        Color(0xFF14141A)
-                    )
+                    colors = listOf(Color(0xFF0A0A0F), Color(0xFF14141A))
                 )
             )
             .padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
         contentPadding = PaddingValues(vertical = 24.dp)
     ) {
-        // Encabezado
         item {
-            AnimatedContent(
-                targetState = transitionState.currentState,
-                transitionSpec = {
-                    fadeIn() + slideInHorizontally(
-                        initialOffsetX = { -it / 2 },
-                        animationSpec = tween(400, easing = FastOutSlowInEasing)
-                    )
-                }
-            ) { _ ->
+            AnimatedContent(transitionState.currentState) { _ ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -91,143 +74,75 @@ fun SettingsScreen(onBack: () -> Unit) {
                             .clip(RoundedCornerShape(14.dp))
                             .background(
                                 brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color(0x22FFFFFF),
-                                        Color(0x11FFFFFF)
-                                    )
+                                    colors = listOf(Color(0x22FFFFFF), Color(0x11FFFFFF))
                                 ),
                                 shape = RoundedCornerShape(14.dp)
                             )
                     ) {
-                        Icon(
-                            Icons.Filled.ArrowBack,
-                            contentDescription = "Atrás",
-                            tint = Color.White.copy(alpha = 0.8f)
-                        )
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Atrás", tint = Color.White.copy(0.8f))
                     }
-
                     Text(
                         text = "CONFIGURACIÓN",
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.W300,
                             letterSpacing = 2.5.sp,
                             fontSize = 20.sp,
-                            color = Color.White.copy(alpha = 0.9f)
+                            color = Color.White.copy(0.9f)
                         ),
                         textAlign = TextAlign.Center
                     )
-
                     Spacer(modifier = Modifier.width(48.dp))
                 }
             }
         }
 
-        // Tarjeta de hardware
         item {
-            AnimatedCard(
-                delay = 0,
-                transitionState = transitionState
-            ) {
+            AnimatedCard(delay = 0, transitionState) {
                 Column {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    ) {
-                        Icon(
-                            Icons.Outlined.Memory,
-                            contentDescription = null,
-                            tint = AccentCyan.copy(alpha = 0.7f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "HARDWARE REAL",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.W600,
-                                letterSpacing = 1.8.sp,
-                                color = AccentCyan.copy(alpha = 0.8f),
-                                fontSize = 11.sp
-                            )
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
+                        Icon(Icons.Outlined.Memory, null, tint = AccentCyan.copy(0.7f), modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text("HARDWARE REAL", style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.W600, letterSpacing = 1.8.sp, color = AccentCyan.copy(0.8f), fontSize = 11.sp
+                        ))
+                        Spacer(Modifier.weight(1f))
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(
-                                    if (supportsHighRes) AccentEmerald
-                                    else AccentAmber
-                                )
+                                .background(if (supportsHighRes) AccentEmerald else AccentAmber)
                         )
                     }
-
                     hardwareItems.forEach { item ->
-                        HardwareParameterRow(
-                            icon = item.icon,
-                            label = item.label,
-                            value = item.value,
-                            description = item.description,
-                            modifier = Modifier.padding(vertical = 6.dp)
-                        )
+                        HardwareParameterRow(item.icon, item.label, item.value, item.description, Modifier.padding(vertical = 6.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(Modifier.height(12.dp))
                     if (!supportsHighRes) {
                         ElevatedCard(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = AccentAmber.copy(alpha = 0.08f)
-                            )
+                            colors = CardDefaults.elevatedCardColors(containerColor = AccentAmber.copy(0.08f))
                         ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Outlined.WarningAmber,
-                                    contentDescription = null,
-                                    tint = AccentAmber,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "192 kHz / 24-bit reales requieren DAC USB-C externo",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = AccentAmber.copy(alpha = 0.8f),
-                                        fontSize = 10.sp,
-                                        letterSpacing = 0.3.sp
-                                    )
-                                )
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.WarningAmber, null, tint = AccentAmber, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text("192 kHz / 24-bit reales requieren DAC USB-C externo", style = MaterialTheme.typography.labelSmall.copy(
+                                    color = AccentAmber.copy(0.8f), fontSize = 10.sp, letterSpacing = 0.3.sp
+                                ))
                             }
                         }
                     } else {
                         ElevatedCard(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = AccentEmerald.copy(alpha = 0.08f)
-                            )
+                            colors = CardDefaults.elevatedCardColors(containerColor = AccentEmerald.copy(0.08f))
                         ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Outlined.CheckCircle,
-                                    contentDescription = null,
-                                    tint = AccentEmerald,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "Hardware compatible con alta resolución",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = AccentEmerald.copy(alpha = 0.8f),
-                                        fontSize = 10.sp,
-                                        letterSpacing = 0.3.sp
-                                    )
-                                )
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.CheckCircle, null, tint = AccentEmerald, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text("Hardware compatible con alta resolución", style = MaterialTheme.typography.labelSmall.copy(
+                                    color = AccentEmerald.copy(0.8f), fontSize = 10.sp, letterSpacing = 0.3.sp
+                                ))
                             }
                         }
                     }
@@ -235,211 +150,95 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // Tarjeta de información
         item {
-            AnimatedCard(
-                delay = 100,
-                transitionState = transitionState
-            ) {
+            AnimatedCard(delay = 100, transitionState) {
                 Column {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    ) {
-                        Icon(
-                            Icons.Outlined.Info,
-                            contentDescription = null,
-                            tint = AccentCyan.copy(alpha = 0.7f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "ACERCA DE",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.W600,
-                                letterSpacing = 1.8.sp,
-                                color = AccentCyan.copy(alpha = 0.8f),
-                                fontSize = 11.sp
-                            )
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
+                        Icon(Icons.Outlined.Info, null, tint = AccentCyan.copy(0.7f), modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text("ACERCA DE", style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.W600, letterSpacing = 1.8.sp, color = AccentCyan.copy(0.8f), fontSize = 11.sp
+                        ))
                     }
-
                     sessionInfo.forEach { info ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    info.icon,
-                                    contentDescription = null,
-                                    tint = Color.White.copy(alpha = 0.3f),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = info.label,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = Color.White.copy(alpha = 0.5f),
-                                        fontSize = 13.sp
-                                    )
-                                )
+                                Icon(info.icon, null, tint = Color.White.copy(0.3f), modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Text(info.label, style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = Color.White.copy(0.5f), fontSize = 13.sp
+                                ))
                             }
-                            Text(
-                                text = info.value,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.W400,
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    fontSize = 14.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            )
+                            Text(info.value, style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.W400, color = Color.White.copy(0.9f), fontSize = 14.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            ))
                         }
                     }
                 }
             }
         }
 
-        item { Spacer(modifier = Modifier.height(40.dp)) }
+        item { Spacer(Modifier.height(40.dp)) }
     }
 }
 
-// ======================================================================
-// COMPONENTES REUTILIZABLES
-// ======================================================================
+// ===== COMPONENTES =====
 
 @Composable
-private fun AnimatedCard(
-    delay: Int,
-    transitionState: MutableTransitionState<Boolean>,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    val animatedAlpha by animateFloatAsState(
+private fun AnimatedCard(delay: Int, transitionState: MutableTransitionState<Boolean>, content: @Composable ColumnScope.() -> Unit) {
+    val alpha by animateFloatAsState(
         targetValue = if (transitionState.currentState) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = 600,
-            delayMillis = delay,
-            easing = FastOutSlowInEasing
-        )
+        animationSpec = tween(600, delayMillis = delay, easing = FastOutSlowInEasing)
     )
-
-    val animatedOffset by animateDpAsState(
+    val offset by animateDpAsState(
         targetValue = if (transitionState.currentState) 0.dp else 20.dp,
-        animationSpec = tween(
-            durationMillis = 500,
-            delayMillis = delay,
-            easing = FastOutSlowInEasing
-        )
+        animationSpec = tween(500, delayMillis = delay, easing = FastOutSlowInEasing)
     )
-
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .offset(y = animatedOffset)
-            .alpha(animatedAlpha)
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(20.dp),
-                clip = false,
-                ambientColor = Color.Black.copy(alpha = 0.3f),
-                spotColor = Color.Black.copy(alpha = 0.5f)
-            ),
+        modifier = Modifier.fillMaxWidth().offset(y = offset).alpha(alpha)
+            .shadow(elevation = 8.dp, shape = RoundedCornerShape(20.dp), clip = false,
+                ambientColor = Color.Black.copy(0.3f), spotColor = Color.Black.copy(0.5f)),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0x1AFFFFFF)
-        ),
-        border = androidx.compose.foundation.BorderStroke(
-            width = 1.dp,
-            color = Color.White.copy(alpha = 0.06f)
-        )
+        colors = CardDefaults.cardColors(containerColor = Color(0x1AFFFFFF)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(0.06f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0x22FFFFFF),
-                            Color(0x0AFFFFFF)
-                        ),
-                        startY = 0f,
-                        endY = 1f
-                    )
-                )
+                .background(Brush.verticalGradient(colors = listOf(Color(0x22FFFFFF), Color(0x0AFFFFFF))))
                 .padding(horizontal = 20.dp, vertical = 20.dp)
-        ) {
-            content()
-        }
+        ) { content() }
     }
 }
 
 @Composable
-private fun HardwareParameterRow(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    description: String,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+private fun HardwareParameterRow(icon: ImageVector, label: String, value: String, description: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.3f),
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 13.sp
-                    )
-                )
+                Icon(icon, null, tint = Color.White.copy(0.3f), modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(label, style = MaterialTheme.typography.bodyMedium.copy(
+                    color = Color.White.copy(0.6f), fontSize = 13.sp
+                ))
             }
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.W400,
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 14.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-            )
+            Text(value, style = MaterialTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.W400, color = Color.White.copy(0.9f), fontSize = 14.sp,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+            ))
         }
         if (description.isNotEmpty()) {
-            Text(
-                text = description,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    color = Color.White.copy(alpha = 0.25f),
-                    fontSize = 9.sp,
-                    letterSpacing = 0.3.sp
-                ),
-                modifier = Modifier.padding(start = 30.dp, top = 2.dp)
-            )
+            Text(description, style = MaterialTheme.typography.labelSmall.copy(
+                color = Color.White.copy(0.25f), fontSize = 9.sp, letterSpacing = 0.3.sp
+            ), modifier = Modifier.padding(start = 30.dp, top = 2.dp))
         }
     }
 }
 
-private data class SessionInfo(
-    val label: String,
-    val value: String,
-    val icon: ImageVector
-)
-
-private data class HardwareItem(
-    val label: String,
-    val value: String,
-    val icon: ImageVector,
-    val description: String = ""
-)
+private data class SessionInfo(val label: String, val value: String, val icon: ImageVector)
+private data class HardwareItem(val label: String, val value: String, val icon: ImageVector, val description: String = "")
