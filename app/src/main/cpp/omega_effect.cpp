@@ -2,43 +2,27 @@
  * IVANNA-FUSION / Ω_in
  * omega_effect.cpp — Audio Effect Plugin (productor del ring buffer SPSC)
  *
- * ── CORRECCIÓN CRÍTICA DE ESTABILIDAD ──────────────────────────────────────
- * La versión anterior de este archivo SOLO exportaba funciones JNI
- * (Java_com_ivannafusion_OmegaEffect_*), pero audio_effects.xml le pide a
- * audioserver que cargue libomega_effect.so como un Audio Effect HAL
- * NATIVO (preprocess de stream "music"). audioserver busca el símbolo
- * AUDIO_EFFECT_LIBRARY_INFO_SYM (una tabla audio_effect_library_t) al
- * hacer dlopen() de esta librería — un símbolo que NO existía en la
- * versión anterior. Esto causaba que audioserver (un proceso crítico del
- * sistema) fallara al intentar cargar el efecto en cuanto cualquier app
- * reproducía música, lo cual puede manifestarse como pantalla negra,
- * comportamiento errático y reinicios en bucle del dispositivo.
+ * CAMBIO CRÍTICO: mapSharedMemory() ahora usa SCM_RIGHTS en lugar de
+ * open("/data/local/tmp/omega_shared_mem").
  *
- * Esta versión implementa la interfaz real audio_effect_library_t (mismo
- * patrón ya verificado y funcionando en src/cpp/effect_library.cpp para
- * libivanna_fusion.so), y MUEVE la lógica del ring buffer SPSC al hot
- * path correcto: Effect_Process(), llamado por audioserver, no por JNI.
+ * La versión anterior fallaba porque audioserver (UID=1041, dominio SELinux
+ * "audioserver") no tiene permiso para abrir shell_data_file (/data/local/tmp).
+ * El open() devolvía EACCES, mmap() sobre fd=-1 producía comportamiento
+ * indefinido (SIGSEGV o MAP_FAILED en función del compilador), colapsando
+ * audioserver → reinicio en bucle del sistema de audio / pantalla negra.
  *
- * ARQUITECTURA (sin cambios de diseño, solo de superficie de carga):
- *   1. Este archivo (libomega_effect.so): vive dentro de audioserver,
- *      intercepta el audio del sistema vía el Effect HAL real. SOLO
- *      mueve datos al/del ring buffer compartido. JAMÁS ejecuta
- *      inferencia de IA aquí.
- *   2. omega_daemon (root, proceso separado): lee del ring buffer de
- *      entrada, ejecuta la inferencia Ω_in, escribe en el ring buffer
- *      de salida.
- *   3. APK (OmegaMagiskBridge.kt): controla parámetros vía Unix Domain
- *      Socket directamente al daemon, no a este efecto.
+ * Solución: omega_daemon crea la shm con memfd_create() y la pasa vía
+ * SCM_RIGHTS en el primer mensaje del socket abstracto Unix. audioserver
+ * puede recibir un fd via socket sin ninguna restricción SELinux adicional.
+ * El efecto conecta al socket, lee el fd, mapea y cierra inmediatamente la
+ * conexión — el canal de comandos lo gestiona la APK por separado.
  *
- * REGLA DE ORO: si el daemon no entrega un bloque de salida a tiempo
- * (ring_out vacío), este efecto pasa el audio de entrada sin modificar
- * (bypass) en vez de silenciar o bloquear. Nunca se espera/duerme aquí.
- *
- * Las funciones JNI Java_com_ivannafusion_OmegaEffect_* se conservan al
- * final de este archivo para no romper compatibilidad con código Kotlin
- * existente que las invoque para control/diagnóstico desde la app, pero
- * ya NO son el mecanismo por el que audioserver carga ni ejecuta el
- * efecto — eso ahora pasa exclusivamente por la vtable de abajo.
+ * ARQUITECTURA (sin cambios de diseño):
+ *   1. Este archivo (libomega_effect.so): vive en audioserver, intercepta
+ *      audio vía Effect HAL real. SOLO mueve datos al/del ring buffer.
+ *   2. omega_daemon (root, ejecutable standalone del módulo Magisk): lee
+ *      del ring_in, ejecuta inferencia, escribe en ring_out.
+ *   3. APK (OmegaMagiskBridge.kt): controla parámetros vía el mismo socket.
  */
 
 #include "audio_effect_compat.h"
@@ -50,116 +34,130 @@
 #include <android/log.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
-
 #include <jni.h>
-
 #include "omega_shared.h"
 
-// ─── Compatibilidad mínima con <system/audio.h> (igual que effect_library.cpp) ──
 #ifndef AUDIO_CHANNEL_OUT_STEREO
 #define AUDIO_CHANNEL_OUT_STEREO 0x3u
 #endif
 #ifndef AUDIO_FORMAT_PCM_FLOAT
 #define AUDIO_FORMAT_PCM_FLOAT   0x5u
 #endif
-// typedef uint32_t audio_format_t;
-
-/* static inline int audio_channel_count_from_out_mask(uint32_t mask) {
-    int n = 0;
-    while (mask) { n += (mask & 1u); mask >>= 1u; }
-    return n;
-}
-*/
-
-static const effect_uuid_t kEffectUuidNull = {0, 0, 0, 0, {0,0,0,0,0,0}};
-// #define EFFECT_UUID_NULL (&kEffectUuidNull)
 
 #define LOG_TAG "OmegaEffect"
 #define ALOG(...)  __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-// ─── Descriptor del efecto ────────────────────────────────────────────────────
-// UUID propio (8d7d5e0a-a6eb-4fde-a0ff-cb1b2dd7275e), DISTINTO al de
-// IVANNA FUSION DSP (7b3be4ec-...) — dos efectos con el mismo UUID
-// confundirían a audioserver sobre cuál instanciar.
+static constexpr const char* kSocketName = "omega_daemon_socket";
+
+// ── Descriptor ───────────────────────────────────────────────────────────────
 static const effect_uuid_t kEffectTypeNull = {
-    0xec7178a0, 0x847d, 0x11e0, 0xa3cb, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}
+    0xec7178a0, 0x847d, 0x11e0, 0xa3cb, {0x00,0x02,0xa5,0xd5,0xc5,0x1b}
 };
 static const effect_uuid_t kEffectUuid = {
-    0x8d7d5e0a, 0xa6eb, 0x4fde, 0xa0ff, {0xcb, 0x1b, 0x2d, 0xd7, 0x27, 0x5e}
+    0x8d7d5e0a, 0xa6eb, 0x4fde, 0xa0ff, {0xcb,0x1b,0x2d,0xd7,0x27,0x5e}
 };
-
 static const effect_descriptor_t kEffectDescriptor = {
     .type          = kEffectTypeNull,
     .uuid          = kEffectUuid,
     .apiVersion    = EFFECT_CONTROL_API_VERSION,
-    .flags         = EFFECT_FLAG_TYPE_INSERT
-                   | EFFECT_FLAG_INSERT_LAST,
-    .cpuLoad       = 30,        // bajo: solo memcpy + ring buffer, sin DSP propio aquí
-    .memoryUsage   = 200,       // tamaño de OmegaSharedState mapeado, no duplicado
-    .name          = "OMEGA Ω_in AI Bridge",
+    .flags         = EFFECT_FLAG_TYPE_INSERT | EFFECT_FLAG_INSERT_LAST,
+    .cpuLoad       = 30,
+    .memoryUsage   = 200,
+    .name          = "OMEGA Omega_in AI Bridge",
     .implementor   = "GORE TNS",
 };
 
-// ─── Contexto por instancia del efecto ───────────────────────────────────────
+// ── Contexto por instancia ────────────────────────────────────────────────────
 struct OmegaContext {
-    const struct effect_interface_s* itfe;   // debe ser el primer miembro
+    const struct effect_interface_s* itfe;
     effect_config_t config;
     bool            active = false;
-
-    // Memoria compartida con omega_daemon, mapeada en EffectCreate (no
-    // en el hot path de Effect_Process), liberada en EffectRelease.
     OmegaSharedState* shared = nullptr;
     int               shm_fd = -1;
-
     std::atomic<uint32_t> consecutive_underruns{0};
 };
 
-static constexpr const char* kShmPath = "/data/local/tmp/omega_shared_mem";
+// ── SCM_RIGHTS: recibir fd del daemon ────────────────────────────────────────
+static int receive_shm_fd_from_daemon() {
+    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock < 0) return -1;
 
+    // Timeout de 200 ms para no bloquear el hilo de audioserver si el
+    // daemon aún no ha arrancado — se reintentará en el siguiente frame.
+    struct timeval tv = { 0, 200000 };
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
+    struct sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+    addr.sun_path[0] = '\0';
+    strncpy(addr.sun_path + 1, kSocketName, sizeof(addr.sun_path) - 2);
+    socklen_t addrlen = (socklen_t)(sizeof(addr.sun_family) + 1 + strlen(kSocketName));
+
+    if (connect(sock, reinterpret_cast<sockaddr*>(&addr), addrlen) < 0) {
+        close(sock);
+        return -1;  // daemon no disponible aún — retry en el siguiente frame
+    }
+
+    // recvmsg con ancillary data para recibir el fd vía SCM_RIGHTS
+    char  data = 0;
+    struct iovec iov = { &data, 1 };
+    char cmsgbuf[CMSG_SPACE(sizeof(int))];
+    struct msghdr msg = {};
+    msg.msg_iov        = &iov;
+    msg.msg_iovlen     = 1;
+    msg.msg_control    = cmsgbuf;
+    msg.msg_controllen = sizeof(cmsgbuf);
+
+    if (recvmsg(sock, &msg, 0) < 0) {
+        close(sock);
+        return -1;
+    }
+    close(sock);  // fd de shm ya recibido; no necesitamos el socket
+
+    struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+    if (!cmsg || cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS) {
+        ALOGE("SCM_RIGHTS no recibido del daemon");
+        return -1;
+    }
+    int received_fd = -1;
+    memcpy(&received_fd, CMSG_DATA(cmsg), sizeof(int));
+    return received_fd;
+}
+
+// ── Mapeo de memoria compartida ───────────────────────────────────────────────
 static bool mapSharedMemory(OmegaContext* ctx) {
     if (ctx->shared != nullptr) return true;
 
-    ctx->shm_fd = open(kShmPath, O_RDWR);
-    if (ctx->shm_fd < 0) {
-        // omega_daemon todavía no creó el archivo (no ha arrancado, o el
-        // módulo Magisk se deshabilitó). No es un error fatal para el
-        // efecto: simplemente seguimos en bypass hasta que exista.
-        return false;
-    }
+    int shm_fd = receive_shm_fd_from_daemon();
+    if (shm_fd < 0) return false;  // daemon no listo — bypass hasta el próximo intento
 
     void* mapped = mmap(nullptr, sizeof(OmegaSharedState),
-                         PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
+                        PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    close(shm_fd);  // mmap retiene la referencia internamente
+
     if (mapped == MAP_FAILED) {
-        ALOGE("mmap falló mapeando memoria compartida con omega_daemon");
-        close(ctx->shm_fd);
-        ctx->shm_fd = -1;
+        ALOGE("mmap falló sobre fd recibido via SCM_RIGHTS (errno=%d)", errno);
         return false;
     }
-
+    ctx->shm_fd = -1;  // ya no guardamos el fd (mmap lo duplicó internamente)
     ctx->shared = static_cast<OmegaSharedState*>(mapped);
-    ALOG("Memoria compartida mapeada correctamente");
+    ALOG("Memoria compartida mapeada via SCM_RIGHTS OK (size=%zu)", sizeof(OmegaSharedState));
     return true;
 }
 
 static void unmapSharedMemory(OmegaContext* ctx) {
-    if (ctx->shared != nullptr) {
-        munmap(ctx->shared, sizeof(OmegaSharedState));
-        ctx->shared = nullptr;
-    }
-    if (ctx->shm_fd >= 0) {
-        close(ctx->shm_fd);
-        ctx->shm_fd = -1;
-    }
+    if (ctx->shared) { munmap(ctx->shared, sizeof(OmegaSharedState)); ctx->shared = nullptr; }
 }
 
-// ─── Forward declarations ─────────────────────────────────────────────────────
-static int Effect_Process(effect_handle_t self, audio_buffer_t* in, audio_buffer_t* out);
-static int Effect_Command(effect_handle_t self,
-                          uint32_t cmdCode, uint32_t cmdSize, void* pCmd,
-                          uint32_t* replySize, void* pReply);
-static int Effect_GetDescriptor(effect_handle_t self, effect_descriptor_t* pDescriptor);
+// ── Forward decls ─────────────────────────────────────────────────────────────
+static int Effect_Process(effect_handle_t, audio_buffer_t*, audio_buffer_t*);
+static int Effect_Command(effect_handle_t, uint32_t, uint32_t, void*, uint32_t*, void*);
+static int Effect_GetDescriptor(effect_handle_t, effect_descriptor_t*);
 
 static const struct effect_interface_s sEffectInterface = {
     .process         = Effect_Process,
@@ -168,61 +166,44 @@ static const struct effect_interface_s sEffectInterface = {
     .process_reverse = nullptr,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PROCESS — hot path real, llamado por audioserver en el hilo de mezcla.
-// CRÍTICO: nunca bloquea, nunca duerme, nunca hace malloc/free, nunca
-// ejecuta inferencia. Solo: (1) tryPush no bloqueante al ring de
-// entrada, (2) tryPop no bloqueante del ring de salida, (3) si no hay
-// bloque procesado disponible, el buffer ya tiene el audio original
-// (bypass automático, sin silencios).
-// ─────────────────────────────────────────────────────────────────────────────
+// ── PROCESS — hot path ────────────────────────────────────────────────────────
 static int Effect_Process(effect_handle_t self,
                           audio_buffer_t* in, audio_buffer_t* out) {
     auto* ctx = reinterpret_cast<OmegaContext*>(self);
-    if (!ctx) return -EINVAL;
-
-    int n_frames = in ? (int)in->frameCount : 0;
+    if (!ctx || !in) return -EINVAL;
+    int n_frames = (int)in->frameCount;
     if (n_frames <= 0) return 0;
 
-    int ch = audio_channel_count_from_out_mask(ctx->config.inputCfg.channels);
+    int ch      = audio_channel_count_from_out_mask(ctx->config.inputCfg.channels);
     int samples = n_frames * (ch > 0 ? ch : 2);
 
-    // Si está desactivado o no hay memoria compartida disponible todavía,
-    // copiar entrada -> salida sin tocar (bypass), igual que haría
-    // cualquier efecto INSERT que no modifica audio.
-    bool can_process = ctx->active && (ctx->shared != nullptr || mapSharedMemory(ctx));
+    // Bypass automático si el daemon aún no entregó la shm
+    bool can_process = ctx->active &&
+                       (ctx->shared != nullptr || mapSharedMemory(ctx));
 
-    if (!can_process || (ctx->shared && ctx->shared->bypass_enabled.load(std::memory_order_relaxed))) {
-        if (in->raw != out->raw) std::memcpy(out->raw, in->raw, (size_t)samples * sizeof(float));
+    if (!can_process ||
+        (ctx->shared && ctx->shared->bypass_enabled.load(std::memory_order_relaxed))) {
+        if (in->raw != out->raw)
+            std::memcpy(out->raw, in->raw, (size_t)samples * sizeof(float));
         return 0;
     }
 
     int cap = (samples < OMEGA_BLOCK_SIZE * OMEGA_MAX_CHANNELS)
                   ? samples : OMEGA_BLOCK_SIZE * OMEGA_MAX_CHANNELS;
 
-    // Copiar primero entrada -> salida (esto YA es el bypass por
-    // defecto); si el daemon entrega un bloque procesado, se sobrescribe
-    // a continuación. Así nunca hay una ruta que deje 'out' sin escribir.
-    if (in->raw != out->raw) std::memcpy(out->raw, in->raw, (size_t)samples * sizeof(float));
+    if (in->raw != out->raw)
+        std::memcpy(out->raw, in->raw, (size_t)samples * sizeof(float));
 
     ctx->shared->ring_in.tryPush(in->f32, cap, &ctx->shared->input_buffer[0][0]);
 
-    bool got_processed = ctx->shared->ring_out.tryPop(
-        out->f32, cap, &ctx->shared->output_buffer[0][0]);
-
-    if (got_processed) {
-        ctx->consecutive_underruns.store(0, std::memory_order_relaxed);
-    } else {
-        ctx->consecutive_underruns.fetch_add(1, std::memory_order_relaxed);
-        // 'out' ya tiene el audio original (bypass), no se hace nada más.
-    }
+    bool got = ctx->shared->ring_out.tryPop(out->f32, cap, &ctx->shared->output_buffer[0][0]);
+    if (got) ctx->consecutive_underruns.store(0, std::memory_order_relaxed);
+    else     ctx->consecutive_underruns.fetch_add(1, std::memory_order_relaxed);
 
     return 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COMMAND
-// ─────────────────────────────────────────────────────────────────────────────
+// ── COMMAND ───────────────────────────────────────────────────────────────────
 static int Effect_Command(effect_handle_t self,
                           uint32_t cmdCode, uint32_t cmdSize, void* pCmd,
                           uint32_t* replySize, void* pReply) {
@@ -232,81 +213,62 @@ static int Effect_Command(effect_handle_t self,
 
     switch (cmdCode) {
     case EFFECT_CMD_INIT:
-        ALOG("INIT");
         if (replySize && *replySize >= sizeof(int)) *(int*)pReply = 0;
+        ALOG("INIT");
         return 0;
-
-    case EFFECT_CMD_CONFIGURE: {
+    case EFFECT_CMD_CONFIGURE:
         if (cmdSize < sizeof(effect_config_t)) return -EINVAL;
         std::memcpy(&ctx->config, pCmd, sizeof(effect_config_t));
         ALOG("CONFIGURE fs=%u ch_mask=0x%x",
              ctx->config.inputCfg.samplingRate, ctx->config.inputCfg.channels);
         if (replySize && *replySize >= sizeof(int)) *(int*)pReply = 0;
         return 0;
-    }
-
     case EFFECT_CMD_RESET:
         if (replySize && *replySize >= sizeof(int)) *(int*)pReply = 0;
         return 0;
-
     case EFFECT_CMD_ENABLE:
         ctx->active = true;
         ALOG("ENABLE");
         if (replySize && *replySize >= sizeof(int)) *(int*)pReply = 0;
         return 0;
-
     case EFFECT_CMD_DISABLE:
         ctx->active = false;
         ALOG("DISABLE");
         if (replySize && *replySize >= sizeof(int)) *(int*)pReply = 0;
         return 0;
-
     case EFFECT_CMD_SET_VOLUME:
-        if (pReply && replySize && *replySize >= sizeof(int32_t))
-            *(int32_t*)pReply = 0;
+        if (pReply && replySize && *replySize >= sizeof(int32_t)) *(int32_t*)pReply = 0;
         return 0;
-
     default:
         return -EINVAL;
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET DESCRIPTOR
-// ─────────────────────────────────────────────────────────────────────────────
-static int Effect_GetDescriptor(effect_handle_t self,
-                                effect_descriptor_t* pDescriptor) {
+// ── GET_DESCRIPTOR ────────────────────────────────────────────────────────────
+static int Effect_GetDescriptor(effect_handle_t self, effect_descriptor_t* pDescriptor) {
     (void)self;
     if (!pDescriptor) return -EINVAL;
     std::memcpy(pDescriptor, &kEffectDescriptor, sizeof(effect_descriptor_t));
     return 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LIBRARY FUNCTIONS — exportadas como AUDIO_EFFECT_LIBRARY_INFO_SYM
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Library functions ─────────────────────────────────────────────────────────
 static int EffectCreate(const effect_uuid_t* uuid,
                         int32_t sessionId, int32_t ioId,
                         effect_handle_t* handle) {
     (void)sessionId; (void)ioId;
     if (!uuid || !handle) return -EINVAL;
     if (std::memcmp(uuid, &kEffectUuid, sizeof(effect_uuid_t)) != 0) return -ENOENT;
-
     auto* ctx = new (std::nothrow) OmegaContext();
     if (!ctx) return -ENOMEM;
-
     ctx->itfe = &sEffectInterface;
-    ctx->config.inputCfg.samplingRate  = OMEGA_SAMPLE_RATE;
-    ctx->config.inputCfg.channels      = AUDIO_CHANNEL_OUT_STEREO;
-    ctx->config.inputCfg.format        = AUDIO_FORMAT_PCM_FLOAT;
-    ctx->config.outputCfg              = ctx->config.inputCfg;
-
-    // Intento de mapeo no bloqueante: si el daemon aún no arrancó, no es
-    // un error — Effect_Process seguirá intentando mapear hasta que exista.
-    mapSharedMemory(ctx);
-
+    ctx->config.inputCfg.samplingRate = OMEGA_SAMPLE_RATE;
+    ctx->config.inputCfg.channels     = AUDIO_CHANNEL_OUT_STEREO;
+    ctx->config.inputCfg.format       = AUDIO_FORMAT_PCM_FLOAT;
+    ctx->config.outputCfg             = ctx->config.inputCfg;
+    mapSharedMemory(ctx);  // intento no bloqueante — si el daemon no está listo, bypass
     *handle = reinterpret_cast<effect_handle_t>(ctx);
-    ALOG("EffectCreate OK, session=%d io=%d", sessionId, ioId);
+    ALOG("EffectCreate OK session=%d io=%d", sessionId, ioId);
     return 0;
 }
 
@@ -319,12 +281,10 @@ static int EffectRelease(effect_handle_t handle) {
     return 0;
 }
 
-static int EffectGetDescriptor(const effect_uuid_t* uuid,
-                               effect_descriptor_t* pDescriptor) {
+static int EffectGetDescriptor(const effect_uuid_t* uuid, effect_descriptor_t* pDescriptor) {
     if (!uuid || !pDescriptor) return -EINVAL;
-    if (std::memcmp(uuid, &kEffectUuid, sizeof(effect_uuid_t)) != 0 &&
-        std::memcmp(uuid, EFFECT_UUID_NULL, sizeof(effect_uuid_t)) != 0)
-        return -ENOENT;
+    if (std::memcmp(uuid, &kEffectUuid,    sizeof(effect_uuid_t)) != 0 &&
+        std::memcmp(uuid, EFFECT_UUID_NULL, sizeof(effect_uuid_t)) != 0) return -ENOENT;
     std::memcpy(pDescriptor, &kEffectDescriptor, sizeof(effect_descriptor_t));
     return 0;
 }
@@ -336,20 +296,16 @@ static int QueryNumEffects(uint32_t* pNumEffects) {
 }
 
 static int QueryEffect(uint32_t index, effect_descriptor_t* pDescriptor) {
-    if (!pDescriptor) return -EINVAL;
-    if (index != 0) return -ENOENT;
+    if (!pDescriptor || index != 0) return -ENOENT;
     std::memcpy(pDescriptor, &kEffectDescriptor, sizeof(effect_descriptor_t));
     return 0;
 }
 
-// IMPORTANTE: el nombre del símbolo debe ser literalmente
-// AUDIO_EFFECT_LIBRARY_INFO_SYM — este es el símbolo que faltaba en la
-// versión anterior y causaba el fallo de carga dentro de audioserver.
 extern "C" __attribute__((visibility("default")))
 const audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM = {
     .tag               = AUDIO_EFFECT_LIBRARY_TAG,
     .version           = EFFECT_LIBRARY_API_VERSION,
-    .name              = "OMEGA Ω_in Bridge Library",
+    .name              = "OMEGA Omega_in Bridge Library",
     .implementor       = "GORE TNS",
     .query_num_effects = QueryNumEffects,
     .query_effect      = QueryEffect,
@@ -358,11 +314,7 @@ const audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM = {
     .get_descriptor    = EffectGetDescriptor,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Bindings JNI conservados (compatibilidad con código Kotlin existente,
-// control/diagnóstico desde la app — NO es el mecanismo de carga por
-// audioserver, que ahora pasa exclusivamente por la vtable de arriba).
-// ─────────────────────────────────────────────────────────────────────────────
+// ── JNI de diagnóstico (compatibilidad con Kotlin) ────────────────────────────
 namespace {
 std::atomic<bool>  g_jni_is_active{false};
 std::atomic<float> g_jni_intensity{0.8f};
@@ -370,32 +322,21 @@ std::atomic<float> g_jni_vocoder_mix{0.8f};
 }
 
 extern "C" {
-
-JNIEXPORT jboolean JNICALL
-Java_com_ivannafusion_OmegaEffect_nativeInit(JNIEnv*, jobject) {
-    ALOG("nativeInit (capa JNI de diagnóstico, separada del Effect HAL real)");
+JNIEXPORT jboolean JNICALL Java_com_ivannafusion_OmegaEffect_nativeInit(JNIEnv*, jobject) {
     g_jni_is_active.store(false);
+    ALOG("nativeInit (JNI diagnóstico)");
     return JNI_TRUE;
 }
-
-JNIEXPORT void JNICALL
-Java_com_ivannafusion_OmegaEffect_nativeRelease(JNIEnv*, jobject) {
+JNIEXPORT void JNICALL Java_com_ivannafusion_OmegaEffect_nativeRelease(JNIEnv*, jobject) {
     g_jni_is_active.store(false);
 }
-
-JNIEXPORT void JNICALL
-Java_com_ivannafusion_OmegaEffect_nativeSetActive(JNIEnv*, jobject, jboolean active) {
-    g_jni_is_active.store(active);
+JNIEXPORT void JNICALL Java_com_ivannafusion_OmegaEffect_nativeSetActive(JNIEnv*, jobject, jboolean a) {
+    g_jni_is_active.store(a);
 }
-
-JNIEXPORT void JNICALL
-Java_com_ivannafusion_OmegaEffect_nativeSetIntensity(JNIEnv*, jobject, jfloat intensity) {
-    g_jni_intensity.store(intensity);
+JNIEXPORT void JNICALL Java_com_ivannafusion_OmegaEffect_nativeSetIntensity(JNIEnv*, jobject, jfloat v) {
+    g_jni_intensity.store(v);
 }
-
-JNIEXPORT void JNICALL
-Java_com_ivannafusion_OmegaEffect_nativeSetVocoderMix(JNIEnv*, jobject, jfloat mix) {
-    g_jni_vocoder_mix.store(mix);
+JNIEXPORT void JNICALL Java_com_ivannafusion_OmegaEffect_nativeSetVocoderMix(JNIEnv*, jobject, jfloat v) {
+    g_jni_vocoder_mix.store(v);
 }
-
 } // extern "C"

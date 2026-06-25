@@ -3,35 +3,48 @@ package com.ivannafusion
 import android.util.Log
 
 /**
- * OmegaDaemon: Interfaz JNI para el daemon root de Magisk (omega_daemon.cpp)
+ * OmegaDaemon — wrapper JNI del daemon de audio (libomega_daemon.so).
  *
- * CORRECCIONES aplicadas en este commit:
- *   1. loadLibrary("omega_daemon") — antes cargaba "ivanna_jni", que compila
- *      jni_wrapper.cpp y NO tiene los símbolos Java_com_ivannafusion_OmegaDaemon_*.
- *      Los símbolos correctos están en omega_daemon.cpp → libomega_daemon.so.
- *   2. Quitado @JvmStatic de las external fun. Con @JvmStatic el runtime espera
- *      la firma JNI con jclass como segundo parámetro; omega_daemon.cpp usa jobject
- *      (instancia del singleton) → mismatch de firma → UnsatisfiedLinkError.
- *      Sin @JvmStatic la firma es jobject, que coincide con lo que está compilado.
+ * Se usa cuando el módulo Magisk NO está instalado (el ejecutable standalone
+ * omega_daemon no corre). En ese caso la APK inicia el daemon dentro de su
+ * propio proceso. Con Magisk instalado, el daemon standalone ya está corriendo
+ * y nativeStart() detecta el socket activo sin conflicto.
  */
 object OmegaDaemon {
+
     private const val TAG = "OmegaDaemon"
+    private var loaded = false
 
     init {
         try {
             System.loadLibrary("omega_daemon")
-            Log.i(TAG, "✅ Librería nativa omega_daemon cargada")
+            loaded = true
+            Log.i(TAG, "libomega_daemon.so cargada")
         } catch (e: UnsatisfiedLinkError) {
-            Log.e(TAG, "❌ Error cargando omega_daemon (requiere root/Magisk): ${e.message}")
+            Log.e(TAG, "No se pudo cargar libomega_daemon.so: ${e.message}")
         }
     }
 
-    /** Inicia el daemon root (Unix socket + ring buffer SPSC + inferencia NPU). */
-    external fun nativeStart(): Boolean
+    fun start(): Boolean {
+        if (!loaded) return false
+        return nativeStart().also { ok ->
+            if (ok) Log.i(TAG, "Daemon iniciado") else Log.e(TAG, "nativeStart() falló")
+        }
+    }
 
-    /** Detiene el daemon. */
-    external fun nativeStop()
+    fun stop() {
+        if (loaded) nativeStop()
+    }
 
-    /** Devuelve true si el daemon sigue corriendo. */
-    external fun nativeIsRunning(): Boolean
+    fun setProcessing(active: Boolean) { if (loaded) nativeSetProcessing(active) }
+    fun setIntensity(v: Float)          { if (loaded) nativeSetIntensity(v) }
+    fun getTemperature(): Float          = if (loaded) nativeGetTemperature() else 35f
+    fun getLatency(): Float              = if (loaded) nativeGetLatency() else 0f
+
+    private external fun nativeStart(): Boolean
+    private external fun nativeStop()
+    private external fun nativeSetProcessing(active: Boolean)
+    private external fun nativeSetIntensity(intensity: Float)
+    private external fun nativeGetTemperature(): Float
+    private external fun nativeGetLatency(): Float
 }
