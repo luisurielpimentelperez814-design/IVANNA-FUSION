@@ -48,12 +48,14 @@ jobs:
 
       - name: Create debug keystore
         run: |
-          keytool -genkey -v \
-            -keystore "$GITHUB_WORKSPACE/debug.keystore" \
+          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+          keytool -genkeypair -v -noprompt \
+            -keystore "${GITHUB_WORKSPACE}/debug.keystore" \
             -alias androiddebugkey \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
-            -dname "CN=Debug, OU=Android, O=Android, L=Unknown, ST=Unknown, C=US"
+            -dname "CN=Debug,OU=Android,O=Android,L=Unknown,ST=Unknown,C=US"
+          ls -lh "${GITHUB_WORKSPACE}/debug.keystore"
 
       - name: Clean Gradle caches
         run: |
