@@ -1,139 +1,89 @@
 package com.ivannafusion.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ivannafusion.ui.theme.*
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
 
+/**
+ * IVANNASlider — slider horizontal de precisión para controles DSP.
+ *
+ * Reemplaza IVANNAKnob: más superficie táctil, rango visual completo y
+ * valor numérico siempre visible sin tener que leer la posición del puntero.
+ *
+ * @param value        Valor actual en las unidades reales del rango
+ * @param onValueChange Callback con el nuevo valor en las mismas unidades
+ * @param range        Rango real del parámetro (p.ej. -18f..18f para EQ en dB)
+ * @param label        Etiqueta izquierda (nombre del parámetro)
+ * @param labelWidth   Ancho fijo de la columna del label
+ * @param valueText    Texto formateado del valor (derecha); si vacío usa "%.2f"
+ * @param valueWidth   Ancho fijo de la columna del valor
+ * @param accentColor  Color del thumb y del track activo
+ * @param enabled      Permite/bloquea la interacción
+ * @param compact      true = altura reducida para listas densas (EQ de 10 bandas)
+ */
 @Composable
-fun IVANNAKnob(
+fun IVANNASlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 80.dp,
     range: ClosedFloatingPointRange<Float> = 0f..1f,
     label: String = "",
-    unit: String = "",
+    labelWidth: Dp = 64.dp,
+    valueText: String = "",
+    valueWidth: Dp = 72.dp,
     accentColor: Color = AccentCyan,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    compact: Boolean = false
 ) {
-    val effectiveColor = if (enabled) accentColor else accentColor.copy(alpha = 0.35f)
-    val normalizedValue = (value - range.start) / (range.endInclusive - range.start)
-    val animatedValue by animateFloatAsState(
-        targetValue = normalizedValue,
-        animationSpec = tween(durationMillis = 150),
-        label = "knob"
-    )
-    
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Row(
         modifier = modifier
-            .size(size)
-            .pointerInput(range, enabled) {
-                if (!enabled) return@pointerInput
-                detectVerticalDragGestures(
-                    onDragEnd = {},
-                    onVerticalDrag = { change, dragAmount ->
-                        change.consume()
-                        val sensitivity = (range.endInclusive - range.start) / 200f
-                        val newValue = (value - dragAmount * sensitivity)
-                            .coerceIn(range.start, range.endInclusive)
-                        onValueChange(newValue)
-                    }
-                )
-            }
+            .fillMaxWidth()
+            .height(if (compact) 36.dp else 44.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(size * 0.9f)) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val strokeWidth = size.value * 0.08f
-                val radius = (this.size.minDimension - strokeWidth) / 2f
-                val center = Offset(this.size.width / 2f, this.size.height / 2f)
-                
-                drawArc(
-                    color = Color(0xFF1F2937),
-                    startAngle = 135f,
-                    sweepAngle = 270f,
-                    useCenter = false,
-                    topLeft = Offset(center.x - radius, center.y - radius),
-                    size = Size(radius * 2, radius * 2),
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-                
-                val sweepAngle = animatedValue * 270f
-                drawArc(
-                    brush = Brush.sweepGradient(
-                        colors = listOf(effectiveColor, effectiveColor.copy(alpha = 0.6f)),
-                        center = center
-                    ),
-                    startAngle = 135f,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = Offset(center.x - radius, center.y - radius),
-                    size = Size(radius * 2, radius * 2),
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-                
-                val angle = (135f + sweepAngle) * (PI / 180f).toFloat()
-                val indicatorLength = radius * 0.75f
-                val startX = center.x + cos(angle) * (radius * 0.4f)
-                val startY = center.y + sin(angle) * (radius * 0.4f)
-                val endX = center.x + cos(angle) * indicatorLength
-                val endY = center.y + sin(angle) * indicatorLength
-                drawLine(
-                    color = effectiveColor,
-                    start = Offset(startX, startY),
-                    end = Offset(endX, endY),
-                    strokeWidth = strokeWidth * 0.6f,
-                    cap = StrokeCap.Round
-                )
-                
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF334155), Color(0xFF1F2937)),
-                        center = center,
-                        radius = radius * 0.5f
-                    ),
-                    radius = radius * 0.5f,
-                    center = center
-                )
-            }
-            
-            Text(
-                text = String.format("%.1f%s", value, unit),
-                style = MaterialTheme.typography.labelMedium,
-                color = if (enabled) Color(0xFFF1F5F9) else Color(0xFFF1F5F9).copy(alpha = 0.4f),
-                textAlign = TextAlign.Center
-            )
-        }
-        
         if (label.isNotEmpty()) {
             Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
+                text  = label,
+                style = if (compact) MaterialTheme.typography.labelSmall
+                        else         MaterialTheme.typography.labelMedium,
                 color = if (enabled) TextSecondary else TextSecondary.copy(alpha = 0.4f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 4.dp)
+                modifier  = Modifier.width(labelWidth),
+                maxLines  = 1
             )
         }
+
+        Slider(
+            value       = value.coerceIn(range.start, range.endInclusive),
+            onValueChange = { if (enabled) onValueChange(it) },
+            valueRange  = range,
+            enabled     = enabled,
+            colors      = SliderDefaults.colors(
+                thumbColor              = if (enabled) accentColor else accentColor.copy(alpha = 0.35f),
+                activeTrackColor        = if (enabled) accentColor else accentColor.copy(alpha = 0.2f),
+                inactiveTrackColor      = Color(0xFF1E293B),
+                disabledThumbColor      = accentColor.copy(alpha = 0.3f),
+                disabledActiveTrackColor= accentColor.copy(alpha = 0.15f),
+                disabledInactiveTrackColor = Color(0xFF0F172A)
+            ),
+            modifier = Modifier.weight(1f)
+        )
+
+        val display = valueText.ifEmpty { "%.2f".format(value) }
+        Text(
+            text      = display,
+            style     = if (compact) MaterialTheme.typography.labelSmall
+                        else         MaterialTheme.typography.labelMedium,
+            color     = if (enabled) accentColor else accentColor.copy(alpha = 0.4f),
+            textAlign = TextAlign.End,
+            modifier  = Modifier.width(valueWidth),
+            maxLines  = 1
+        )
     }
 }
