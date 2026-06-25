@@ -13,3 +13,9 @@ ghp_*
 id_*
 *.pub
 .ssh/
+ghp_*
+*.pem
+*.key
+id_*
+*.pub
+.ssh/
