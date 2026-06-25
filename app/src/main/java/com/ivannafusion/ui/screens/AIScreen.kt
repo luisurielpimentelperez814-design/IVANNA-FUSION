@@ -5,10 +5,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.ivannafusion.AudioEngine
 import com.ivannafusion.DSPState
 
 @Composable
-fun AIScreen(onBack: () -> Unit) {
+fun AIScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
     var aiEnabled by remember { mutableStateOf(DSPState.aiEnabled) }
     var aiAutoAdapt by remember { mutableStateOf(DSPState.aiAutoAdapt) }
     var aiSensitivity by remember { mutableFloatStateOf(DSPState.aiSensitivity) }
