@@ -32,6 +32,20 @@ object DSPState {
     var pfMidGain: Float = 0.0f
     var pfHighGain: Float = 0.0f
     var pfPresence: Float = 0.0f
+    var pfBeta: Float = 0.0f
+    var pfFreq: Float = 1000f
+    var pfResonance: Float = 0.0f
+    var pfMix: Float = 0.5f
+    var aiEnabled: Boolean = false
+    var aiAutoAdapt: Boolean = true
+    var aiSensitivity: Float = 0.5f
+    var pfBeta: Float = 0.0f
+    var pfFreq: Float = 1000f
+    var pfResonance: Float = 0.0f
+    var pfMix: Float = 0.5f
+    var aiEnabled: Boolean = false
+    var aiAutoAdapt: Boolean = true
+    var aiSensitivity: Float = 0.5f
 
     // AI
     var aiEnabled: Boolean = false

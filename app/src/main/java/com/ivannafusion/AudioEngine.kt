@@ -483,31 +483,108 @@ class AudioEngine {
     private external fun nativeSetExciterMix(mix: Float)
     private external fun nativeSetExciterBypass(bypass: Boolean)
     private external fun nativeSetFFTEffect(enabled: Boolean)
+    // PF-Engine methods (added by patch)
+    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
+    fun updatePfWet(value: Float) { DSPState.pfWet = value }
+    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
+    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
+    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
+    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
+    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
+    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
+    fun updatePfMix(value: Float) { DSPState.pfMix = value }
+    fun resetPfEvolution() { /* stub */ }
 }
 
 // ===== Stubs para PF-Engine (añadidos para evitar errores de compilación) =====
 fun pfSetAmp(model: Int) {
     // Implementación real iría aquí
+    // PF-Engine methods (added by patch)
+    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
+    fun updatePfWet(value: Float) { DSPState.pfWet = value }
+    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
+    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
+    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
+    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
+    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
+    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
+    fun updatePfMix(value: Float) { DSPState.pfMix = value }
+    fun resetPfEvolution() { /* stub */ }
 }
 
 fun pfSetParam(name: String, value: Float) {
     // Implementación real iría aquí
+    // PF-Engine methods (added by patch)
+    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
+    fun updatePfWet(value: Float) { DSPState.pfWet = value }
+    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
+    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
+    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
+    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
+    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
+    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
+    fun updatePfMix(value: Float) { DSPState.pfMix = value }
+    fun resetPfEvolution() { /* stub */ }
 }
 
 fun applyPFPreset(name: String) {
     // Implementación real iría aquí
+    // PF-Engine methods (added by patch)
+    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
+    fun updatePfWet(value: Float) { DSPState.pfWet = value }
+    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
+    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
+    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
+    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
+    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
+    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
+    fun updatePfMix(value: Float) { DSPState.pfMix = value }
+    fun resetPfEvolution() { /* stub */ }
 }
 
 fun pfEvoTick() {
     // Implementación real iría aquí
+    // PF-Engine methods (added by patch)
+    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
+    fun updatePfWet(value: Float) { DSPState.pfWet = value }
+    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
+    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
+    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
+    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
+    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
+    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
+    fun updatePfMix(value: Float) { DSPState.pfMix = value }
+    fun resetPfEvolution() { /* stub */ }
 }
 
 fun pfEvoReset() {
     // Implementación real iría aquí
+    // PF-Engine methods (added by patch)
+    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
+    fun updatePfWet(value: Float) { DSPState.pfWet = value }
+    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
+    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
+    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
+    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
+    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
+    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
+    fun updatePfMix(value: Float) { DSPState.pfMix = value }
+    fun resetPfEvolution() { /* stub */ }
 }
 
 fun pfEvoStop() {
     // Implementación real iría aquí
+    // PF-Engine methods (added by patch)
+    fun updatePfDrive(value: Float) { DSPState.pfDrive = value }
+    fun updatePfWet(value: Float) { DSPState.pfWet = value }
+    fun updatePfAlpha(value: Float) { DSPState.pfAlpha = value }
+    fun updatePfBeta(value: Float) { DSPState.pfBeta = value }
+    fun updatePfDelta(value: Float) { DSPState.pfDelta = value }
+    fun updatePfSigma(value: Float) { DSPState.pfSigma = value }
+    fun updatePfFreq(value: Float) { DSPState.pfFreq = value }
+    fun updatePfResonance(value: Float) { DSPState.pfResonance = value }
+    fun updatePfMix(value: Float) { DSPState.pfMix = value }
+    fun resetPfEvolution() { /* stub */ }
 }
 
 fun pfGetBarCount(): Int = 0
