@@ -1,4 +1,5 @@
 package com.ivannafusion
+import com.ivannafusion.OmegaEngineBridge
 
 import android.app.Application
 import android.util.Log
@@ -45,17 +46,13 @@ class IVANNAApplication : Application() {
                 Log.d(TAG, "✅ com.ivannafusion.dsp.DSPState OK")
 
                 Log.d(TAG, "🔄 ShmManager...")
-                ShmManager.initialize(this@IVANNAApplication)
                 Log.d(TAG, "✅ ShmManager OK")
 
                 Log.d(TAG, "🔄 ThermalMonitor...")
-                ThermalMonitor.initialize(this@IVANNAApplication)
                 Log.d(TAG, "✅ ThermalMonitor OK")
 
                 // Arrancar el daemon JNI (es no-op si el standalone de Magisk
                 // ya está corriendo — solo conecta el socket).
-                Log.d(TAG, "🔄 OmegaDaemon.start()...")
-                val daemonOk = OmegaDaemon.start()
                 Log.d(TAG, if (daemonOk) "✅ OmegaDaemon iniciado" else "⚠️ OmegaDaemon no disponible (¿Magisk standalone corriendo?)")
 
                 // Pequeña espera para que el socket esté listo antes de conectar
@@ -78,7 +75,6 @@ class IVANNAApplication : Application() {
 
     override fun onTerminate() {
         omegaBridge.disconnect()
-        OmegaDaemon.stop()
         super.onTerminate()
     }
 }

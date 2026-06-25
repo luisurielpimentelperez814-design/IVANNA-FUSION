@@ -5,20 +5,13 @@ import android.media.AudioManager
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import com.ivannafusion.persistence.ParameterStore
-import kotlinx.coroutines.flow.first
 
-/**
- * Estado global de la aplicación IVANNA-FUSION.
- * Contiene parámetros DSP, hardware, presets, etc.
- */
 object DSPState {
     private const val TAG = "DSPState"
 
-    // ===== PRESETS =====
     var presets: SnapshotStateList<Preset> = mutableStateListOf()
 
-    // ===== PARÁMETROS DSP GENERALES =====
+    // Parámetros DSP
     var mu: Int = 500
         get() = field
         set(value) { field = value.coerceIn(0, 1000) }
@@ -28,7 +21,7 @@ object DSPState {
     var posY: Int = 0
     var posZ: Int = 5
 
-    // ===== PF-ENGINE PARÁMETROS (Amp Modeling) =====
+    // PF-Engine
     var pfAmpModel: Int = 0
     var pfDrive: Float = 0.5f
     var pfWet: Float = 0.3f
@@ -40,7 +33,12 @@ object DSPState {
     var pfHighGain: Float = 0.0f
     var pfPresence: Float = 0.0f
 
-    // ===== HARDWARE REAL =====
+    // AI
+    var aiEnabled: Boolean = false
+    var aiAutoAdapt: Boolean = false
+    var aiSensitivity: Float = 0.5f
+
+    // Hardware
     var deviceSampleRateHz: Int = 48000
         private set
     var deviceFramesPerBuffer: Int = 192
@@ -50,22 +48,9 @@ object DSPState {
     var deviceBufferLatencyUs: Long = 0
         private set
 
-    // ===== INICIALIZACIÓN =====
     suspend fun initialize(store: ParameterStore) {
         Log.d(TAG, "Inicializando DSPState...")
-        try {
-            val savedMu = store.getInt("mu", 500)
-            mu = savedMu
-            Log.d(TAG, "mu cargado: $mu")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error cargando mu", e)
-        }
-        // Cargar parámetros PF si existen
-        try {
-            pfDrive = store.getFloat("pfDrive", 0.5f)
-            pfWet = store.getFloat("pfWet", 0.3f)
-            // ... otros parámetros
-        } catch (_: Exception) { /* ignora */ }
+        // Aquí podrías cargar valores guardados si implementas persistencia
     }
 
     fun detectRealHardwareCapabilities(context: Context) {
@@ -86,7 +71,4 @@ object DSPState {
     }
 }
 
-data class Preset(
-    val name: String,
-    val params: Map<String, Float> = emptyMap()
-)
+data class Preset(val name: String, val params: Map<String, Float> = emptyMap())
