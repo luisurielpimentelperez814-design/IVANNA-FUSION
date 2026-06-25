@@ -5,3 +5,5 @@ debug.keystore
 build/
 local.properties
 local.properties
+ghp_*
+*.pub
