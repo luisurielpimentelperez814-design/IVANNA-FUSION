@@ -32,6 +32,10 @@ object DSPState {
     var pfMidGain: Float = 0.0f
     var pfHighGain: Float = 0.0f
     var pfPresence: Float = 0.0f
+    var convEarlyMix: Float = 0.5f
+    var convMix: Float = 0.3f
+    var convEarlyDelay: Float = 0.2f
+    var convEarlyDecay: Float = 0.1f
     var spatModRate: Float = 0.5f
     var spatMix: Float = 0.3f
     var spatWidth: Float = 0.5f
