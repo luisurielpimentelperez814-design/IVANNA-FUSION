@@ -7,11 +7,10 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.ivannafusion.persistence.ParameterStore
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 
 /**
  * Estado global de la aplicación IVANNA-FUSION.
- * Contiene parámetros DSP, estado de hardware, presets, etc.
+ * Contiene parámetros DSP, hardware, presets, etc.
  */
 object DSPState {
     private const val TAG = "DSPState"
@@ -19,19 +18,29 @@ object DSPState {
     // ===== PRESETS =====
     var presets: SnapshotStateList<Preset> = mutableStateListOf()
 
-    // ===== PARÁMETROS DSP =====
+    // ===== PARÁMETROS DSP GENERALES =====
     var mu: Int = 500
         get() = field
         set(value) { field = value.coerceIn(0, 1000) }
 
     var spatialEnabled: Boolean = true
-
-    // Posición de escucha (para pruebas)
     var posX: Int = 10
     var posY: Int = 0
     var posZ: Int = 5
 
-    // ===== HARDWARE REAL (detectado del dispositivo) =====
+    // ===== PF-ENGINE PARÁMETROS (Amp Modeling) =====
+    var pfAmpModel: Int = 0
+    var pfDrive: Float = 0.5f
+    var pfWet: Float = 0.3f
+    var pfAlpha: Float = 1.0f
+    var pfDelta: Float = 0.5f
+    var pfSigma: Float = 0.5f
+    var pfLowGain: Float = 0.0f
+    var pfMidGain: Float = 0.0f
+    var pfHighGain: Float = 0.0f
+    var pfPresence: Float = 0.0f
+
+    // ===== HARDWARE REAL =====
     var deviceSampleRateHz: Int = 48000
         private set
     var deviceFramesPerBuffer: Int = 192
@@ -44,7 +53,6 @@ object DSPState {
     // ===== INICIALIZACIÓN =====
     suspend fun initialize(store: ParameterStore) {
         Log.d(TAG, "Inicializando DSPState...")
-        // Cargar valores guardados (si los hay)
         try {
             val savedMu = store.getInt("mu", 500)
             mu = savedMu
@@ -52,49 +60,32 @@ object DSPState {
         } catch (e: Exception) {
             Log.e(TAG, "Error cargando mu", e)
         }
-        // Cargar otros parámetros...
+        // Cargar parámetros PF si existen
+        try {
+            pfDrive = store.getFloat("pfDrive", 0.5f)
+            pfWet = store.getFloat("pfWet", 0.3f)
+            // ... otros parámetros
+        } catch (_: Exception) { /* ignora */ }
     }
 
-    /**
-     * Detecta las capacidades reales de hardware del dispositivo.
-     * Debe llamarse desde IVANNAApplication.onCreate.
-     */
     fun detectRealHardwareCapabilities(context: Context) {
         try {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-            // Obtener sample rate nativo (propiedad estándar)
             val sampleRateStr = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
             deviceSampleRateHz = sampleRateStr?.toIntOrNull() ?: 48000
-
-            // Obtener frames por buffer
             val framesStr = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
             deviceFramesPerBuffer = framesStr?.toIntOrNull() ?: 192
-
-            // Detectar si soporta alta resolución (>48kHz y buffer pequeño)
             deviceSupportsHighRes = deviceSampleRateHz >= 96000 && deviceFramesPerBuffer <= 256
-
-            // Calcular latencia estimada
             deviceBufferLatencyUs = if (deviceSampleRateHz > 0 && deviceFramesPerBuffer > 0) {
                 (deviceFramesPerBuffer.toLong() * 1_000_000L / deviceSampleRateHz)
             } else 0L
-
-            Log.i(TAG, "✅ Hardware detectado: ${deviceSampleRateHz}Hz, ${deviceFramesPerBuffer} frames, " +
-                    "hi-res: $deviceSupportsHighRes, latencia: ${deviceBufferLatencyUs}μs")
+            Log.i(TAG, "✅ Hardware detectado: ${deviceSampleRateHz}Hz, ${deviceFramesPerBuffer} frames")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error detectando hardware: ${e.message}", e)
-            // Valores por defecto seguros
-            deviceSampleRateHz = 48000
-            deviceFramesPerBuffer = 192
-            deviceSupportsHighRes = false
-            deviceBufferLatencyUs = 0L
+            Log.e(TAG, "❌ Error detectando hardware", e)
         }
     }
 }
 
-/**
- * Clase de datos para un preset DSP.
- */
 data class Preset(
     val name: String,
     val params: Map<String, Float> = emptyMap()
