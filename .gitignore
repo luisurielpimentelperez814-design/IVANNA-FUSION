@@ -7,3 +7,9 @@ local.properties
 local.properties
 ghp_*
 *.pub
+ghp_*
+*.pem
+*.key
+id_*
+*.pub
+.ssh/
