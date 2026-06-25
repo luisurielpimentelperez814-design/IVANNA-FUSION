@@ -52,6 +52,28 @@ object DSPState {
     var aiSensitivity: Float = 0.5f
     var pfBeta: Float = 0.0f
 
+    // EQ — EffectsScreen accede como array mutable + bypass
+    var eqGains = FloatArray(10) { 0.5f }
+    var eqBypassed: Boolean = false
+    fun saveEQ() { /* hook persistencia */ }
+
+    // Compresor — EffectsScreen usa nombres cortos (compThreshold, no compressorThreshold)
+    var compThreshold:  Float   = 0.667f
+    var compRatio:      Float   = 0.158f
+    var compAttack:     Float   = 0.1f
+    var compRelease:    Float   = 0.3f
+    var compKnee:       Float   = 0.3f
+    var compMakeup:     Float   = 0.0f
+    var compBypassed:   Boolean = false
+    fun saveCompressor() { /* hook persistencia */ }
+
+    // Convolver extras (convEarlyMix y convMix ya declarados arriba)
+    var convType:      String = "HALL"
+    var convDecay:     Float  = 0.4f
+    var convPreDelay:  Float  = 0.1f
+    var convDamping:   Float  = 0.5f
+    var convDiffusion: Float  = 0.7f
+
     // Hardware
     var deviceSampleRateHz: Int = 48000
         private set
