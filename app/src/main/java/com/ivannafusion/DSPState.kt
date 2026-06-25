@@ -42,14 +42,14 @@ object DSPState {
     var spatDepth: Float = 0.5f
     var spatDiffusion: Float = 0.5f
     var spatDelay: Float = 0.2f
-    var pfBeta: Float = 0.0f
+
     var pfFreq: Float = 1000f
     var pfResonance: Float = 0.0f
     var pfMix: Float = 0.5f
     var aiEnabled: Boolean = false
     var aiAutoAdapt: Boolean = true
     var aiSensitivity: Float = 0.5f
-    var pfBeta: Float = 0.0f
+1    var pfBeta: Float = 0.0f
     var pfFreq: Float = 1000f
     var pfResonance: Float = 0.0f
     var pfMix: Float = 0.5f
