@@ -1,111 +1,75 @@
-#!/data/data/com.termux/files/usr/bin/bash
-# ==============================================================
-# CORRECCIÓN AUTOMÁTICA PARA IVANNA-FUSION (motor espacial)
-# Soluciona error de compilación: nativeRenderSpatial -> nativeRenderSpatialBlock
-# También verifica y crea archivos necesarios para GitHub Actions
-# ==============================================================
+package com.ivannafusion
 
-set -e  # Detener si hay error
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.AudioTrack
+import android.media.MediaRecorder
+import kotlinx.coroutines.*
 
-# Colores
-VERDE='\033[0;32m'
-AMARILLO='\033[1;33m'
-ROJO='\033[0;31m'
-NC='\033[0m'
+class SpatialAudioEngineV2 {
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var isRunning = false
+    private var audioRecord: AudioRecord? = null
+    private var audioTrack: AudioTrack? = null
+    private val bufferSize = 64
+    private val sampleRate = 48000
 
-PROJECT_DIR="$HOME/IVANNA-FUSION"
+    fun start() {
+        if (isRunning) return
+        isRunning = true
 
-echo -e "${VERDE}🔧 INICIANDO CORRECCIÓN AUTOMÁTICA DE IVANNA-FUSION${NC}"
+        IvannaNativeLib.nativeInitSpatialEngine(sampleRate, bufferSize)
 
-# 1. Ir al proyecto
-cd "$PROJECT_DIR" || { echo -e "${ROJO}No se encuentra el proyecto en $PROJECT_DIR${NC}"; exit 1; }
+        val recordBufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        audioRecord = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, recordBufferSize)
 
-# 2. CORREGIR SpatialAudioEngineV2.kt (cambiar nombre de función nativa)
-echo -e "${AMARILLO}Corrigiendo SpatialAudioEngineV2.kt...${NC}"
-if [ -f app/src/main/java/com/ivannafusion/SpatialAudioEngineV2.kt ]; then
-    # Reemplazar "nativeRenderSpatial" por "nativeRenderSpatialBlock"
-    sed -i 's/nativeRenderSpatialBlock(/nativeRenderSpatialBlock(/g' app/src/main/java/com/ivannafusion/SpatialAudioEngineV2.kt
-    echo -e "${VERDE}✅ SpatialAudioEngineV2.kt corregido.${NC}"
-else
-    echo -e "${ROJO}No se encontró SpatialAudioEngineV2.kt, saltando.${NC}"
-fi
+        val trackBufferSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT)
+        audioTrack = AudioTrack.Builder()
+            .setAudioAttributes(android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build())
+            .setAudioFormat(android.media.AudioFormat.Builder()
+                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setSampleRate(sampleRate)
+                .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                .build())
+            .setBufferSizeInBytes(trackBufferSize)
+            .build()
 
-# 3. Verificar que IvannaNativeLib.kt tenga la declaración correcta
-echo -e "${AMARILLO}Verificando IvannaNativeLib.kt...${NC}"
-if ! grep -q "nativeRenderSpatialBlock" app/src/main/java/com/ivannafusion/IvannaNativeLib.kt; then
-    echo -e "${AMARILLO}Declaración no encontrada. Añadiendo...${NC}"
-    # Insertar antes de la última llave
-    sed -i '/^}/ i\
-    external fun nativeRenderSpatialBlock(\
-        inputBuffer: FloatArray,\
-        outL: FloatArray,\
-        outR: FloatArray,\
-        posX: Int,\
-        posY: Int,\
-        posZ: Int,\
-        mu: Int\
-    ): Int' app/src/main/java/com/ivannafusion/IvannaNativeLib.kt
-    echo -e "${VERDE}✅ Declaración añadida.${NC}"
-else
-    echo -e "${VERDE}✅ Declaración ya presente.${NC}"
-fi
+        audioRecord?.startRecording()
+        audioTrack?.play()
 
-# 4. Verificar que el workflow de GitHub Actions exista, si no, crearlo
-echo -e "${AMARILLO}Verificando workflow de GitHub Actions...${NC}"
-mkdir -p .github/workflows
-if [ ! -f .github/workflows/build.yml ]; then
-    echo -e "${AMARILLO}Creando build.yml...${NC}"
-    cat > .github/workflows/build.yml << 'EOF'
-name: Build APK
+        scope.launch {
+            val input = FloatArray(bufferSize)
+            val outL = FloatArray(bufferSize)
+            val outR = FloatArray(bufferSize)
+            while (isRunning) {
+                val read = audioRecord?.read(input, 0, bufferSize) ?: 0
+                if (read > 0) {
+                    val posX = 10
+                    val posY = 0
+                    val posZ = 5
+                    val mu = DSPState.mu
+                    IvannaNativeLib.nativeRenderSpatialBlock(input, outL, outR, posX, posY, posZ, mu)
+                    val mixed = FloatArray(bufferSize * 2)
+                    for (i in 0 until bufferSize) {
+                        mixed[i * 2] = outL[i]
+                        mixed[i * 2 + 1] = outR[i]
+                    }
+                    audioTrack?.write(mixed, 0, mixed.size, AudioTrack.WRITE_BLOCKING)
+                }
+            }
+        }
+    }
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v3
-      - run: ./gradlew assembleDebug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/*.apk
-EOF
-    echo -e "${VERDE}✅ build.yml creado.${NC}"
-else
-    echo -e "${VERDE}✅ build.yml ya existe.${NC}"
-fi
-
-# 5. Asegurar que .gitignore excluya archivos sensibles (claves, tokens, etc.)
-echo -e "${AMARILLO}Verificando .gitignore...${NC}"
-if ! grep -q "ghp_" .gitignore 2>/dev/null; then
-    echo -e "ghp_*\n*.pem\n*.key\nid_*\n*.pub\n.ssh/" >> .gitignore
-    echo -e "${VERDE}✅ .gitignore actualizado.${NC}"
-else
-    echo -e "${VERDE}✅ .gitignore ya tiene exclusiones.${NC}"
-fi
-
-# 6. Añadir y commitear los cambios
-echo -e "${AMARILLO}Preparando commit y push...${NC}"
-git add .
-git commit -m "Corrección automática: nativeRenderSpatial -> nativeRenderSpatialBlock, workflow y .gitignore" || echo -e "${AMARILLO}No hay cambios nuevos para commitear.${NC}"
-
-# 7. Subir a GitHub (usando SSH)
-echo -e "${AMARILLO}Subiendo cambios a GitHub...${NC}"
-git push origin main || { echo -e "${ROJO}Error en push. Verifica que tengas SSH configurado.${NC}"; exit 1; }
-
-echo -e "${VERDE}🎉 ¡TODO LISTO! Los cambios se han subido exitosamente.${NC}"
-echo -e "${AMARILLO}Ahora ve a GitHub → Actions y espera a que termine la compilación.${NC}"
-echo -e "${AMARILLO}Descarga el APK desde Artifacts.${NC}"
-
-# 8. Recordatorio de seguridad
-echo -e "${ROJO}⚠️  RECUERDA REVOCAR TODOS LOS TOKENS VIEJOS (ghp_*) EN GITHUB.${NC}"
-echo -e "${ROJO}⚠️  Y GENERAR UNA NUEVA CLAVE SSH SI COMPARTISTE LA ANTERIOR.${NC}"
+    fun stop() {
+        isRunning = false
+        scope.cancel()
+        audioRecord?.stop()
+        audioRecord?.release()
+        audioTrack?.stop()
+        audioTrack?.release()
+        IvannaNativeLib.nativeReleaseSpatialEngine()
+    }
+}

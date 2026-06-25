@@ -4,30 +4,27 @@ import kotlinx.coroutines.*
 
 class MuController {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private var isUpdating = false
-    private var currentMu = 500  // valor inicial
+    private var isRunning = false
 
-    fun startUpdating() {
-        if (isUpdating) return
-        isUpdating = true
+    fun start() {
+        if (isRunning) return
+        isRunning = true
         scope.launch {
-            while (isUpdating) {
-                // Simular errores (en producción, calcular de la señal)
-                val spatialErr = 10
-                val roomErr = 5
-                val maskingErr = 2
-                currentMu = IvannaNativeLib.nativeUpdateMu(spatialErr, roomErr, maskingErr)
-                // Actualizar el estado global legacy (para que la UI lo muestre)
-                DSPState.mu = currentMu  // Nota: DSPState es un object con var
-                delay(50)  // Actualizar cada 50 ms
+            while (isRunning) {
+                val spatialErr = (0..20).random()
+                val roomErr = (0..10).random()
+                val maskingErr = (0..5).random()
+                val newMu = IvannaNativeLib.nativeUpdateMu(spatialErr, roomErr, maskingErr)
+                withContext(Dispatchers.Main) {
+                    DSPState.mu = newMu
+                }
+                delay(100)
             }
         }
     }
 
-    fun stopUpdating() {
-        isUpdating = false
+    fun stop() {
+        isRunning = false
         scope.cancel()
     }
-
-    fun getCurrentMu(): Int = currentMu
 }
