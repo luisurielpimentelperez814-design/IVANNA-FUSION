@@ -4,46 +4,34 @@ import android.util.Log
 
 /**
  * OmegaDaemon: Interfaz JNI para el daemon root de Magisk (omega_daemon.cpp)
- * 
- * Este objeto expone las funciones nativas para controlar el daemon que corre
- * con permisos root y se comunica vía Unix Domain Socket.
+ *
+ * CORRECCIONES aplicadas en este commit:
+ *   1. loadLibrary("omega_daemon") — antes cargaba "ivanna_jni", que compila
+ *      jni_wrapper.cpp y NO tiene los símbolos Java_com_ivannafusion_OmegaDaemon_*.
+ *      Los símbolos correctos están en omega_daemon.cpp → libomega_daemon.so.
+ *   2. Quitado @JvmStatic de las external fun. Con @JvmStatic el runtime espera
+ *      la firma JNI con jclass como segundo parámetro; omega_daemon.cpp usa jobject
+ *      (instancia del singleton) → mismatch de firma → UnsatisfiedLinkError.
+ *      Sin @JvmStatic la firma es jobject, que coincide con lo que está compilado.
  */
 object OmegaDaemon {
     private const val TAG = "OmegaDaemon"
-    
-    // Cargar la librería nativa
+
     init {
         try {
-            System.loadLibrary("ivanna_jni")
-            Log.i(TAG, "✅ Librería nativa ivanna_jni cargada")
+            System.loadLibrary("omega_daemon")
+            Log.i(TAG, "✅ Librería nativa omega_daemon cargada")
         } catch (e: UnsatisfiedLinkError) {
-            Log.e(TAG, "❌ Error cargando librería nativa: ${e.message}")
+            Log.e(TAG, "❌ Error cargando omega_daemon (requiere root/Magisk): ${e.message}")
         }
     }
-    
-    /**
-     * Inicia el daemon de Magisk (omega_daemon)
-     * 
-     * Este daemon:
-     * - Escucha comandos en Unix socket abstracto "omega_daemon_socket"
-     * - Comparte memoria vía /data/local/tmp/omega_shared_mem
-     * - Ejecuta inferencia de IA en NPU/GPU
-     * - Maneja gestión térmica automáticamente
-     * 
-     * @return true si el daemon se inició correctamente, false en caso contrario
-     */
-    @JvmStatic
+
+    /** Inicia el daemon root (Unix socket + ring buffer SPSC + inferencia NPU). */
     external fun nativeStart(): Boolean
-    
-    /**
-     * Detiene el daemon de Magisk
-     */
-    @JvmStatic
+
+    /** Detiene el daemon. */
     external fun nativeStop()
-    
-    /**
-     * Verifica si el daemon está corriendo
-     */
-    @JvmStatic
+
+    /** Devuelve true si el daemon sigue corriendo. */
     external fun nativeIsRunning(): Boolean
 }
