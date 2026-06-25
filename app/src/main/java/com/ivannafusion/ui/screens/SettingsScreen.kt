@@ -8,78 +8,51 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.*
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivannafusion.DSPState
 import com.ivannafusion.ui.theme.*
-import kotlin.math.abs
 
-/**
- * Pantalla de configuración con diseño de estudio de audio profesional.
- * Inspirada en interfaces de hardware y software de gama alta.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
-    // Estado animado para entrada de las tarjetas (efecto cascada)
     val transitionState = remember { MutableTransitionState(false) }
     transitionState.targetState = true
 
-    // Valores reales del hardware (se asume que DSPState los expone correctamente)
+    // Valores reales desde DSPState
     val sampleRate = DSPState.deviceSampleRateHz
     val framesPerBuffer = DSPState.deviceFramesPerBuffer
     val supportsHighRes = DSPState.deviceSupportsHighRes
     val bufferLatencyUs = if (sampleRate > 0 && framesPerBuffer > 0)
         (framesPerBuffer.toLong() * 1_000_000L / sampleRate) else 0L
 
-    // Información de la sesión (simulada, puede venir de un ViewModel)
+    // Información de sesión
     val sessionInfo = listOf(
         SessionInfo("Versión", "2.1.0", Icons.Outlined.Info),
         SessionInfo("Build", "2025.06.21", Icons.Outlined.Build),
         SessionInfo("Autor", "Luis Uriel Pimentel", Icons.Outlined.Person)
     )
 
-    // Tarjetas de hardware (información técnica)
     val hardwareItems = listOf(
-        HardwareItem(
-            label = "Sample Rate",
-            value = "$sampleRate Hz",
-            icon = Icons.Outlined.Speed,
-            description = "Frecuencia de muestreo nativa del dispositivo"
-        ),
-        HardwareItem(
-            label = "Formato interno",
-            value = "32-bit float",
-            icon = Icons.Outlined.Analytics,
-            description = "Procesamiento en coma flotante (AAudio/PCM_FLOAT)"
-        ),
-        HardwareItem(
-            label = "Frames por buffer",
-            value = if (framesPerBuffer > 0) "$framesPerBuffer" else "—",
-            icon = Icons.Outlined.ViewAgenda,
-            description = "Tamaño del bloque de procesamiento"
-        ),
-        HardwareItem(
-            label = "Latencia estimada",
-            value = if (bufferLatencyUs > 0) "${bufferLatencyUs} μs" else "—",
-            icon = Icons.Outlined.Timer,
-            description = "Latencia de ida y vuelta del buffer"
-        )
+        HardwareItem("Sample Rate", "$sampleRate Hz", Icons.Outlined.Speed, "Frecuencia nativa del dispositivo"),
+        HardwareItem("Formato interno", "32-bit float", Icons.Outlined.Analytics, "Procesamiento en coma flotante"),
+        HardwareItem("Frames por buffer", if (framesPerBuffer > 0) "$framesPerBuffer" else "—", Icons.Outlined.ViewAgenda, "Tamaño del bloque de procesamiento"),
+        HardwareItem("Latencia estimada", if (bufferLatencyUs > 0) "${bufferLatencyUs} μs" else "—", Icons.Outlined.Timer, "Latencia de ida y vuelta del buffer")
     )
 
-    // Scroll con comportamiento suave
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -95,7 +68,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(20.dp),
         contentPadding = PaddingValues(vertical = 24.dp)
     ) {
-        // Encabezado con botón de retroceso y título elegante
+        // Encabezado
         item {
             AnimatedContent(
                 targetState = transitionState.currentState,
@@ -111,7 +84,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Botón de retroceso estilizado
                     IconButton(
                         onClick = onBack,
                         modifier = Modifier
@@ -145,20 +117,18 @@ fun SettingsScreen(onBack: () -> Unit) {
                         textAlign = TextAlign.Center
                     )
 
-                    // Espacio para balancear la fila
                     Spacer(modifier = Modifier.width(48.dp))
                 }
             }
         }
 
-        // Tarjeta de hardware: información del sistema
+        // Tarjeta de hardware
         item {
             AnimatedCard(
                 delay = 0,
                 transitionState = transitionState
             ) {
                 Column {
-                    // Título de sección con detalle decorativo
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -180,7 +150,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                             )
                         )
                         Spacer(modifier = Modifier.weight(1f))
-                        // Micro indicador de estado
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
@@ -192,7 +161,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                         )
                     }
 
-                    // Lista de parámetros de hardware en columnas
                     hardwareItems.forEach { item ->
                         HardwareParameterRow(
                             icon = item.icon,
@@ -203,7 +171,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                         )
                     }
 
-                    // Mensaje de calidad de audio
                     Spacer(modifier = Modifier.height(12.dp))
                     if (!supportsHighRes) {
                         ElevatedCard(
@@ -268,14 +235,13 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // Tarjeta de información general (versión, autor, etc.)
+        // Tarjeta de información
         item {
             AnimatedCard(
                 delay = 100,
                 transitionState = transitionState
             ) {
                 Column {
-                    // Título
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -298,7 +264,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                         )
                     }
 
-                    // Lista de elementos
                     sessionInfo.forEach { info ->
                         Row(
                             modifier = Modifier
@@ -329,7 +294,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                     fontWeight = FontWeight.W400,
                                     color = Color.White.copy(alpha = 0.9f),
                                     fontSize = 14.sp,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                    fontFamily = FontFamily.Monospace
                                 )
                             )
                         }
@@ -338,20 +303,14 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // Espacio final para evitar que el contenido quede pegado al borde
-        item {
-            Spacer(modifier = Modifier.height(40.dp))
-        }
+        item { Spacer(modifier = Modifier.height(40.dp)) }
     }
 }
 
 // ======================================================================
-// COMPONENTES REUTILIZABLES DE DISEÑO DE ÉLITE
+// COMPONENTES REUTILIZABLES
 // ======================================================================
 
-/**
- * Tarjeta con efecto glassmorphism y animación de entrada en cascada.
- */
 @Composable
 private fun AnimatedCard(
     delay: Int,
@@ -417,11 +376,6 @@ private fun AnimatedCard(
     }
 }
 
-/**
- * Fila que muestra un parámetro de hardware con icono, etiqueta, valor y descripción
- * emergente al pasar el cursor (simulado con un tooltip simple en UI móvil no aplica).
- * En móvil mostramos la descripción como subtítulo pequeño.
- */
 @Composable
 private fun HardwareParameterRow(
     icon: ImageVector,
@@ -459,11 +413,10 @@ private fun HardwareParameterRow(
                     fontWeight = FontWeight.W400,
                     color = Color.White.copy(alpha = 0.9f),
                     fontSize = 14.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace
                 )
             )
         }
-        // Descripción como subtítulo sutil
         if (description.isNotEmpty()) {
             Text(
                 text = description,
@@ -478,30 +431,15 @@ private fun HardwareParameterRow(
     }
 }
 
-/**
- * Clase de datos para información de sesión.
- */
 private data class SessionInfo(
     val label: String,
     val value: String,
     val icon: ImageVector
 )
 
-/**
- * Clase de datos para elementos de hardware.
- */
 private data class HardwareItem(
     val label: String,
     val value: String,
     val icon: ImageVector,
     val description: String = ""
 )
-
-// ======================================================================
-// NOTA: Se asume que DSPState expone las siguientes propiedades:
-// - deviceSampleRateHz: Int
-// - deviceFramesPerBuffer: Int
-// - deviceSupportsHighRes: Boolean
-// Si no existen en tu proyecto, créalas en DSPState.kt con valores dummy
-// o extráelas mediante AudioManager.
-// ======================================================================
