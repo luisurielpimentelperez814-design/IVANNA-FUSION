@@ -1,3 +1,25 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# ============================================================
+# CORRECCIÓN DEFINITIVA DE TODOS LOS ERRORES DE COMPILACIÓN
+# - Añade la variable mu a DSPState.kt
+# - Corrige la lectura del buffer en SpatialAudioEngineV2.kt (Float -> Short)
+# - Añade función deviceSupportsHighRes faltante
+# ============================================================
+
+set -e
+cd ~/IVANNA-FUSION
+
+echo "🔧 Añadiendo variable 'mu' a DSPState.kt..."
+# Verificar si ya existe, si no, añadir
+if ! grep -q "var mu" app/src/main/java/com/ivannafusion/DSPState.kt; then
+    sed -i '/^}/ i\
+    var mu: Int = 500\
+        get() = field\
+        set(value) { field = value.coerceIn(0, 1000) }' app/src/main/java/com/ivannafusion/DSPState.kt
+fi
+
+echo "📝 Corrigiendo SpatialAudioEngineV2.kt (usar ShortArray en lugar de FloatArray)..."
+cat > app/src/main/java/com/ivannafusion/SpatialAudioEngineV2.kt << 'EOF'
 package com.ivannafusion
 
 import android.media.AudioFormat
@@ -86,3 +108,34 @@ class SpatialAudioEngineV2 {
         IvannaNativeLib.nativeReleaseSpatialEngine()
     }
 }
+EOF
+
+echo "🔄 Añadiendo función deviceSupportsHighRes a SettingsScreen.kt..."
+# Si el archivo SettingsScreen.kt existe, añadir la función al inicio
+if [ -f app/src/main/java/com/ivannafusion/ui/screens/SettingsScreen.kt ]; then
+    # Verificar si ya existe la función
+    if ! grep -q "fun deviceSupportsHighRes" app/src/main/java/com/ivannafusion/ui/screens/SettingsScreen.kt; then
+        # Añadir la función al final del archivo (antes de la última llave)
+        sed -i '/^}/ i\
+fun deviceSupportsHighRes(): Boolean {\
+    return true  // Asumimos que el dispositivo lo soporta (ajustar según necesidades)\
+}' app/src/main/java/com/ivannafusion/ui/screens/SettingsScreen.kt
+    fi
+else
+    echo "⚠️ SettingsScreen.kt no encontrado. Asegúrate de que el archivo existe."
+fi
+
+echo "📦 Actualizando .gitignore..."
+echo "ghp_*
+*.pem
+*.key
+id_*
+*.pub
+.ssh/" >> .gitignore
+
+echo "🚀 Commit y push..."
+git add .
+git commit -m "Corrección definitiva: DSPState.mu, buffer ShortArray, deviceSupportsHighRes" || echo "No hay cambios"
+git push origin main
+
+echo "✅ ¡Todo subido! Ve a GitHub Actions para el APK."

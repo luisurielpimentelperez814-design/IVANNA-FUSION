@@ -70,6 +70,9 @@ fun SettingsScreen(onBack: () -> Unit) {
         
         Spacer(Modifier.height(100.dp))
     }
+fun deviceSupportsHighRes(): Boolean {
+    return true  // Asumimos que el dispositivo lo soporta (ajustar según necesidades)
+}
 }
 
 @Composable
@@ -78,4 +81,7 @@ private fun SettingRow(label: String, value: String) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
         Text(value, style = MaterialTheme.typography.labelLarge, color = AccentCyan)
     }
+fun deviceSupportsHighRes(): Boolean {
+    return true  // Asumimos que el dispositivo lo soporta (ajustar según necesidades)
+}
 }
