@@ -9,134 +9,145 @@ concurrency:
   group: ivanna-${{ github.ref }}
   cancel-in-progress: true
 
-
 jobs:
 
-# ─────────────────────────────
-# 1. BOOTSTRAP (ENTORNO LIMPIO)
-# ─────────────────────────────
-  bootstrap:
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1 — APK (Gradle + NDK, self-contained, sube artifact en este mismo job)
+# ─────────────────────────────────────────────────────────────────────────────
+  build-apk:
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Hard clean environment
-        run: |
-          rm -rf ~/.gradle
-          rm -rf ~/.android
-          rm -rf $HOME/.m2
-
-      - name: Setup Java 17 (stable ABI for AGP 8+)
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
 
-      - name: Setup Android SDK (isolated)
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install exact toolchain (PINNED)
+      - name: Install SDK components
         run: |
-          sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
+          SDKMGR=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager
+          yes | $SDKMGR \
             "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0" \
             "ndk;25.1.8937393" \
-            "cmake;3.22.1"
+            "cmake;3.22.1" 2>/dev/null || true
 
-      - name: Validate AAPT2
+      - name: Verify toolchain
         run: |
-          file $ANDROID_SDK_ROOT/build-tools/34.0.0/aapt2
           $ANDROID_SDK_ROOT/build-tools/34.0.0/aapt2 version
+          echo "NDK: $ANDROID_SDK_ROOT/ndk/25.1.8937393"
+          ls $ANDROID_SDK_ROOT/ndk/25.1.8937393/build/cmake/android.toolchain.cmake
 
-
-# ─────────────────────────────
-# 2. NATIVE DSP BUILD (C++)
-# ─────────────────────────────
-  dsp-native:
-    runs-on: ubuntu-latest
-    needs: bootstrap
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup NDK
-        run: $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "ndk;25.1.8937393"
-
-      - name: Build DSP (multi-ABI clean)
+      - name: Create debug keystore
         run: |
-          export NDK=$ANDROID_SDK_ROOT/ndk/25.1.8937393
+          keytool -genkey -v \
+            -keystore "$GITHUB_WORKSPACE/debug.keystore" \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=GORE TNS, OU=IVANNA, O=IVANNA-FUSION, L=MX, ST=Estado de Mexico, C=MX"
 
-          cmake -B build \
-            -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-26 \
-            -DCMAKE_BUILD_TYPE=Release
-
-          cmake --build build --parallel
-
-
-# ─────────────────────────────
-# 3. ANDROID BUILD (GRADLE ISOLATED)
-# ─────────────────────────────
-  android-build:
-    runs-on: ubuntu-latest
-    needs: dsp-native
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - uses: android-actions/setup-android@v3
-
-      - name: Reinstall exact SDK (deterministic)
-        run: |
-          sdkmanager "platforms;android-34" \
-                     "build-tools;34.0.0"
-
-      - name: Fix Gradle isolation
+      - name: Clean Gradle caches
         run: |
           rm -rf ~/.gradle/caches
           chmod +x gradlew
 
-      - name: Build APK (enterprise)
-        run: |
-          ./gradlew clean
-          ./gradlew assembleEnterpriseDebug --no-daemon --stacktrace
+      - name: Build APK (enterprise debug)
+        run: ./gradlew assembleEnterpriseDebug --no-daemon --stacktrace
+
+      - name: Build APK (universal debug)
+        run: ./gradlew assembleUniversalDebug --no-daemon --stacktrace
+
+      - name: List APKs generated
+        run: find app/build/outputs/apk -name "*.apk" | sort
+
+      # ── UPLOAD aquí mismo, en la VM que tiene los archivos ──────────────
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ivanna-fusion-apks
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload native .so libs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ivanna-native-libs
+          path: app/build/intermediates/cxx/**/*.so
+          if-no-files-found: warn
+          retention-days: 14
 
 
-# ─────────────────────────────
-# 4. MAGISK PACKAGING LAYER
-# ─────────────────────────────
-  magisk:
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2 — Magisk module (self-contained, sube artifact en este mismo job)
+# ─────────────────────────────────────────────────────────────────────────────
+  build-magisk:
+    name: Build Magisk Module
     runs-on: ubuntu-latest
-    needs: android-build
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Package module
+      - name: Package Magisk module
         run: |
           cd magisk_module
-          zip -r ../ivanna-magisk.zip .
+          zip -r ../ivanna-magisk-module.zip . \
+            --exclude "*.git*" \
+            --exclude "*.DS_Store"
+          echo "Module size: $(du -sh ../ivanna-magisk-module.zip)"
+
+      # ── UPLOAD aquí mismo ────────────────────────────────────────────────
+      - name: Upload Magisk module
+        uses: actions/upload-artifact@v4
+        with:
+          name: ivanna-magisk-module
+          path: ivanna-magisk-module.zip
+          if-no-files-found: error
+          retention-days: 14
 
 
-# ─────────────────────────────
-# 5. ARTIFACT EXPORT (IMMUTABLE)
-# ─────────────────────────────
-  publish:
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 3 — Release bundle (descarga los artifacts anteriores y los combina)
+#          Solo corre si los dos jobs anteriores tuvieron éxito
+# ─────────────────────────────────────────────────────────────────────────────
+  bundle-release:
+    name: Bundle Release
     runs-on: ubuntu-latest
-    needs: magisk
+    needs: [build-apk, build-magisk]
 
     steps:
-      - uses: actions/upload-artifact@v4
+      - name: Download APKs
+        uses: actions/download-artifact@v4
         with:
-          name: ivanna-fusion-release
-          path: |
-            app/build/outputs/apk/**/enterprise/debug/*.apk
-            ivanna-magisk.zip
+          name: ivanna-fusion-apks
+          path: release/apk
+
+      - name: Download Magisk module
+        uses: actions/download-artifact@v4
+        with:
+          name: ivanna-magisk-module
+          path: release/magisk
+
+      - name: Inventory release bundle
+        run: |
+          echo "=== APKs ==="
+          find release/apk -name "*.apk" -exec ls -lh {} \;
+          echo "=== Magisk ==="
+          ls -lh release/magisk/
+
+      - name: Upload complete release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ivanna-fusion-RELEASE-${{ github.sha }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
