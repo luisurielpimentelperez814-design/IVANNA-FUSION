@@ -12,7 +12,10 @@ concurrency:
 jobs:
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 1 — APK (Gradle + NDK, self-contained, sube artifact en este mismo job)
+# JOB 1 — APK (Gradle + NDK)
+# libomega_effect.so se compila aquí pero se EXCLUYE del APK via
+# packagingOptions. El .so se sube como artefacto para que el job de
+# Magisk lo recoja y lo ponga en system/vendor/lib64/soundfx/.
 # ─────────────────────────────────────────────────────────────────────────────
   build-apk:
     name: Build APK
@@ -40,16 +43,8 @@ jobs:
             "ndk;25.1.8937393" \
             "cmake;3.22.1" 2>/dev/null || true
 
-      - name: Verify toolchain
-        run: |
-          $ANDROID_SDK_ROOT/build-tools/34.0.0/aapt2 version
-          echo "NDK: $ANDROID_SDK_ROOT/ndk/25.1.8937393"
-          ls $ANDROID_SDK_ROOT/ndk/25.1.8937393/build/cmake/android.toolchain.cmake
-
       - name: Create debug keystore
         run: |
-          # El SDK genera ~/.android/debug.keystore automáticamente.
-          # Si aún no existe, forzamos su creación con adb (más confiable que keytool directo).
           if [ ! -f ~/.android/debug.keystore ]; then
             mkdir -p ~/.android
             keytool -genkeypair -noprompt \
@@ -60,7 +55,6 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
           cp ~/.android/debug.keystore "${GITHUB_WORKSPACE}/debug.keystore"
-          ls -lh "${GITHUB_WORKSPACE}/debug.keystore"
 
       - name: Clean Gradle caches
         run: |
@@ -76,7 +70,15 @@ jobs:
       - name: List APKs generated
         run: find app/build/outputs/apk -name "*.apk" | sort
 
-      # ── UPLOAD aquí mismo, en la VM que tiene los archivos ──────────────
+      - name: Verify libomega_effect.so NOT in APK
+        run: |
+          APK=$(find app/build/outputs/apk -name "*.apk" | head -1)
+          if unzip -l "$APK" | grep -q "libomega_effect.so"; then
+            echo "ERROR: libomega_effect.so sigue dentro del APK — revisar packagingOptions"
+            exit 1
+          fi
+          echo "OK: libomega_effect.so correctamente excluida del APK"
+
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
@@ -85,34 +87,74 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload native .so libs
+      # Subir libomega_effect.so para que build-magisk la recoja
+      - name: Extract and upload libomega_effect.so
+        run: |
+          SO=$(find app/build/intermediates/cxx -name "libomega_effect.so" \
+               -path "*/arm64-v8a/*" | head -1)
+          if [ -z "$SO" ]; then
+            echo "ERROR: libomega_effect.so no encontrada en intermediates/cxx"
+            find app/build/intermediates/cxx -name "*.so" | head -10
+            exit 1
+          fi
+          echo "Found: $SO"
+          cp "$SO" libomega_effect_arm64.so
+
+      - name: Upload libomega_effect.so
         uses: actions/upload-artifact@v4
         with:
-          name: ivanna-native-libs
-          path: app/build/intermediates/cxx/**/*.so
-          if-no-files-found: warn
+          name: omega-effect-so
+          path: libomega_effect_arm64.so
+          if-no-files-found: error
           retention-days: 14
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 2 — Magisk module (self-contained, sube artifact en este mismo job)
+# JOB 2 — Módulo Magisk
+# Recoge libomega_effect.so del job anterior y la coloca en la posición
+# correcta: system/vendor/lib64/soundfx/ (donde Magisk la monta sobre
+# /vendor/lib64/soundfx/ — el path que AudioFlinger escanea al arrancar).
 # ─────────────────────────────────────────────────────────────────────────────
   build-magisk:
     name: Build Magisk Module
     runs-on: ubuntu-latest
+    needs: [build-apk]
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download libomega_effect.so
+        uses: actions/download-artifact@v4
+        with:
+          name: omega-effect-so
+          path: effect-so/
+
+      - name: Place SO in module
+        run: |
+          DST="magisk_module/system/vendor/lib64/soundfx"
+          mkdir -p "$DST"
+          cp effect-so/libomega_effect_arm64.so "$DST/libomega_effect.so"
+          ls -lh "$DST/"
+          echo "SHA256: $(sha256sum "$DST/libomega_effect.so")"
+
       - name: Package Magisk module
         run: |
           cd magisk_module
+          # Verificar que audio_effects.xml referencia el UUID correcto
+          grep "8d7d5e0a-a6eb-4fde-a0ff-cb1b2dd7275e" system/etc/audio_effects.xml \
+            || { echo "ERROR: UUID no encontrado en audio_effects.xml"; exit 1; }
+          # Verificar que libomega_effect.so está presente
+          [ -f system/vendor/lib64/soundfx/libomega_effect.so ] \
+            || { echo "ERROR: libomega_effect.so falta en soundfx/"; exit 1; }
           zip -r ../ivanna-magisk-module.zip . \
             --exclude "*.git*" \
-            --exclude "*.DS_Store"
-          echo "Module size: $(du -sh ../ivanna-magisk-module.zip)"
+            --exclude "*.DS_Store" \
+            --exclude "*/.gitkeep"
+          echo "=== Contenido del módulo ==="
+          unzip -l ../ivanna-magisk-module.zip
+          echo "=== Tamaño total ==="
+          du -sh ../ivanna-magisk-module.zip
 
-      # ── UPLOAD aquí mismo ────────────────────────────────────────────────
       - name: Upload Magisk module
         uses: actions/upload-artifact@v4
         with:
@@ -123,8 +165,7 @@ jobs:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 3 — Release bundle (descarga los artifacts anteriores y los combina)
-#          Solo corre si los dos jobs anteriores tuvieron éxito
+# JOB 3 — Release bundle
 # ─────────────────────────────────────────────────────────────────────────────
   bundle-release:
     name: Bundle Release

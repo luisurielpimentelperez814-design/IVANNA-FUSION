@@ -81,6 +81,13 @@ android {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
+        // libomega_effect.so es un efecto AudioFlinger — AudioFlinger la carga
+        // desde /vendor/lib64/soundfx/ (instalada por el módulo Magisk).
+        // La APK nunca hace System.loadLibrary("omega_effect"), por lo que
+        // empaquetarla en el APK no sirve y puede causar conflictos de versión.
+        jniLibs {
+            excludes += ['**/libomega_effect.so']
+        }
     }
 
     externalNativeBuild {
