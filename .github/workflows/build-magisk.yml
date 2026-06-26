@@ -1,158 +1,16 @@
-name: Build IVANNA FUSION Magisk Module
-
+# DESHABILITADO — este workflow usaba src/ (directorio huérfano eliminado).
+# La compilación del módulo Magisk ahora la hace el job build-magisk
+# dentro de .github/workflows/ivanna-ci.yml, que recoge libomega_effect.so
+# del job build-apk vía artifacts.
+name: Build IVANNA FUSION Magisk Module (DEPRECATED)
 on:
-  push:
-    branches: [main, magisk]
-    tags:     ['v*']
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
-      preset:
-        description: 'Preset de preset predeterminado (0=flat, 1=rock_clasico)'
-        required: false
-        default: '1'
-
-env:
-  NDK_VERSION: r27c
-  ANDROID_API: 26          # mínimo Android 8.0
-  TARGET_ABI:  arm64-v8a   # Snapdragon 4 Gen 2
-
+      reason:
+        description: 'Este workflow está deshabilitado. Usa ivanna-ci.yml'
+        required: true
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  build-dsp:
-    name: Compilar libivanna_fusion.so (ARM64 NEON)
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    # ─── Android NDK ─────────────────────────────────────────────────────────
-    - name: Setup Android NDK ${{ env.NDK_VERSION }}
-      id: setup-ndk
-      uses: nttld/setup-ndk@v1
-      with:
-        ndk-version: ${{ env.NDK_VERSION }}
-        add-to-path: true
-
-    - name: Verificar NDK
-      run: |
-        echo "NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}"
-        ls "${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/"
-
-    # ─── Compilar .so ────────────────────────────────────────────────────────
-    - name: Configure CMake
-      run: |
-        cmake -B build \
-          -DCMAKE_TOOLCHAIN_FILE="${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake" \
-          -DANDROID_ABI=${{ env.TARGET_ABI }} \
-          -DANDROID_PLATFORM=android-${{ env.ANDROID_API }} \
-          -DCMAKE_BUILD_TYPE=Release \
-          -S src
-      env:
-        ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-
-    - name: Build
-      run: cmake --build build --config Release --parallel $(nproc)
-
-    - name: Verificar .so
-      run: |
-        echo "=== Archivo generado ==="
-        ls -lh build/libivanna_fusion.so
-        echo "=== Símbolos exportados ==="
-        # Verificar que el símbolo clave está presente
-        nm -D build/libivanna_fusion.so | grep "AUDIO_EFFECT_LIBRARY_INFO_SYM" || {
-          echo "ERROR: símbolo AUDIO_EFFECT_LIBRARY_INFO_SYM no encontrado"
-          exit 1
-        }
-        echo "=== Dependencias ==="
-        ${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf \
-          -d build/libivanna_fusion.so | grep NEEDED
-
-    # ─── Construir módulo Magisk ──────────────────────────────────────────────
-    - name: Copiar .so al módulo
-      run: cp build/libivanna_fusion.so system/lib64/soundfx/
-
-    - name: Calcular versión
-      id: version
-      run: |
-        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-          VERSION="${{ github.ref_name }}"
-        else
-          VERSION="dev-$(git rev-parse --short HEAD)"
-        fi
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "Versión del módulo: $VERSION"
-
-    - name: Actualizar versionCode en module.prop
-      run: |
-        BUILD_NUM="${{ github.run_number }}"
-        sed -i "s/^version=.*/version=${{ steps.version.outputs.version }}/" module.prop
-        sed -i "s/^versionCode=.*/versionCode=${BUILD_NUM}/" module.prop
-        cat module.prop
-
-    - name: Empaquetar módulo Magisk .zip
-      run: |
-        MODULE_ZIP="IVANNA_FUSION_MAGISK_${{ steps.version.outputs.version }}.zip"
-        zip -r "$MODULE_ZIP" \
-          module.prop \
-          customize.sh \
-          service.sh \
-          META-INF/ \
-          system/ \
-          sepolicy/
-        echo "module_zip=$MODULE_ZIP" >> $GITHUB_ENV
-        echo "=== Contenido del .zip ==="
-        unzip -l "$MODULE_ZIP"
-        echo "=== Tamaño total ==="
-        du -h "$MODULE_ZIP"
-
-    # ─── Artefactos ──────────────────────────────────────────────────────────
-    - name: Upload módulo como artefacto
-      uses: actions/upload-artifact@v4
-      with:
-        name: IVANNA_FUSION_MAGISK
-        path: ${{ env.module_zip }}
-        retention-days: 30
-
-    # ─── Release en tags ─────────────────────────────────────────────────────
-    - name: Create Release (en tags)
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v2
-      with:
-        files: ${{ env.module_zip }}
-        body: |
-          ## IVANNA FUSION DSP — ${{ steps.version.outputs.version }}
-
-          ### Efectos DSP reales (ARM64 NEON SIMD)
-          - **Parametric EQ 8 bandas** — biquad IIR Audio EQ Cookbook
-          - **Compresor RMS soft-knee** — attack/release configurable
-          - **Excitador Armónico** — waveshaping tanh + HPF blend
-
-          ### Instalación
-          1. Flash en Magisk Manager / KernelSU
-          2. Reiniciar
-          3. El efecto se activa automáticamente en streams de música
-
-          ### Dispositivo objetivo
-          - Motorola Moto G85 5G (malmo_gn)
-          - Snapdragon 4 Gen 2 / Android 14-15 / Magisk
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Test de compilación rápida (smoke test — sin NDK real)
-  verify-headers:
-    name: Verificar headers C++
+  noop:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Verificar que headers compilan
-      run: |
-        # Compilar los headers sin el NDK de Android para verificar C++ básico
-        g++ -std=c++17 -I src/include -I /usr/include \
-          -DIVANNA_NEON=0 \
-          -x c++ -c src/include/ivanna_fusion.h -o /dev/null \
-          2>&1 | head -20 || true
-        echo "Headers verificados (warnings esperados sin NDK completo)"
+      - run: echo "Workflow deshabilitado. Ver ivanna-ci.yml"

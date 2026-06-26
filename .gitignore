@@ -1,12 +1,33 @@
+# Archivos y carpetas de Gradle / Android
 *.iml
 .gradle/
 local.properties
 build/
 app/build/
 tmp/
+
+# Archivos de compresión y medios
 *.zip
 *.tar.gz
 *.deb
 *.webm
 *.mp3
+
+# Scripts de instalación y reparación
 install_*.sh
+fix_*.sh
+
+# Archivos de configuración y llaves SSH (seguridad)
+ghp_*
+*.pem
+*.key
+id_*
+*.pub
+.ssh/
+
+# Backups y documentación del proyecto
+*.bak
+*.backup
+CONTINUATION_PROMPT*.md
+REPAIRS_SUMMARY.md
+ARCHITECTURE.md

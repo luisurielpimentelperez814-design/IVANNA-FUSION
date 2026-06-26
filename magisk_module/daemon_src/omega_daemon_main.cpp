@@ -149,7 +149,24 @@ static void process_audio_thread() {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
             continue;
         }
-        if (++thermal_counter >= 200) { thermal_counter = 0; update_thermal_state(); }
+        if (++thermal_counter >= 200) {
+            thermal_counter = 0;
+            update_thermal_state();
+            // Auto-adapt: si está activo, ajusta intensity por temperatura y latencia
+            if (g_shared && g_shared->ai_auto_adapt.load()) {
+                float t    = g_shared->current_temperature.load();
+                float lat  = g_shared->current_latency_ms.load();
+                float sens = g_shared->ai_sensitivity.load();
+                if (t > 42.0f) {
+                    float reduction = (t - 42.0f) / 10.0f * sens * 0.005f;
+                    float cur = g_shared->intensity.load();
+                    g_shared->intensity.store(fmaxf(0.2f, cur - reduction));
+                }
+                if (lat > 25.0f) g_shared->bypass_enabled.store(true);
+                else if (lat < 10.0f && g_shared->bypass_enabled.load())
+                    g_shared->bypass_enabled.store(false);
+            }
+        }
 
         if (!g_shared->ring_in.tryPop(g_process_buf, samples, &g_shared->input_buffer[0][0])) {
             std::this_thread::sleep_for(std::chrono::microseconds(500));
@@ -178,13 +195,19 @@ static void handle_command(const std::string& cmd, int client_fd) {
         if (g_shared) { g_shared->intensity.store(0.8f); g_shared->vocoder_mix.store(0.8f); g_shared->bypass_enabled.store(false); }
     }
     else if (starts("SET_PRESET:"))      { printf("[omega_daemon] Preset: %s\n", cmd.c_str()+11); }
+    else if (starts("SET_AI_ENABLED:"))   { if (g_shared) g_shared->ai_enabled.store(cmd.back()=='1'); }
+    else if (starts("SET_AI_AUTO_ADAPT:")) { if (g_shared) g_shared->ai_auto_adapt.store(cmd.back()=='1'); }
+    else if (starts("SET_AI_SENSITIVITY:")) { if (g_shared) g_shared->ai_sensitivity.store(strtof(cmd.c_str()+19,nullptr)); }
     else if (starts("GET_TELEMETRY")) {
         float temp = g_shared ? g_shared->current_temperature.load() : 0.0f;
         float lat  = g_shared ? g_shared->current_latency_ms.load()  : 0.0f;
-        char buf[160];
+        float rms     = g_shared ? g_shared->ai_rms_level.load() : 0.0f;
+        float gain_db = g_shared ? g_shared->ai_gain_db.load()   : 0.0f;
+        char buf[240];
         snprintf(buf, sizeof(buf),
-                 "{\"temp\":%.1f,\"npu\":0.0,\"latency\":%.2f,\"complexity_level\":%d}\n",
-                 temp, lat, g_complexity_level.load());
+                 "{\"temp\":%.1f,\"npu\":0.0,\"latency\":%.2f,\"complexity_level\":%d,"
+                 "\"ai_rms\":%.4f,\"ai_gain_db\":%.2f}\n",
+                 temp, lat, g_complexity_level.load(), rms, gain_db);
         write(client_fd, buf, strlen(buf));
         return;
     }
