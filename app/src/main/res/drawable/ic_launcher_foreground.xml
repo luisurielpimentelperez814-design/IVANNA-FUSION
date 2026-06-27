@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- IVANNA FUSION launcher icon foreground — onda sonora estilizada -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Círculo central -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,44 A10,10 0 1,1 54,64 A10,10 0 1,1 54,44 Z"/>
+
+    <!-- Arco interior izquierdo -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M40,40 A19,19 0 0,0 40,68"/>
+
+    <!-- Arco exterior izquierdo -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:pathData="M32,33 A30,30 0 0,0 32,75"/>
+
+    <!-- Arco interior derecho -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M68,40 A19,19 0 0,1 68,68"/>
+
+    <!-- Arco exterior derecho -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:pathData="M76,33 A30,30 0 0,1 76,75"/>
+
+    <!-- Barras EQ debajo -->
+    <path
+        android:fillColor="#00BCD4"
+        android:pathData="M44,72 L46,72 L46,80 L44,80 Z"/>
+    <path
+        android:fillColor="#00BCD4"
+        android:pathData="M49,68 L51,68 L51,80 L49,80 Z"/>
+    <path
+        android:fillColor="#00BCD4"
+        android:pathData="M54,65 L56,65 L56,80 L54,80 Z"/>
+    <path
+        android:fillColor="#00BCD4"
+        android:pathData="M59,68 L61,68 L61,80 L59,80 Z"/>
+    <path
+        android:fillColor="#00BCD4"
+        android:pathData="M64,72 L66,72 L66,80 L64,80 Z"/>
+</vector>

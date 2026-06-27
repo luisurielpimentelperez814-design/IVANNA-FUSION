@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.IVANNAFusion" parent="android:Theme.Material.Light.NoActionBar">        <item name="android:colorPrimary">#00BCD4</item>
+    <!-- Tema base para Compose + EdgeToEdge en modo oscuro.
+         Extiende Theme.Material (dark) para evitar el flash blanco
+         de Theme.Material.Light antes de que Compose renderice. -->
+    <style name="Theme.IVANNAFusion" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">#00BCD4</item>
         <item name="android:colorPrimaryDark">#0097A7</item>
         <item name="android:colorAccent">#9C27B0</item>
         <item name="android:windowBackground">#1A1A1A</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 </resources>
