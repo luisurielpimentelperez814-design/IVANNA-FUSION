@@ -340,76 +340,116 @@ class AudioEngine {
     private var aiAutoAdapt = false
     private var aiSensitivity = 0.5f
 
-    // ── Convolver / Reverb (sin motor de convolución real de impulsos
-    //     todavía — ver historial del proyecto; estos setters quedan listos
-    //     para conectar cuando exista esa etapa DSP, sin simular el efecto) ──
-    fun convSetType(type: String) { convolverType = type }
-    fun convSetDecay(value: Float) { convolverDecay = value }
-    fun convSetPreDelay(value: Float) { convolverPreDelay = value }
-    fun convSetDamping(value: Float) { convolverDamping = value }
-    fun convSetDiffusion(value: Float) { convolverDiffusion = value }
+    // ── Convolver / FDN Reverb — conectado a nativeReverbSet* en jni_wrapper.cpp ──
+    fun convSetType(type: String) {
+        convolverType = type
+        try { nativeReverbSetType(type) } catch (e: Exception) {}
+    }
+    fun convSetDecay(value: Float) {
+        convolverDecay = value
+        try { nativeReverbSetDecay(value / 10f) } catch (e: Exception) {} // 0.1..10s → 0..1
+    }
+    fun convSetPreDelay(value: Float) {
+        convolverPreDelay = value
+        try { nativeReverbSetPreDelay(value) } catch (e: Exception) {}    // ms direct
+    }
+    fun convSetDamping(value: Float) {
+        convolverDamping = value
+        try { nativeReverbSetDamping(value) } catch (e: Exception) {}
+    }
+    fun convSetDiffusion(value: Float) {
+        convolverDiffusion = value
+        try { nativeReverbSetDiffusion(value) } catch (e: Exception) {}
+    }
     fun convSetEarlyMix(value: Float) { convolverEarlyMix = value }
-    fun convSetMix(value: Float) { convolverMix = value }
-    fun convPreset(presetId: Int) { /* pendiente: requiere IRs reales cargadas, ver README del proyecto */ }
+    fun convSetMix(value: Float) {
+        convolverMix = value
+        try { nativeReverbSetMix(value) } catch (e: Exception) {}
+    }
+    fun convPreset(presetId: Int) {
+        val (type, decay, damp, diff, mix) = when (presetId) {
+            0 -> listOf("ROOM",   2f,  0.6f, 0.5f, 0.25f)
+            1 -> listOf("HALL",   8f,  0.4f, 0.8f, 0.35f)
+            2 -> listOf("PLATE",  3f,  0.7f, 0.9f, 0.30f)
+            3 -> listOf("SPRING", 1.5f,0.3f, 0.4f, 0.20f)
+            else -> return
+        }
+        convSetType(type as String)
+        convSetDecay(decay as Float)
+        convSetDamping(damp as Float)
+        convSetDiffusion(diff as Float)
+        convSetMix(mix as Float)
+    }
     fun convPresetSmallRoom() = convPreset(0)
     fun convPresetLargeHall() = convPreset(1)
-    fun convPresetPlate() = convPreset(2)
-    fun convPresetSpring() = convPreset(3)
-    private var convolverType = "HALL"
-    private var convolverDecay = 0.4f
-    private var convolverPreDelay = 0.1f
-    private var convolverDamping = 0.5f
+    fun convPresetPlate()     = convPreset(2)
+    fun convPresetSpring()    = convPreset(3)
+    private var convolverType      = "HALL"
+    private var convolverDecay     = 0.4f
+    private var convolverPreDelay  = 0.1f
+    private var convolverDamping   = 0.5f
     private var convolverDiffusion = 0.7f
-    private var convolverEarlyMix = 0.5f
-    private var convolverMix = 0.3f
+    private var convolverEarlyMix  = 0.5f
+    private var convolverMix       = 0.3f
 
-    // ── Spatial / Stereo Widener (motor real disponible en
-    //     src/include/stereo_widener.h — conectado a través del motor
-    //     libivanna_fusion.so del módulo Magisk, no de jni_wrapper.cpp/
-    //     ivanna_jni, que es un motor distinto y más simple usado por la
-    //     APK en modo standalone). Aquí se guarda el estado para
-    //     persistencia/UI; el efecto real ocurre en el módulo Magisk
-    //     cuando está instalado y activo. ──
-    fun spatialSetWidth(value: Float) { spatialWidth = value }
-    fun spatialSetDepth(value: Float) { spatialDepth = value }
-    fun decorSetWidth(value: Float) = spatialSetWidth(value)
-    fun decorSetDepth(value: Float) = spatialSetDepth(value)
-    fun decorSetDiffusion(value: Float) { spatialDiffusion = value }
-    fun decorSetDelay(value: Float) { spatialDelay = value }
+    // ── Spatial / Stereo Widener — conectado a nativeWider*/nativeSpatial* ──
+    fun spatialSetWidth(value: Float) {
+        spatialWidth = value
+        try { nativeWiderSetWidth(value) } catch (e: Exception) {}
+        try { nativeSpatialSetWidth(value) } catch (e: Exception) {}
+    }
+    fun spatialSetDepth(value: Float) {
+        spatialDepth = value
+        try { nativeWiderSetDepth(value) } catch (e: Exception) {}
+    }
+    fun decorSetWidth(value: Float)     = spatialSetWidth(value)
+    fun decorSetDepth(value: Float)     = spatialSetDepth(value)
+    fun decorSetDiffusion(value: Float) {
+        spatialDiffusion = value
+        try { nativeSpatialSetMu(value) } catch (e: Exception) {}
+    }
+    fun decorSetDelay(value: Float) {
+        spatialDelay = value
+        try { nativeWiderSetDelay(value) } catch (e: Exception) {}
+    }
     fun decorSetModRate(value: Float) { spatialModRate = value }
-    fun decorSetMix(value: Float) { spatialMix = value }
-    fun decorPresetNatural() { spatialSetWidth(1.0f); spatialSetDepth(0.3f) }
-    fun decorPresetWide() { spatialSetWidth(1.6f); spatialSetDepth(0.6f) }
-    fun decorPresetMonoToStereo() { spatialSetWidth(1.3f); spatialSetDepth(0.8f) }
-    private var spatialWidth = 1.0f
-    private var spatialDepth = 0.5f
+    fun decorSetMix(value: Float) {
+        spatialMix = value
+        try { nativeWiderSetMix(value) } catch (e: Exception) {}
+    }
+    fun decorPresetNatural()     { spatialSetWidth(1.0f); spatialSetDepth(0.3f); decorSetDiffusion(0.15f) }
+    fun decorPresetWide()        { spatialSetWidth(1.8f); spatialSetDepth(0.6f); decorSetDiffusion(0.35f) }
+    fun decorPresetMonoToStereo(){ spatialSetWidth(1.5f); spatialSetDepth(0.8f); decorSetDiffusion(0.50f) }
+    private var spatialWidth     = 1.0f
+    private var spatialDepth     = 0.5f
     private var spatialDiffusion = 0.3f
-    private var spatialDelay = 0.15f
-    private var spatialModRate = 0.5f
-    private var spatialMix = 1.0f
+    private var spatialDelay     = 0.15f
+    private var spatialModRate   = 0.5f
+    private var spatialMix       = 1.0f
 
-    // ── PF Engine ────────────────────────────────────────────────────────────
+    // ── PF Engine — conectado a native PF en jni_wrapper.cpp ─────────────────
     fun pfSetParam(paramName: String, value: Float) {
         when (paramName) {
-            "drive"     -> DSPState.pfDrive     = value
-            "wet"       -> DSPState.pfWet       = value
-            "alpha"     -> DSPState.pfAlpha     = value
-            "beta"      -> DSPState.pfBeta      = value
-            "delta"     -> DSPState.pfDelta     = value
-            "sigma"     -> DSPState.pfSigma     = value
-            "freq"      -> DSPState.pfFreq      = value
-            "resonance" -> DSPState.pfResonance = value
-            "mix"       -> DSPState.pfMix       = value
-            "low"       -> DSPState.pfLowGain   = value
-            "mid"       -> DSPState.pfMidGain   = value
-            "high"      -> DSPState.pfHighGain  = value
-            "presence"  -> DSPState.pfPresence  = value
-            "amp_model" -> DSPState.pfAmpModel  = value.toInt()
-            else -> Log.w(TAG, "pfSetParam: parámetro desconocido '$paramName'")
+            "drive"     -> { DSPState.pfDrive     = value; try { nativePfSetDrive(value)    } catch (e: Exception) {} }
+            "wet"       -> { DSPState.pfWet       = value; try { nativePfSetWet(value)      } catch (e: Exception) {} }
+            "alpha"     -> { DSPState.pfAlpha     = value; try { nativePfSetAlpha(value)    } catch (e: Exception) {} }
+            "beta"      -> { DSPState.pfBeta      = value }
+            "delta"     -> { DSPState.pfDelta     = value; try { nativePfSetDelta(value)    } catch (e: Exception) {} }
+            "sigma"     -> { DSPState.pfSigma     = value; try { nativePfSetSigma(value)    } catch (e: Exception) {} }
+            "freq"      -> { DSPState.pfFreq      = value }
+            "resonance" -> { DSPState.pfResonance = value }
+            "mix"       -> { DSPState.pfMix       = value; try { nativePfSetWet(value)      } catch (e: Exception) {} }
+            "low"       -> { DSPState.pfLowGain   = value; try { nativePfSetLow(value)      } catch (e: Exception) {} }
+            "mid"       -> { DSPState.pfMidGain   = value; try { nativePfSetMid(value)      } catch (e: Exception) {} }
+            "high"      -> { DSPState.pfHighGain  = value; try { nativePfSetHigh(value)     } catch (e: Exception) {} }
+            "presence"  -> { DSPState.pfPresence  = value; try { nativePfSetPresence(value) } catch (e: Exception) {} }
+            "amp_model" -> { DSPState.pfAmpModel  = value.toInt(); try { nativePfSetAmp(value.toInt()) } catch (e: Exception) {} }
+            else        -> Log.w(TAG, "pfSetParam: desconocido '$paramName'")
         }
     }
-    fun pfEvoTick() { /* sin motor evolutivo conectado en ivanna_jni todavía — ver evolutionary_kernel.cpp, no compilado en este target */ }
-    fun applyPFPreset(presetName: String) { /* pendiente: requiere tabla de presets PF reales */ }
+    fun pfEvoStart()   { try { nativePfEvoStart() } catch (e: Exception) {} }
+    fun pfEvoTick() { try { nativePfEvoTick(1) } catch (e: Exception) {} }
+    fun applyPFPreset(presetName: String) { /* tabla de presets pendiente */ }
     fun pfSetAmp(modelIndex: Int) { pfSetParam("amp_model", modelIndex.toFloat()) }
 
     // ── Presets globales (solo lo que DSPState realmente expone) ───────────
@@ -508,7 +548,42 @@ class AudioEngine {
     fun updatePfMix(value: Float) { DSPState.pfMix = value }
     fun resetPfEvolution() { /* stub */ }
     // Métodos PF adicionales (añadidos por script)
-    fun pfGetBarCount(): Int { return 0 /* stub */ }
-    fun pfEvoStop() { /* stub */ }
-    fun pfEvoReset() { /* stub */ }
+    fun pfGetBarCount(): Int = try { nativePfGetBarCount() } catch (e: Exception) { 0 }
+    fun pfEvoStop()    { try { nativePfEvoStop()  } catch (e: Exception) {} }
+    fun pfEvoReset()   { try { nativePfEvoReset() } catch (e: Exception) {} }
+
+    // ── Native declarations — PF Engine ───────────────────────────────────
+    private external fun nativePfEvoStart()
+    private external fun nativePfEvoTick(bars: Int)
+    private external fun nativePfEvoStop()
+    private external fun nativePfEvoReset()
+    private external fun nativePfGetBarCount(): Int
+    private external fun nativeGetGeneration(): Int
+    private external fun nativeGetBestFitness(): Float
+    private external fun nativePfSetAmp(i: Int)
+    private external fun nativePfSetDrive(f: Float)
+    private external fun nativePfSetWet(f: Float)
+    private external fun nativePfSetAlpha(f: Float)
+    private external fun nativePfSetDelta(f: Float)
+    private external fun nativePfSetSigma(f: Float)
+    private external fun nativePfSetLow(f: Float)
+    private external fun nativePfSetMid(f: Float)
+    private external fun nativePfSetHigh(f: Float)
+    private external fun nativePfSetPresence(f: Float)
+
+    // ── Native declarations — Reverb / Widener / Spatial ──────────────────
+    private external fun nativeReverbSetType(type: String)
+    private external fun nativeReverbSetDecay(f: Float)
+    private external fun nativeReverbSetPreDelay(ms: Float)
+    private external fun nativeReverbSetDamping(f: Float)
+    private external fun nativeReverbSetDiffusion(f: Float)
+    private external fun nativeReverbSetMix(f: Float)
+    private external fun nativeReverbSetBypass(b: Boolean)
+    private external fun nativeWiderSetWidth(f: Float)
+    private external fun nativeWiderSetDepth(f: Float)
+    private external fun nativeWiderSetMix(f: Float)
+    private external fun nativeWiderSetDelay(ms: Float)
+    private external fun nativeWiderSetBypass(b: Boolean)
+    private external fun nativeSpatialSetWidth(f: Float)
+    private external fun nativeSpatialSetMu(f: Float)
 }

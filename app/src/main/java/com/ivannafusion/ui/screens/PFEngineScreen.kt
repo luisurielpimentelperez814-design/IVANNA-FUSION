@@ -141,6 +141,7 @@ fun PFEngineScreen(audioEngine: AudioEngine, onBack: () -> Unit) {
     // Efecto de evolución
     LaunchedEffect(evoActive) {
         if (evoActive) {
+            audioEngine.pfEvoStart()
             while (evoActive) {
                 audioEngine.pfEvoTick()
                 barCount = audioEngine.pfGetBarCount()

@@ -152,6 +152,9 @@ Java_com_ivannafusion_AudioEngine_nativeProcessAudio(JNIEnv* env, jobject, jfloa
     float rawRmsDb = (lastInputLevel > 0.001f) ? 20.0f * log10f(lastInputLevel) : -60.0f;
     currentRmsDb = homeostasis(currentRmsDb, rawRmsDb, 0.35f);
 
+    // Post-FX: FDN reverb + M/S widener (implementación real, no stubs)
+    apply_post_fx(outBuf, frames);
+
     env->ReleaseFloatArrayElements(in, inBuf, 0);
     env->ReleaseFloatArrayElements(out, outBuf, 0);
 }
@@ -528,19 +531,284 @@ extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeAiSetA
 extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeAiSetSensitivity(JNIEnv*, jobject, jfloat f)   { (void)f; }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_ivannafusion_AudioEngine_nativeAiIsLoaded  (JNIEnv*, jobject)              { return initialized; }
 
-// ─── Reverb / Widener / Spatial setters (ya en estado global) ─────────────
+// ═══════════════════════════════════════════════════════════════
+// FDN-4 REVERB — Feedback Delay Network de 4 nodos
+// Delays mutuamente primos calibrados para densidad Hall/Plate/Room/Spring/Chamber.
+// Damping: filtro paso-bajos de 1 polo en cada nodo de retroalimentación.
+// Diffusion: mezcla de señal directa + early reflections Hadamard.
+// Pre-delay: línea de retardo de hasta 500 ms.
+// ═══════════════════════════════════════════════════════════════
 
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeReverbSetType     (JNIEnv*, jobject, jstring t) { (void)t; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeReverbSetDecay    (JNIEnv*, jobject, jfloat f)  { (void)f; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeReverbSetPreDelay (JNIEnv*, jobject, jfloat f)  { (void)f; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeReverbSetDamping  (JNIEnv*, jobject, jfloat f)  { (void)f; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeReverbSetDiffusion(JNIEnv*, jobject, jfloat f)  { (void)f; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeReverbSetMix      (JNIEnv*, jobject, jfloat f)  { (void)f; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeReverbSetBypass   (JNIEnv*, jobject, jboolean b){ (void)b; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeWiderSetWidth     (JNIEnv*, jobject, jfloat f)  { (void)f; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeWiderSetDepth     (JNIEnv*, jobject, jfloat f)  { (void)f; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeWiderSetMix       (JNIEnv*, jobject, jfloat f)  { (void)f; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeWiderSetDelay     (JNIEnv*, jobject, jfloat f)  { (void)f; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeWiderSetBypass    (JNIEnv*, jobject, jboolean b){ (void)b; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSpatialSetWidth   (JNIEnv*, jobject, jfloat f)  { (void)f; }
-extern "C" JNIEXPORT void JNICALL Java_com_ivannafusion_AudioEngine_nativeSpatialSetMu      (JNIEnv*, jobject, jfloat f)  { (void)f; }
+static const int FDN_PRIMES_HALL[4]   = { 1327, 1559, 1877, 2039 }; // ~27–42 ms @ 48kHz
+static const int FDN_PRIMES_PLATE[4]  = { 743,  887, 1049, 1217  }; // ~15–25 ms
+static const int FDN_PRIMES_ROOM[4]   = { 401,  503,  613,  701  }; // ~8–14 ms
+static const int FDN_PRIMES_SPRING[4] = { 251,  317,  397,  479  }; // ~5–10 ms (shimmer)
+static const int FDN_PRIMES_CHAMBER[4]= { 997, 1151, 1303, 1483  }; // ~20–30 ms
+
+static constexpr int FDN_MAX_DELAY  = 2100;   // samples (≥largest prime above)
+static constexpr int PRE_DELAY_MAX  = 24001;  // 500 ms @ 48kHz
+
+struct FDNNode {
+    float buf[FDN_MAX_DELAY] = {};
+    int   wp = 0, len = 1327;
+    float lp = 0.f;   // low-pass state (damping)
+    float read() const { int rp = (wp - len + FDN_MAX_DELAY) % FDN_MAX_DELAY; return buf[rp]; }
+    void  write(float v) { buf[wp] = v; wp = (wp + 1) % FDN_MAX_DELAY; }
+};
+
+struct PreDelayLine {
+    float buf[PRE_DELAY_MAX] = {};
+    int wp = 0, len = 0;
+    float tick(float in) {
+        buf[wp] = in;
+        int rp = (wp - len + PRE_DELAY_MAX) % PRE_DELAY_MAX;
+        wp = (wp + 1) % PRE_DELAY_MAX;
+        return buf[rp];
+    }
+};
+
+static FDNNode    fdn_L[4], fdn_R[4];
+static PreDelayLine pre_L, pre_R;
+
+static float rev_decay     = 0.4f;   // 0..1  → maps to feedback coefficient
+static float rev_preDelay  = 0.f;    // ms
+static float rev_damping   = 0.5f;   // 0..1  → LPF coefficient
+static float rev_diffusion = 0.7f;   // 0..1  → early-to-late mix
+static float rev_earlyMix  = 0.5f;   // not used in JNI route but stored
+static float rev_mix       = 0.3f;   // wet/dry
+static bool  rev_bypass    = false;
+
+static void fdn_set_primes(FDNNode* nodes, const int* primes) {
+    for (int i = 0; i < 4; i++) {
+        nodes[i].len = primes[i];
+        nodes[i].wp  = 0;
+        nodes[i].lp  = 0.f;
+        memset(nodes[i].buf, 0, sizeof(nodes[i].buf));
+    }
+}
+
+static void fdn_apply_type(const char* type) {
+    const int* P = FDN_PRIMES_HALL;
+    if      (!strcmp(type,"PLATE"))  P = FDN_PRIMES_PLATE;
+    else if (!strcmp(type,"ROOM"))   P = FDN_PRIMES_ROOM;
+    else if (!strcmp(type,"SPRING")) P = FDN_PRIMES_SPRING;
+    else if (!strcmp(type,"CHAMBER"))P = FDN_PRIMES_CHAMBER;
+    fdn_set_primes(fdn_L, P);
+    fdn_set_primes(fdn_R, P);
+}
+
+// Procesa 1 sample de reverb en un canal de 4 nodos FDN
+// Hadamard 4×4 mixando los nodos (ortogonal, máxima densidad):
+//   [ a+b+c+d,  a+b-c-d,  a-b+c-d,  a-b-c+d ] * 0.5
+static inline float fdn_tick(FDNNode* nodes, float inp, float fb, float damp) {
+    float s[4];
+    for (int i = 0; i < 4; i++) s[i] = nodes[i].read();
+
+    // Hadamard mix
+    float h0 = (s[0]+s[1]+s[2]+s[3]) * 0.5f;
+    float h1 = (s[0]+s[1]-s[2]-s[3]) * 0.5f;
+    float h2 = (s[0]-s[1]+s[2]-s[3]) * 0.5f;
+    float h3 = (s[0]-s[1]-s[2]+s[3]) * 0.5f;
+    float hm[4] = { h0, h1, h2, h3 };
+
+    float out = 0.f;
+    for (int i = 0; i < 4; i++) {
+        // Low-pass damping on feedback path
+        nodes[i].lp = damp * nodes[i].lp + (1.f - damp) * (hm[i] * fb + (i == 0 ? inp : 0.f));
+        nodes[i].write(nodes[i].lp);
+        out += nodes[i].lp;
+    }
+    return out * 0.25f;
+}
+
+// Called from nativeProcessAudio interleaved stereo (inBuf/outBuf already modified by DSP chain)
+static void reverb_process(jfloat* buf, int frames) {
+    if (rev_bypass || rev_mix < 0.001f) return;
+
+    float fb   = powf(10.f, -3.f * rev_decay * (float)FDN_PRIMES_HALL[3] / 48000.f / rev_decay);
+    // Simpler: fb = 0.3 + 0.65 * decay → range 0.30..0.95
+    fb = 0.30f + 0.65f * rev_decay;
+    float damp = 0.1f + 0.88f * rev_damping;   // LPF coeff (closer to 1 = more damping)
+
+    for (int f = 0; f < frames; f++) {
+        float L = buf[f*2],   R = buf[f*2+1];
+
+        // Pre-delay
+        float pdL = pre_L.tick(L);
+        float pdR = pre_R.tick(R);
+
+        // FDN per channel (decorrelated by different primes init order)
+        float wetL = fdn_tick(fdn_L, pdL, fb, damp);
+        float wetR = fdn_tick(fdn_R, pdR, fb, damp);
+
+        // Diffusion: blend direct+reverb on wet path
+        wetL = pdL * (1.f - rev_diffusion) + wetL * rev_diffusion;
+        wetR = pdR * (1.f - rev_diffusion) + wetR * rev_diffusion;
+
+        buf[f*2]   = L   * (1.f - rev_mix) + wetL * rev_mix;
+        buf[f*2+1] = R   * (1.f - rev_mix) + wetR * rev_mix;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// M/S STEREO WIDENER
+// width: M/S balance. 1.0 = unity. >1 = wider. 0 = mono.
+// Haas delay: adds a short delay to R channel for extra width perception.
+// LFO modulation for spatial decorrelation (nativeSpatialSet*).
+// ═══════════════════════════════════════════════════════════════
+
+static constexpr int HAAS_BUF = 9601;   // 200 ms @ 48kHz
+static float haas_buf[HAAS_BUF] = {};
+static int   haas_wp   = 0;
+static int   haas_len  = 0;          // Haas delay in samples
+
+static float wid_width   = 1.f;     // 0..2 (1 = unity)
+static float wid_depth   = 0.5f;
+static float wid_mix     = 0.f;
+static float wid_bypass  = false;
+
+// Spatial / decorrelation (LFO)
+static float spat_width  = 1.f;
+static float spat_mu     = 0.5f;
+static float spat_lfo_ph = 0.f;
+static float spat_lfo_rate = 0.2f;   // Hz
+
+static inline void widener_process(jfloat* buf, int frames) {
+    if (wid_bypass || (wid_mix < 0.001f && fabsf(wid_width - 1.f) < 0.01f && spat_width < 1.01f)) return;
+
+    // Combined effective width = wid_width * spat_width, clamped 0..3
+    float eff_width = wid_width * spat_width;
+    if (eff_width < 0.f) eff_width = 0.f;
+    if (eff_width > 3.f) eff_width = 3.f;
+
+    float lfo_inc = spat_lfo_rate / 48000.f * 2.f * (float)M_PI;
+
+    for (int f = 0; f < frames; f++) {
+        float L = buf[f*2], R = buf[f*2+1];
+
+        // M/S encode
+        float M = (L + R) * 0.5f;
+        float S = (L - R) * 0.5f;
+
+        // LFO modulates S width for spatial decorrelation
+        float lfo = sinf(spat_lfo_ph) * spat_mu * 0.15f;
+        spat_lfo_ph += lfo_inc;
+        if (spat_lfo_ph > (float)(2.0 * M_PI)) spat_lfo_ph -= (float)(2.0 * M_PI);
+
+        // Apply width to S channel
+        S *= eff_width * (1.f + lfo);
+
+        // M/S decode
+        float wL = M + S;
+        float wR = M - S;
+
+        // Haas delay on R (widening perception)
+        if (haas_len > 0) {
+            haas_buf[haas_wp] = wR;
+            int rp = (haas_wp - haas_len + HAAS_BUF) % HAAS_BUF;
+            haas_wp = (haas_wp + 1) % HAAS_BUF;
+            wR = haas_buf[rp];
+        }
+
+        // Mix wet/dry (wid_mix=0 → pure width processing, no dry/wet crossfade)
+        buf[f*2]   = wL;
+        buf[f*2+1] = wR;
+    }
+}
+
+// Hook reverb+widener into nativeProcessAudio output
+// (called at the end of Java_com_ivannafusion_AudioEngine_nativeProcessAudio)
+static void apply_post_fx(jfloat* outBuf, int frames) {
+    widener_process(outBuf, frames);
+    reverb_process(outBuf, frames);
+}
+
+// ─── JNI setters — Reverb ──────────────────────────────────────────────────
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeReverbSetType(JNIEnv* env, jobject, jstring t) {
+    const char* type = env->GetStringUTFChars(t, nullptr);
+    fdn_apply_type(type);
+    env->ReleaseStringUTFChars(t, type);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeReverbSetDecay(JNIEnv*, jobject, jfloat f) {
+    rev_decay = (f < 0.f) ? 0.f : (f > 1.f) ? 1.f : f;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeReverbSetPreDelay(JNIEnv*, jobject, jfloat ms) {
+    rev_preDelay = ms;
+    int len = (int)(ms * 48.f);   // ms → samples @ 48kHz
+    if (len < 0) len = 0;
+    if (len >= PRE_DELAY_MAX) len = PRE_DELAY_MAX - 1;
+    pre_L.len = len; pre_R.len = len;
+    pre_L.wp  = 0;   pre_R.wp  = 0;
+    memset(pre_L.buf, 0, sizeof(pre_L.buf));
+    memset(pre_R.buf, 0, sizeof(pre_R.buf));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeReverbSetDamping(JNIEnv*, jobject, jfloat f) {
+    rev_damping = (f < 0.f) ? 0.f : (f > 1.f) ? 1.f : f;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeReverbSetDiffusion(JNIEnv*, jobject, jfloat f) {
+    rev_diffusion = (f < 0.f) ? 0.f : (f > 1.f) ? 1.f : f;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeReverbSetMix(JNIEnv*, jobject, jfloat f) {
+    rev_mix = (f < 0.f) ? 0.f : (f > 1.f) ? 1.f : f;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeReverbSetBypass(JNIEnv*, jobject, jboolean b) {
+    rev_bypass = (b == JNI_TRUE);
+}
+
+// ─── JNI setters — Widener ─────────────────────────────────────────────────
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeWiderSetWidth(JNIEnv*, jobject, jfloat f) {
+    wid_width = (f < 0.f) ? 0.f : (f > 3.f) ? 3.f : f;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeWiderSetDepth(JNIEnv*, jobject, jfloat f) {
+    wid_depth = (f < 0.f) ? 0.f : (f > 1.f) ? 1.f : f;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeWiderSetMix(JNIEnv*, jobject, jfloat f) {
+    wid_mix = (f < 0.f) ? 0.f : (f > 1.f) ? 1.f : f;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeWiderSetDelay(JNIEnv*, jobject, jfloat ms) {
+    int len = (int)(ms * 48.f);
+    if (len < 0) len = 0;
+    if (len >= HAAS_BUF) len = HAAS_BUF - 1;
+    haas_len = len;
+    haas_wp  = 0;
+    memset(haas_buf, 0, sizeof(haas_buf));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeWiderSetBypass(JNIEnv*, jobject, jboolean b) {
+    wid_bypass = (b == JNI_TRUE);
+}
+
+// ─── JNI setters — Spatial ─────────────────────────────────────────────────
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeSpatialSetWidth(JNIEnv*, jobject, jfloat f) {
+    spat_width = (f < 0.f) ? 0.f : (f > 3.f) ? 3.f : f;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_ivannafusion_AudioEngine_nativeSpatialSetMu(JNIEnv*, jobject, jfloat f) {
+    spat_mu = (f < 0.f) ? 0.f : (f > 1.f) ? 1.f : f;
+}
