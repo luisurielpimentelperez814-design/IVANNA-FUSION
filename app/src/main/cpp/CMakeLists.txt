@@ -9,6 +9,7 @@ add_library(ivanna_jni SHARED
     evolutionary_kernel.cpp
     phase_oracle.cpp
     spatial_engine.cpp
+    shm_hyperplane.cpp
 )
 
 target_include_directories(ivanna_jni PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

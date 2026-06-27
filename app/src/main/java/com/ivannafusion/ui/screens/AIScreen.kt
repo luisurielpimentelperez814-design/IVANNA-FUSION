@@ -49,11 +49,11 @@ fun AIScreen(onBack: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Surface(shape = MaterialTheme.shapes.small,
-                            color = if (isConnected) AccentEmerald else ErrorRed,
+                            color = if (isConnected) AccentEmerald else SignalHot,
                             modifier = Modifier.size(8.dp)) {}
                         Text(if (isConnected) "CONECTADO" else "SIN SEÑAL",
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (isConnected) AccentEmerald else ErrorRed)
+                            color = if (isConnected) AccentEmerald else SignalHot)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -130,7 +130,7 @@ fun AIScreen(onBack: () -> Unit) {
             // ── Advertencia temp ──────────────────────────────────────────────
             if (deviceTemp >= 42f) {
                 Surface(
-                    color  = ErrorRed.copy(alpha = 0.12f),
+                    color  = SignalHot.copy(alpha = 0.12f),
                     shape  = MaterialTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -138,7 +138,7 @@ fun AIScreen(onBack: () -> Unit) {
                         "⚠  Temperatura alta (${"%.1f".format(deviceTemp)} °C) — " +
                         if (aiAutoAdapt) "auto-adapt activo" else "activa auto-adapt",
                         style    = MaterialTheme.typography.labelSmall,
-                        color    = ErrorRed,
+                        color    = SignalHot,
                         modifier = Modifier.padding(12.dp)
                     )
                 }

@@ -35,6 +35,7 @@ fun AppNavigation(audioEngine: AudioEngine, presetManager: PresetManager) {
                     IVANNANavItem(icon = Icons.Default.GraphicEq, label = "EFECTOS", selected = currentRoute == "effects", onClick = { currentRoute = "effects"; navController.navigate("effects") })
                     IVANNANavItem(icon = Icons.Default.AutoAwesome, label = "IA", selected = currentRoute == "ai", onClick = { currentRoute = "ai"; navController.navigate("ai") })
                     IVANNANavItem(icon = Icons.Default.LibraryMusic, label = "PRESETS", selected = currentRoute == "presets", onClick = { currentRoute = "presets"; navController.navigate("presets") })
+                    IVANNANavItem(icon = Icons.Default.Memory, label = "MONITOR", selected = currentRoute == "monitor", onClick = { currentRoute = "monitor"; navController.navigate("monitor") })
                     IVANNANavItem(icon = Icons.Default.Tune, label = "PF-ENG", selected = currentRoute == "pfengine", onClick = { currentRoute = "pfengine"; navController.navigate("pfengine") })
                     IVANNANavItem(icon = Icons.Default.Settings, label = "AJUSTES", selected = currentRoute == "settings", onClick = { currentRoute = "settings"; navController.navigate("settings") })
                 }
@@ -50,6 +51,7 @@ fun AppNavigation(audioEngine: AudioEngine, presetManager: PresetManager) {
             composable("effects") { EffectsScreen(audioEngine = audioEngine, onBack = { navController.popBackStack() }) }
             composable("ai") { AIScreen(onBack = { navController.popBackStack() }) }
             composable("presets") { PresetsScreen(audioEngine = audioEngine, presetManager = presetManager, onBack = { navController.popBackStack() }) }
+            composable("monitor") { DiagnosticsScreen(audioEngine = audioEngine, onBack = { navController.popBackStack() }) }
             composable("settings") { SettingsScreen(onBack = { navController.popBackStack() }) }
             composable("pfengine") { PFEngineScreen(audioEngine = audioEngine, onBack = { navController.popBackStack() }) }
         }

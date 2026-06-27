@@ -31,11 +31,13 @@ class IVANNAApplication : Application() {
                 DSPState.detectRealHardwareCapabilities(this@IVANNAApplication)
                 Log.d(TAG, "✅ DSPState listo — ${DSPState.deviceSampleRateHz} Hz")
 
+                ShmManager.initialize(this@IVANNAApplication)
+                ThermalMonitor.initialize(this@IVANNAApplication)
+                Log.d(TAG, "✅ SHM y telemetría térmica inicializadas")
+
                 val daemonOk = OmegaDaemon.start()
                 Log.d(TAG, if (daemonOk) "✅ OmegaDaemon iniciado"
                            else          "⚠️ OmegaDaemon no disponible (Magisk standalone activo?)")
-
-
 
                 delay(300)
                 omegaBridge.connect()
@@ -54,6 +56,8 @@ class IVANNAApplication : Application() {
     override fun onTerminate() {
         omegaBridge.disconnect()
         OmegaDaemon.stop()
+        ThermalMonitor.shutdown()
+        ShmManager.close()
         super.onTerminate()
     }
 }
